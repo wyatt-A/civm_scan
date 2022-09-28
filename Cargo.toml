@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+"seq_tools",
+    "seq_lib",
+"scan_ui"
+]

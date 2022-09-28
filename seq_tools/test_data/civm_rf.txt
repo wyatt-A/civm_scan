@@ -1,0 +1,4 @@
+50	20	0	excitation_rfwav	1	50,2047;
+50	20	1	excitation_rfwav	1	50P,0;
+100	20	0	refocus_rfwav	1	100,2047;
+100	20	1	refocus_rfwav	1	25P,0;50P,90;25P,0;

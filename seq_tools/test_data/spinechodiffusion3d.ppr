@@ -1,0 +1,14 @@
+:PPL d:\smis\N20220824_00\_02_ICO61_6b0\res\220824T17_m00\SpinEchoDiffusion3D.ppl
+:DSP_ROUTINE dsp
+:RECEIVER_MASK rec_sel, 1
+:GRADIENT_STRENGTH grad_var, 4, 92456, 101857, 92456, 112634
+:OBSERVE_FREQUENCY "9.4T 1H", 30171405.1, MHz, kHz, Hz, rx1MHz
+:SAMPLE_PERIOD sample_period, 50, 25, "200  KHz   5 µs"
+:NO_VIEWS no_views, 28800
+:NO_ECHOES no_echoes, 1
+:NO_AVERAGES no_averages, 1
+:NO_SAMPLES no_samples, 788
+:DISCARD no_discard, 0
+:VAR refocus, 896
+:VAR excitation, 400
+:NO_VIEWS_2 no_views_2, 1
