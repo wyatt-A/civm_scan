@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use eframe::egui;
 
+use build_sequence::build_directory::build_directory;
+
 fn main() {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
@@ -25,7 +27,7 @@ impl Default for MyApp {
         Self {
             name: "How motivated are you?".to_string(),
             age: 42,
-            work_dir_buff: "d:/smis".to_string(),
+            work_dir_buff: "dummy_path".to_string(),
             work_dir:None
         }
     }
@@ -58,6 +60,9 @@ impl eframe::App for MyApp {
             });
             ui.button("run setup").clicked();
             ui.button("start scan").clicked();
+            if ui.button("compile sequence").clicked() {
+                build_directory(Path::new("d:/dev/221011"));
+            }
         });
     }
 }

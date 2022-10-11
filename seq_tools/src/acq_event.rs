@@ -57,6 +57,15 @@ impl SpectralWidth {
         let sample_period = 1.0/self.hertz() as f32;
         sample_period*n_samples as f32
     }
+
+    pub fn ppr_string(&self) -> String {
+        match self {
+            SpectralWidth::SW200kH => format!("{}, {}, \"200  KHz   5 µs\"",50,25),
+            SpectralWidth::SW100kH => format!("{}, {}, \"100  KHz  10 µs\"",100,23),
+            SpectralWidth::SW133kH => format!("{}, {}, \"133  KHz 7.5 µs\"",75,24),
+            SpectralWidth::SW80kH => format!("{}, {}, \"80.0 KHz 12.5 µs\"",125,22),
+        }
+    }
 }
 
 #[derive(Clone)]

@@ -6,7 +6,9 @@
       <sourceFolder url="file://$MODULE_DIR$/scan_ui/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/seq_lib/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/seq_tools/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/scan_control/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/build_sequence/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

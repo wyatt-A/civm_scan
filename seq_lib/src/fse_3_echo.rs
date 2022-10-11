@@ -33,10 +33,16 @@ fn test(){
     let ppl = me.ppl_export(Civm9p4T(0.0),Orientation::CivmStandard,acceleration,sim_mode);
 
     let filename = output_dir.join("multi_echo.ppl");
-    let mut outfile = File::create(filename).expect("cannot create file");
+    let mut outfile = File::create(&filename).expect("cannot create file");
     //let mut outfile = File::create("multi_echo.ppl").expect("cannot create file");
     outfile.write_all(ppl.print().as_bytes()).expect("cannot write to file");
     me.seq_export(4,output_dir.to_str().unwrap());
+
+
+    let ppr_filename = output_dir.join("setup.ppr");
+    let mut outfile = File::create(ppr_filename).expect("cannot create file");
+    outfile.write_all(ppl.print_ppr(Path::new("d:/dev/221011/multi_echo.ppl")).as_bytes()).expect("cannot write to file");
+
     //me.seq_export(4,".");
 }
 

@@ -1,3 +1,4 @@
+use std::path::Path;
 use crate::command_string::CommandString;
 use crate::acq_event::SpectralWidth;
 use crate::event_block::EventQueue;
@@ -8,6 +9,7 @@ use crate::seqframe::{FrameType, RF_SEQ_FILE_LABEL, GRAD_SEQ_FILE_LABEL};
 use crate::seqframe::FrameType::Grad;
 use crate::gradient_matrix::{LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, LONG_TEMPVAL_VAR_NAME, LUT_INDEX_VAR_NAME};
 use crate::pulse_function::Function;
+use crate::grad_cal;
 
 const CIVM_INCLUDE:&str = r"C:\workstation\SequenceTools\CivmSequenceTools_v1.0\civm_var_20_long.PPH";
 const STD_FN_INCLUDE:&str = r"stdfn_15.pph";
@@ -127,6 +129,12 @@ impl DspRoutine {
                 String::from("DSP_ROUTINE \"dsp\";")
         }
     }
+    pub fn print_ppr(&self) -> String {
+        match self {
+            DspRoutine::Dsp =>
+                String::from(":DSP_ROUTINE dsp")
+        }
+    }
 }
 
 pub enum BaseFrequency {
@@ -140,6 +148,14 @@ impl BaseFrequency {
             BaseFrequency::Civm9p4T(offset) =>
                 format!("OBSERVE_FREQUENCY \"9.4T 1H\",{},{},{},MHz, kHz, Hz, rx1MHz;",
                         FREQ_OFFSET_MIN,FREQ_OFFSET_MAX,offset)
+        }
+    }
+    fn print_ppr(&self) -> String {
+        match self {
+            BaseFrequency::Civm9p4T(offset) =>
+                format!(":OBSERVE_FREQUENCY \"9.4T 1H\", {:.1}, MHz, kHz, Hz, rx1MHz"
+                        ,30171576.0+offset)
+
         }
     }
     pub fn set_freq_buffer(&self) -> String {
@@ -391,6 +407,9 @@ impl PPL {
             String::from("end:\n}"),
         ].join("\n")
     }
+    pub fn print_ppr(&self,path_to_ppl:&Path) -> String {
+        self.header.print_ppr(path_to_ppl)
+    }
 }
 
 pub struct Setup {
@@ -459,6 +478,9 @@ impl ScrollBar {
         format!("SCROLLBAR \"{}\",\"{}\",\"%.2f\",{},{},{},{},{};",
                 self.title,self.title_hint,self.min,self.max,self.default,self.scale,self.target_var,)
     }
+    fn print_ppr(&self) -> String {
+        format!(":VAR {}, {}",self.target_var,self.default)
+    }
 }
 
 struct PPLNumeric {
@@ -488,6 +510,9 @@ impl PPLNumeric {
             None =>
                 format!("{} {},{},{},{};",self.keyword,self.min,self.max,self.value,self.var)
         }
+    }
+    pub fn print_ppr(&self) -> String {
+        format!(":{} {}, {}",self.keyword,self.var,self.value)
     }
 }
 
@@ -563,6 +588,73 @@ impl Header {
             None => {}
         }
         out.push(String::from(format!("END\n*/")));
+        out.join("\n")
+    }
+    pub fn print_ppr(&self,path_to_ppl:&Path) -> String {
+        let mut out = vec![
+            format!(":PPL {}",path_to_ppl.to_str().unwrap().to_owned()),
+            self.dsp_routine.print_ppr(),
+            PPLNumeric::new(
+                "RECEIVER_MASK",
+                RECEIVER_MASK_VAR,
+                RECEIVER_MASK_MIN,
+                RECEIVER_MASK_MAX,
+                None,
+                self.receiver_mask as u32
+            ).print_ppr(),
+            format!(":GRADIENT_STRENGTH {}, 4, {}, {}, {}, {}",
+                    GRAD_STRENGTH_VAR,grad_cal::GRAD_MIN,grad_cal::GRAD_MAX_READ,
+                    grad_cal::GRAD_MAX_PHASE,grad_cal::GRAD_MAX_SLICE),
+            self.base_frequency.print_ppr(),
+            format!(":SAMPLE_PERIOD {}, {}",SPECTRAL_WIDTH_VAR,self.spectral_width.ppr_string()),
+            PPLNumeric::new(
+                "NO_VIEWS",
+                NO_VIEWS_VAR,
+                NO_VIEWS_MIN,
+                NO_VIEWS_MAX,
+                None,
+                self.repetitions
+            ).print_ppr(),
+            PPLNumeric::new(
+                "NO_ECHOES",
+                NO_ECHOES_VAR,
+                NO_ECHOES_MIN,
+                NO_ECHOES_MAX,
+                Some(self.echo_divisor as u32),
+                self.echos as u32
+            ).print_ppr(),
+            PPLNumeric::new(
+                "NO_AVERAGES",
+                NO_AVERAGES_VAR,
+                NO_AVERAGES_MIN,
+                NO_AVERAGES_MAX,
+                None,
+                self.averages as u32
+            ).print_ppr(),
+            PPLNumeric::new(
+                "NO_SAMPLES",
+                NO_SAMPLES_VAR,
+                NO_SAMPLES_MIN,
+                NO_SAMPLES_MAX,
+                None,
+                self.samples as u32
+            ).print_ppr(),
+            PPLNumeric::new(
+                "DISCARD",
+                NO_DISCARD_VAR,
+                NO_DISCARD_MIN,
+                NO_DISCARD_MAX,
+                None,
+                self.sample_discards as u32
+            ).print_ppr(),
+        ];
+        match &self.user_adjustments {
+            Some(list) =>{
+                let strvec:Vec<String> = list.iter().map(|item| item.print_ppr()).collect();
+                out.extend(strvec);
+            }
+            None => {}
+        }
         out.join("\n")
     }
 }
