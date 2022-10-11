@@ -26,7 +26,7 @@ fn test(){
     mep.setup_mode = true;
     let sim_mode = false;
     let acceleration = 2;
-    let output_dir = Path::new("/mnt/d/dev/221010");
+    let output_dir = Path::new("/mnt/d/dev/221011");
     let me = MultiEcho3D::new(mep);
     //me.plot_export(4,100,"/mnt/d/dev/plotter/output");
     //me.plot_export(4,0,"output");
@@ -556,7 +556,7 @@ impl MultiEcho3D {
         let repetitions = 8192;
         PPL::new(
             &mut self.place_events(),repetitions,averages,self.params.rep_time,base_frequency,
-            r"d:\dev\221010\civm_grad.seq",r"d:\dev\221010\civm_rf.seq",
+            r"d:\dev\221011\civm_grad.seq",r"d:\dev\221011\civm_rf.seq",
             orientation,GradClock::CPS20,PhaseUnit::Min,acceleration,simulation_mode)
     }
 

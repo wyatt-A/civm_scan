@@ -6,3 +6,9 @@ cargo run -p <package_name>
 
 To test a single module within a package, use
 cargo test <package_name> <module_name>
+
+To test a sequence for development, run something like ...
+cargo test -p seq_lib fse_3_echo -- --nocapture
+
+To run the gui app in debug mode, run
+bash run_native_windows.bash
