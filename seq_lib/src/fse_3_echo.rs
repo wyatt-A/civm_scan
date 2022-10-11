@@ -1,20 +1,9 @@
-use crate::execution::ExecutionBlock;
-use crate::rf_event::RfEvent;
-use crate::pulse::{Hardpulse, Trapezoid, Pulse, CompositeHardpulse};
-use crate::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
-use crate::gradient_event::GradEvent;
-use crate::gradient_matrix::{Matrix, DacValues, MatrixDriver, MatrixDriverType, EncodeStrategy, LinTransform, Dimension, DriverVar};
-use crate::event_block::{GradEventType, EventQueue, Event};
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::ppl::{VIEW_LOOP_COUNTER_VAR, Orientation, GradClock, PhaseUnit, BaseFrequency, PPL};
-use crate::acq_event::{AcqEvent, SpectralWidth};
-use crate::acq_event::SpectralWidth::{SW200kH, SW133kH};
-use crate::event_block::EventPlacementType::{Origin, ExactFromOrigin, Before, After};
-use crate::utils::{sec_to_clock, clock_to_sec, ms_to_clock, us_to_clock};
 use std::path::Path;
 use std::fs::File;
 use std::io::Write;
+use seq_tools::grad_cal;
 use seq_tools::acq_event::{AcqEvent, SpectralWidth};
 use seq_tools::event_block::{Event, EventQueue, GradEventType};
 use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin, Origin};
@@ -29,9 +18,6 @@ use seq_tools::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateTyp
 use seq_tools::seqframe::SeqFrame;
 use seq_tools::utils;
 use seq_tools::utils::us_to_clock;
-use crate::{grad_cal, utils};
-use crate::ppl::BaseFrequency::Civm9p4T;
-use crate::seqframe::SeqFrame;
 
 #[test]
 fn test(){
@@ -42,7 +28,7 @@ fn test(){
     let acceleration = 2;
     let output_dir = Path::new("/mnt/d/dev/221010");
     let me = MultiEcho3D::new(mep);
-    me.plot_export(4,100,"/mnt/d/dev/plotter/output");
+    //me.plot_export(4,100,"/mnt/d/dev/plotter/output");
     //me.plot_export(4,0,"output");
     let ppl = me.ppl_export(Civm9p4T(0.0),Orientation::CivmStandard,acceleration,sim_mode);
 
@@ -557,13 +543,13 @@ impl MultiEcho3D {
         ]);
         EventQueue::new(&events)
     }
-    pub fn plot_export(&self,sample_period_us:usize,driver_val:u32,filename:&str){
-        let file = Path::new(filename);
-        let graphs = self.place_events().graphs_dynamic(sample_period_us,driver_val);
-        let s = serde_json::to_string_pretty(&graphs).expect("cannot serialize");
-        let mut f = File::create(file).expect("cannot create file");
-        f.write_all(&s.as_bytes()).expect("trouble writing to file");
-    }
+    // pub fn plot_export(&self,sample_period_us:usize,driver_val:u32,filename:&str){
+    //     let file = Path::new(filename);
+    //     let graphs = self.place_events().graphs_dynamic(sample_period_us,driver_val);
+    //     let s = serde_json::to_string_pretty(&graphs).expect("cannot serialize");
+    //     let mut f = File::create(file).expect("cannot create file");
+    //     f.write_all(&s.as_bytes()).expect("trouble writing to file");
+    // }
     pub fn ppl_export(&self,base_frequency:BaseFrequency,orientation:Orientation,acceleration:u16,simulation_mode:bool) -> PPL {
         let averages = 100;
         //let repetitions = (self.params.samples.1 as u32*self.params.samples.2 as u32);

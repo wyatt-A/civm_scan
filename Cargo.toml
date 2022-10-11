@@ -1,7 +1,11 @@
 [workspace]
 
 members = [
-"seq_tools",
+    "seq_tools",
     "seq_lib",
-"scan_ui"
+    "scan_ui",
+    "scan_control"
 ]
+
+# this determines which package is the entry point for cargo run
+default-members = ["scan_ui"]

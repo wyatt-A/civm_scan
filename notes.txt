@@ -1,0 +1,8 @@
+To run a single package as a test, use
+cargo test -p <package_name>
+
+To its main function, use
+cargo run -p <package_name>
+
+To test a single module within a package, use
+cargo test <package_name> <module_name>

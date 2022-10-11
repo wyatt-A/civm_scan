@@ -23,7 +23,6 @@ pub mod pulse_function;
 pub mod ppl;
 pub mod event_block;
 mod GradientEcho;
-mod grad_cal;
+pub mod grad_cal;
 mod Multi6Echo;
 mod FSE4Echo;
-mod fse_3_echo;
