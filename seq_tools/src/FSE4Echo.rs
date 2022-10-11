@@ -1,38 +1,43 @@
-use seq_tools::execution::ExecutionBlock;
-use seq_tools::rf_event::RfEvent;
-use seq_tools::pulse::{Hardpulse, Trapezoid, Pulse, CompositeHardpulse};
-use seq_tools::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
-use seq_tools::gradient_event::GradEvent;
-use seq_tools::gradient_matrix::{Matrix, DacValues, MatrixDriver, MatrixDriverType, EncodeStrategy, LinTransform, Dimension, DriverVar};
-use seq_tools::event_block::{GradEventType, EventQueue, Event};
+use crate::execution::ExecutionBlock;
+use crate::rf_event::RfEvent;
+use crate::pulse::{Hardpulse, Trapezoid, Pulse, CompositeHardpulse};
+use crate::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
+use crate::gradient_event::GradEvent;
+use crate::gradient_matrix::{Matrix, DacValues, MatrixDriver, MatrixDriverType, EncodeStrategy, LinTransform, Dimension, DriverVar};
+use crate::event_block::{GradEventType, EventQueue, Event};
 use std::cell::RefCell;
 use std::rc::Rc;
-use seq_tools::ppl::{VIEW_LOOP_COUNTER_VAR, Orientation, GradClock, PhaseUnit, BaseFrequency, PPL};
-use seq_tools::acq_event::{AcqEvent, SpectralWidth};
-use seq_tools::acq_event::SpectralWidth::{SW200kH, SW133kH};
-use seq_tools::event_block::EventPlacementType::{Origin, ExactFromOrigin, Before, After};
-use seq_tools::utils::{sec_to_clock, clock_to_sec, ms_to_clock, us_to_clock};
+use crate::ppl::{VIEW_LOOP_COUNTER_VAR, Orientation, GradClock, PhaseUnit, BaseFrequency, PPL};
+use crate::acq_event::{AcqEvent, SpectralWidth};
+use crate::acq_event::SpectralWidth::{SW200kH, SW133kH};
+use crate::event_block::EventPlacementType::{Origin, ExactFromOrigin, Before, After};
+use crate::utils::{sec_to_clock, clock_to_sec, ms_to_clock, us_to_clock};
 use std::path::Path;
 use std::fs::File;
 use std::io::Write;
-use seq_tools::{grad_cal, utils};
-use seq_tools::ppl::BaseFrequency::Civm9p4T;
-use seq_tools::seqframe::SeqFrame;
+use crate::{grad_cal, utils};
+use crate::ppl::BaseFrequency::Civm9p4T;
+use crate::seqframe::SeqFrame;
 
 #[test]
 fn test(){
-    let mut mep = MultiEcho3D::default_params();
-    mep.setup_mode = false;
+    //let mut mep = MultiEcho3D::default_params();
+    let mut mep = MultiEcho3D::low_res_params();
+    mep.setup_mode = true;
     let sim_mode = false;
-    let acceleration = 4;
+    let acceleration = 1;
+    //let acceleration = 4;
+    let output_dir = Path::new("/mnt/d/dev/220928");
     let me = MultiEcho3D::new(mep);
     me.plot_export(4,100,"/mnt/d/dev/plotter/output");
     //me.plot_export(4,0,"output");
     let ppl = me.ppl_export(Civm9p4T(0.0),Orientation::CivmStandard,acceleration,sim_mode);
-    let mut outfile = File::create("/mnt/d/dev/220925/multi_echo.ppl").expect("cannot create file");
+
+    let filename = output_dir.join("multi_echo.ppl");
+    let mut outfile = File::create(filename).expect("cannot create file");
     //let mut outfile = File::create("multi_echo.ppl").expect("cannot create file");
     outfile.write_all(ppl.print().as_bytes()).expect("cannot write to file");
-    me.seq_export(4,"/mnt/d/dev/220925");
+    me.seq_export(4,output_dir.to_str().unwrap());
     //me.seq_export(4,".");
 }
 
@@ -57,21 +62,28 @@ pub struct MultiEcho3D {
 
 pub struct MultiEcho3DEvents{
     excitation:RfEvent<Hardpulse>,
+
     diffusion:GradEvent<Trapezoid>,
+
     refocus1:RfEvent<CompositeHardpulse>,
     refocus2:RfEvent<CompositeHardpulse>,
     refocus3:RfEvent<CompositeHardpulse>,
     refocus4:RfEvent<CompositeHardpulse>,
+
     phase_encode_1:GradEvent<Trapezoid>,
     phase_encode_2:GradEvent<Trapezoid>,
     phase_encode_3:GradEvent<Trapezoid>,
     phase_encode_4:GradEvent<Trapezoid>,
+
     readout:GradEvent<Trapezoid>,
     acquire:AcqEvent,
-    rewind_1:GradEvent<Trapezoid>,
-    rewind_2:GradEvent<Trapezoid>,
-    rewind_3:GradEvent<Trapezoid>,
+
+    rewinder1:GradEvent<Trapezoid>,
+    rewinder2:GradEvent<Trapezoid>,
+    rewinder3:GradEvent<Trapezoid>,
+
     spoiler:GradEvent<Trapezoid>,
+
 }
 
 impl MultiEcho3D {
@@ -80,6 +92,21 @@ impl MultiEcho3D {
         MultiEcho3DParams {
             fov:(19.7,12.0,12.0),
             samples:(788,480,480),
+            sample_discards:0,
+            spectral_width:SpectralWidth::SW200kH,
+            ramp_time:100E-6,
+            phase_encode_time:500E-6,
+            echo_time:13.0E-3,
+            echo_time2:6.530E-3,
+            rep_time:100.0E-3,
+            setup_mode:false
+        }
+    }
+
+    pub fn low_res_params() -> MultiEcho3DParams {
+        MultiEcho3DParams {
+            fov:(19.7,12.0,12.0),
+            samples:(788,256,256),
             sample_discards:0,
             spectral_width:SpectralWidth::SW200kH,
             ramp_time:100E-6,
@@ -168,7 +195,7 @@ impl MultiEcho3D {
         to 0
         */
         let excite_waveform = Hardpulse::new(100E-6);
-        let excite_power = RfStateType::Adjustable(500);
+        let excite_power = RfStateType::Adjustable(513);
         let excite_phase = RfStateType::Static(0);
         let excitation = RfEvent::new(
             "excitation",
@@ -178,26 +205,28 @@ impl MultiEcho3D {
             excite_phase
         );
 
+        let echo_index = vec![0,0,0,0];
+
         /* REFOCUS */
         /* Composite hard pulse that gets a different phase depending on k-space coordinate read from a LUT */
         let refocus_waveform = CompositeHardpulse::new_180(200E-6);
-        let refocus_power = RfStateType::Adjustable(1000);
+        let refocus_power = RfStateType::Adjustable(897);
         let rf_phase_cycle_strategy = PhaseCycleStrategy::LUTNinetyTwoSeventy(n_phase as usize,Some(n_slice as usize));
         // 90  270  90  270
         // 270  90  270  90
         // 90  270  90  270
         let cycle = RfDriverType::PhaseCycle3D(rf_phase_cycle_strategy);
 
-        let ref_driver1 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(0));
+        let ref_driver1 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[0]));
         let refocus_phase1 = RfStateType::Driven(ref_driver1);
 
-        let ref_driver2 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(1));
+        let ref_driver2 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[1]));
         let refocus_phase2 = RfStateType::Driven(ref_driver2);
 
-        let ref_driver3 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(2));
+        let ref_driver3 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[2]));
         let refocus_phase3 = RfStateType::Driven(ref_driver3);
 
-        let ref_driver4 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(3));
+        let ref_driver4 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[3]));
         let refocus_phase4 = RfStateType::Driven(ref_driver4);
 
 
@@ -274,10 +303,10 @@ impl MultiEcho3D {
         // set the phase encoding driver to the view loop counter //todo!(make an enum of the available driver variables)
 
 
-        let pe_driver1 = MatrixDriver::new(DriverVar::Repetition,MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()),Some(0));
-        let pe_driver2 = MatrixDriver::new(DriverVar::Repetition,MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()),Some(1));
-        let pe_driver3 = MatrixDriver::new(DriverVar::Repetition,MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()),Some(2));
-        let pe_driver4 = MatrixDriver::new(DriverVar::Repetition,MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()),Some(3));
+        let pe_driver1 = MatrixDriver::new(DriverVar::Repetition,MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()),Some(echo_index[0]));
+        let pe_driver2 = MatrixDriver::new(DriverVar::Repetition,MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()),Some(echo_index[1]));
+        let pe_driver3 = MatrixDriver::new(DriverVar::Repetition,MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()),Some(echo_index[2]));
+        let pe_driver4 = MatrixDriver::new(DriverVar::Repetition,MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()),Some(echo_index[3]));
 
 
 
@@ -305,7 +334,7 @@ impl MultiEcho3D {
             "c_pe_mat2",
             pe_driver2.clone(),
             transform,
-            static_crusher,
+            DacValues::new(Some(crusher_dac),None,None),
             &mat_count
         );
 
@@ -313,7 +342,7 @@ impl MultiEcho3D {
             "c_pe_mat3",
             pe_driver3.clone(),
             transform,
-            static_crusher,
+            DacValues::new(Some(crusher_dac),None,None),
             &mat_count
         );
 
@@ -321,7 +350,7 @@ impl MultiEcho3D {
             "c_pe_mat4",
             pe_driver4.clone(),
             transform,
-            static_crusher,
+            DacValues::new(Some(crusher_dac),None,None),
             &mat_count
         );
 
@@ -370,21 +399,21 @@ impl MultiEcho3D {
         let rewinder_matrix1 = Matrix::new_derived(
             "c_rewind_mat1",
             &Rc::new(phase_encode_matrix1.clone()),
-            LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac), Some(0), Some(0))),
+            LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac+85), Some(0), Some(0))),
             &mat_count
         );
 
         let rewinder_matrix2 = Matrix::new_derived(
             "c_rewind_mat2",
             &Rc::new(phase_encode_matrix2.clone()),
-            LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac), Some(0), Some(0))),
+            LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac+75), Some(0), Some(0))),
             &mat_count
         );
 
         let rewinder_matrix3 = Matrix::new_derived(
             "c_rewind_mat3",
             &Rc::new(phase_encode_matrix3.clone()),
-            LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac), Some(0), Some(0))),
+            LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac+77), Some(0), Some(0))),
             &mat_count
         );
 
@@ -445,9 +474,7 @@ impl MultiEcho3D {
             phase_encode_1,phase_encode_2,phase_encode_3,phase_encode_4,
             readout,
             acquire,
-            rewind_1: rewinder1,
-            rewind_2: rewinder2,
-            rewind_3: rewinder3,
+            rewinder1,rewinder2,rewinder3,
             spoiler
         }
     }
@@ -488,13 +515,13 @@ impl MultiEcho3D {
 
         let pe1 = Event::new(self.events.phase_encode_1.as_reference(),Before(read[0].clone(),0));
         let d2 = Event::new(self.events.diffusion.as_reference(),Before(pe1.clone(),0));
-        let re1 = Event::new(self.events.rewind_1.as_reference(), Before(refocus2.clone(), 0));
+        let re1 = Event::new(self.events.rewinder1.as_reference(),Before(refocus2.clone(),0));
         let pe2 = Event::new(self.events.phase_encode_2.as_reference(),After(refocus2.clone(),0));
-        let re2 = Event::new(self.events.rewind_2.as_reference(), Before(refocus3.clone(), 0));
+        let re2 = Event::new(self.events.rewinder2.as_reference(),Before(refocus3.clone(),0));
 
         let pe3 = Event::new(self.events.phase_encode_3.as_reference(),After(refocus3.clone(),0));
 
-        let re3 = Event::new(self.events.rewind_3.as_reference(), Before(refocus4.clone(), 0));
+        let re3 = Event::new(self.events.rewinder3.as_reference(),Before(refocus4.clone(),0));
         let pe4 = Event::new(self.events.phase_encode_4.as_reference(),After(refocus4.clone(),0));
 
         let grad_spoil = Event::new(self.events.spoiler.as_reference(),After(acq[3].clone(),0));
@@ -516,12 +543,35 @@ impl MultiEcho3D {
 
         EventQueue::new(&events)
     }
+    pub fn plot_export(&self,sample_period_us:usize,driver_val:u32,filename:&str){
+        let file = Path::new(filename);
+        let graphs = self.place_events().graphs_dynamic(sample_period_us,driver_val);
+        let s = serde_json::to_string_pretty(&graphs).expect("cannot serialize");
+        let mut f = File::create(file).expect("cannot create file");
+        f.write_all(&s.as_bytes()).expect("trouble writing to file");
+    }
     pub fn ppl_export(&self,base_frequency:BaseFrequency,orientation:Orientation,acceleration:u16,simulation_mode:bool) -> PPL {
         let averages = 1;
+        //let repetitions = (self.params.samples.1 as u32*self.params.samples.2 as u32);
         let repetitions = 8192;
         PPL::new(
             &mut self.place_events(),repetitions,averages,self.params.rep_time,base_frequency,
-            r"d:\dev\220925\civm_grad.seq",r"d:\dev\220925\civm_rf.seq",
+            r"d:\dev\220928\civm_grad.seq",r"d:\dev\220928\civm_rf.seq",
             orientation,GradClock::CPS20,PhaseUnit::PU90,acceleration,simulation_mode)
+    }
+
+    pub fn seq_export(&self,sample_period_us:usize,filepath:&str){
+        let q = self.place_events();
+        let (grad_params,rf_params) = q.ppl_seq_params(sample_period_us);
+        //let path = std::env::current_dir().expect("cannot get current dir");
+        let path = Path::new(filepath);
+        let grad_param = Path::new("civm_grad_params").with_extension("txt");
+        let grad_param_path = path.join(grad_param);
+        let rf_param = Path::new("civm_rf_params").with_extension("txt");
+        let rf_param_path = path.join(rf_param);
+        let mut rf_seq_file = File::create(rf_param_path).expect("cannot create file");
+        rf_seq_file.write_all(&SeqFrame::format_as_bytes(&rf_params.unwrap())).expect("trouble writing to file");
+        let mut grad_seq_file = File::create(grad_param_path).expect("cannot create file");
+        grad_seq_file.write_all(&SeqFrame::format_as_bytes(&grad_params.unwrap())).expect("trouble writing to file");
     }
 }

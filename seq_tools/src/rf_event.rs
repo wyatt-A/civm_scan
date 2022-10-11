@@ -12,7 +12,8 @@ use crate::utils::us_to_clock;
 use crate::ppl::ScrollBar;
 use crate::seqframe::{RF_SEQ_FILE_LABEL, SeqFrame};
 
-const TIME_BLOCK:i32 = 150; // clock cycles (100ns)
+//const TIME_BLOCK:i32 = 150; // clock cycles (100ns)
+const TIME_BLOCK:i32 = 400; // clock cycles (100ns)
 const RFSTART_PREDELAY:i32 = 600; // clock cycles
 const RFSTART_POSTDELAY:i32 = 84; // clock cycles (found experimentally)
 

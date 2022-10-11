@@ -72,7 +72,8 @@ pub enum GradClock {
 }
 
 pub enum PhaseUnit {
-    PU90
+    PU90,
+    Min
 }
 
 impl GradClock {
@@ -110,7 +111,8 @@ impl Orientation {
 impl PhaseUnit{
     pub fn value(&self) -> i16 {
         match self {
-            PhaseUnit::PU90 => 400
+            PhaseUnit::PU90 => 400,
+            PhaseUnit::Min => 1,
         }
     }
     pub fn print(&self) -> String {
@@ -440,6 +442,17 @@ impl ScrollBar {
             max:3,
             scale:100.0/3.0,
             default:default_val
+        }
+    }
+    pub fn new_grad_adj(label:&str,target_var:&str,half_range:i16) -> Self {
+        Self {
+            title:format!("{}",label),
+            title_hint:String::from("dac"),
+            target_var:String::from(target_var),
+            min:-half_range,
+            max:half_range,
+            scale:1.0,
+            default:0
         }
     }
     fn print(&self) -> String {

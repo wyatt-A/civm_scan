@@ -227,7 +227,7 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
         BlockExecution::new(cmd,post_delay_clocks)
     }
     fn block_header_adjustments(&self) -> Option<Vec<ScrollBar>> {
-        None
+        self.matrix.header_declaration()
     }
     fn block_constant_initialization(&self) -> Option<CommandString> {
         Some(CommandString::new_constant(&self.matrix.declaration()))
@@ -271,6 +271,10 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
             None => {}
         }
         cmds.push(self.matrix.vars_declaration());
+        let adj = self.matrix.vars_adj_declaration();
+        if adj.is_some() {
+            cmds.push(adj.unwrap());
+        }
         CommandString::new_declare(&cmds.join("\n"))
     }
     fn block_calculation(&self) -> Option<CommandString> {

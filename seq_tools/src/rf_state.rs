@@ -28,7 +28,8 @@ pub enum RfDriverType{
 #[derive(Clone,Debug)]
 pub enum PhaseCycleStrategy{
     LUTNinetyTwoSeventy(usize,Option<usize>),
-    FullySampledNinetyTwoSeventy(usize,Option<usize>)
+    FullySampledNinetyTwoSeventy(usize,Option<usize>),
+    CycleCPMG(usize)
 }
 
 #[derive(Clone,Debug)]
@@ -167,6 +168,9 @@ impl RfState {
                                     format!("{} = 2*(({}+{}+{})%2)+1;",self.phase_var(),LUT_TEMPVAL_VAR_NAME_1,LUT_TEMPVAL_VAR_NAME_2,(size_1/2)+(size_2/2)+2),
                                 ];
                                 out_str.join("\n")
+                            }
+                            PhaseCycleStrategy::CycleCPMG(acceleration) => {
+                                format!("{} = 400*(2*(({}/{}+{})%2)+1);",self.phase_var(),&driver.driver_var,acceleration,driver.echo_index)
                             }
                             _=> "phase cycle strategy not implemented yet".to_owned()
                         }

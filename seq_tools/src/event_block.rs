@@ -9,9 +9,6 @@ use crate::ppl::{FlatLoopStructure, ScrollBar};
 use crate::utils;
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
 use crate::acq_event::SpectralWidth;
 
 
@@ -30,13 +27,6 @@ pub struct EventGraph {
     pub block_interval:(f32,f32),
     pub waveform_start:f32,
     pub wave_data:WaveformData
-}
-
-pub fn plot_export(event_queue:&EventQueue,sample_period_us:usize,driver_val:u32,file_path:&Path){
-    let graphs = event_queue.graphs_dynamic(sample_period_us,driver_val);
-    let s = serde_json::to_string_pretty(&graphs).expect("cannot serialize");
-    let mut f = File::create(file_path).expect("cannot create file");
-    f.write_all(&s.as_bytes()).expect("trouble writing to file");
 }
 
 impl Event {

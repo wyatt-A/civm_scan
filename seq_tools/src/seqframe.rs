@@ -4,11 +4,7 @@ use std::path::{Path,PathBuf};
 use crate::utils;
 use std::io::Write;
 use std::fs::File;
-use crate::event_block::EventQueue;
 use crate::pulse_function::{Function, FunctionParams};
-
-const GRAD_PARAMS_NAME:&str = "civm_grad_params";
-const RF_PARAMS_NAME:&str = "civm_rf_params";
 
 const CLOCK_PERIOD_NS:usize = 100;
 const GRAD_CLOCK_MULTIPLIER:usize = 20; // this means that the gradient clock period is 2 us
@@ -128,6 +124,73 @@ impl SeqFrameExpression for Function {
     }
 }
 
+// #[derive(Copy,Clone)]
+// pub struct FunctionParams {
+//     n_samples:usize,
+//     max_dac:i16
+// }
+//
+// impl FunctionParams{
+//     pub fn new(n_samples:usize,max_dac:i16) -> Self {
+//         Self {
+//             n_samples,
+//             max_dac
+//         }
+//     }
+// }
+//
+// pub enum Function {
+//     RampUp(FunctionParams),
+//     RampDown(FunctionParams),
+//     HalfSin(FunctionParams),
+//     Plateau(FunctionParams),
+//     Sinc(u16,FunctionParams)
+// }
+
+
+
+
+
+
+// impl Expression {
+//
+//     pub fn ramp_up(n_samples:usize,max_dac:i16) -> Expression {
+//         Expression {
+//             n_samples,
+//             text: format!("ramp(0,{})",max_dac)
+//         }
+//     }
+//
+//     pub fn ramp_down(n_samples:usize,max_dac:i16) -> Expression {
+//         Expression {
+//             n_samples,
+//             text: format!("ramp({},0)",max_dac)
+//         }
+//     }
+//
+//     pub fn half_sin(n_samples:usize,max_dac:i16) -> Expression{
+//         Expression {
+//             n_samples,
+//             text: format!("{}*sin(PI*(Ñ/({}-1)))",max_dac,n_samples)
+//         }
+//     }
+//
+//     pub fn plateau(n_samples:usize,max_dac:i16) -> Expression{
+//         Expression {
+//             n_samples,
+//             text: format!("{}",max_dac)
+//         }
+//     }
+//
+//     pub fn sinc(n_lobes:u8,n_samples:usize,max_dac:i16) -> Expression{
+//         let lobes = if n_lobes%2 == 0 {n_lobes+1} else {n_lobes};
+//         let lobe_val = (lobes + 1)/2;
+//         Expression {
+//             n_samples,
+//             text: format!("{}*sinc(PI*{}*((Ñ-({}/2))/({}/2)))",max_dac,lobe_val,n_samples,n_samples)
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub struct SeqFrame {
@@ -140,6 +203,7 @@ pub struct SeqFrame {
 }
 
 impl SeqFrame {
+
     pub fn from_expressions(expressions:Vec<Expression>,label:&str,sample_period_us:usize,target:FrameType) -> SeqFrame {
 
         let cycles_per_sample = match target {
@@ -173,11 +237,13 @@ impl SeqFrame {
             function
         }
     }
+
     pub fn write(&self,filename:&Path){
         let bytes = self.serialize_as_bytes();
         let mut f = File::create(filename).expect("cannot create file");
         f.write_all(&bytes).expect("trouble writing to file");
     }
+
     pub fn serialize(&self) -> String {
         let s:Vec<String> = vec![
             self.n_samples.to_string(),
@@ -189,22 +255,12 @@ impl SeqFrame {
             ];
         return s.join("\t");
     }
+
     pub fn serialize_as_bytes(&self) -> Vec<u8>{
         return ISO_8859_1.encode(&self.serialize(),EncoderTrap::Strict).expect("cannot encode string");
     }
+
     pub fn format_as_bytes(text:&str) -> Vec<u8> {
         return ISO_8859_1.encode(text,EncoderTrap::Strict).expect("cannot encode string");
     }
-}
-
-pub fn seq_export(event_queue:&EventQueue,sample_period_us:usize,directory:&Path){
-    let (grad_params,rf_params) = event_queue.ppl_seq_params(sample_period_us);
-    let grad_param = Path::new(GRAD_PARAMS_NAME).with_extension("txt");
-    let grad_param_path = directory.join(grad_param);
-    let rf_param = Path::new(RF_PARAMS_NAME).with_extension("txt");
-    let rf_param_path = directory.join(rf_param);
-    let mut rf_seq_file = File::create(rf_param_path).expect("cannot create file");
-    rf_seq_file.write_all(&SeqFrame::format_as_bytes(&rf_params.unwrap())).expect("trouble writing to file");
-    let mut grad_seq_file = File::create(grad_param_path).expect("cannot create file");
-    grad_seq_file.write_all(&SeqFrame::format_as_bytes(&grad_params.unwrap())).expect("trouble writing to file");
 }
