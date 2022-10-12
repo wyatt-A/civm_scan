@@ -22,11 +22,12 @@ use seq_tools::utils::us_to_clock;
 #[test]
 fn test(){
     //let mut mep = MultiEcho3D::default_params();
-    let mut mep = MultiEcho3D::low_res_params();
-    mep.setup_mode = true;
+    //let mut mep = MultiEcho3D::low_res_params();
+    let mut mep = MultiEcho3D::low_res_params_2();
+    mep.setup_mode = false;
     let sim_mode = false;
     let acceleration = 2;
-    let output_dir = Path::new("/mnt/d/dev/221011");
+    let output_dir = Path::new("/mnt/d/dev/221012");
     let me = MultiEcho3D::new(mep);
     //me.plot_export(4,100,"/mnt/d/dev/plotter/output");
     //me.plot_export(4,0,"output");
@@ -41,7 +42,7 @@ fn test(){
 
     let ppr_filename = output_dir.join("setup.ppr");
     let mut outfile = File::create(ppr_filename).expect("cannot create file");
-    outfile.write_all(ppl.print_ppr(Path::new("d:/dev/221011/multi_echo.ppl")).as_bytes()).expect("cannot write to file");
+    outfile.write_all(ppl.print_ppr(Path::new("d:/dev/221012/multi_echo.ppl")).as_bytes()).expect("cannot write to file");
 
     //me.seq_export(4,".");
 }
@@ -118,6 +119,21 @@ impl MultiEcho3D {
             phase_encode_time:500E-6,
             echo_time:13.0E-3,
             echo_time2:7.0E-3,
+            rep_time:80.0E-3,
+            setup_mode:false
+        }
+    }
+
+    pub fn low_res_params_2() -> MultiEcho3DParams {
+        MultiEcho3DParams {
+            fov:(19.7,12.0,12.0),
+            samples:(788,256,256),
+            sample_discards:0,
+            spectral_width:SpectralWidth::SW200kH,
+            ramp_time:200E-6,
+            phase_encode_time:1E-3,
+            echo_time:13.0E-3,
+            echo_time2:10E-3,
             rep_time:80.0E-3,
             setup_mode:false
         }
@@ -557,12 +573,12 @@ impl MultiEcho3D {
     //     f.write_all(&s.as_bytes()).expect("trouble writing to file");
     // }
     pub fn ppl_export(&self,base_frequency:BaseFrequency,orientation:Orientation,acceleration:u16,simulation_mode:bool) -> PPL {
-        let averages = 100;
+        let averages = 1;
         //let repetitions = (self.params.samples.1 as u32*self.params.samples.2 as u32);
-        let repetitions = 8192;
+        let repetitions = 2;
         PPL::new(
             &mut self.place_events(),repetitions,averages,self.params.rep_time,base_frequency,
-            r"d:\dev\221011\civm_grad.seq",r"d:\dev\221011\civm_rf.seq",
+            r"d:\dev\221012\civm_grad.seq",r"d:\dev\221012\civm_rf.seq",
             orientation,GradClock::CPS20,PhaseUnit::Min,acceleration,simulation_mode)
     }
 
