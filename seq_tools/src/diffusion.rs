@@ -19,7 +19,7 @@ fn test(){
 
     let diffusion_waveform = Trapezoid::new(500E-6,4E-3);
 
-    let channel_dacs = solve_dac(Rc::new(Box::new(diffusion_waveform)),10E-3,20E-3,30E-3,(1.0,1.0,1.0),500.0);
+    let channel_dacs = solve_dac(Rc::new(Box::new(diffusion_waveform)),10E-3,20E-3,30E-3,(1.0,0.0,0.0),3000.0);
 
     println!("{:?}",channel_dacs);
 }
@@ -120,108 +120,6 @@ fn find_bvalue(diff_pulse:&Box<dyn Pulse>,pulse1_center:f32,pulse2_center:f32,ec
     (grad_cal::GAMMA*2.0*PI).powi(2)*(term1 - term2 + term3)*1E-6
 
 }
-
-
-// fn calc_bvalue(pulse1:Rc<RefCell<Event>>,pulse2:Rc<RefCell<Event>>,echo_time:f32) -> f32 {
-//
-//     let n = 500;
-//     let e1 = pulse1.borrow().event_graph_dynamic(1,0);
-//     let e2 = pulse2.borrow().event_graph_dynamic(1,0);
-//
-//     let w = e1.wave_data.clone();
-//     let render1 = match w {
-//         WaveformData::Grad(wr,wp,ws) => {
-//             let r = wr.unwrap();
-//             let p = wp.unwrap();
-//             let s = ws.unwrap();
-//             let start = e1.waveform_start.clone();
-//             let mut rt = r.x.clone();
-//             rt.iter_mut().for_each(|t| *t += start);
-//             let r = r.y;
-//             let p = p.y;
-//             let s = s.y;
-//             (rt,r,p,s)
-//         },
-//         _=> panic!("diffusion event must be a gradient event")
-//     };
-//
-//     let w = e2.wave_data.clone();
-//     let render2 = match w {
-//         WaveformData::Grad(wr,wp,ws) => {
-//             let r = wr.unwrap();
-//             let p = wp.unwrap();
-//             let s = ws.unwrap();
-//             let start = e2.waveform_start;
-//             let mut rt = r.x.clone();
-//             rt.iter_mut().for_each(|t| *t += start);
-//             let r = r.y;
-//             let p = p.y;
-//             let s = s.y;
-//             (rt,r,p,s)
-//         },
-//         _=> panic!("diffusion event must be a gradient event")
-//     };
-//
-//     let mut time = Vec::<f32>::new();
-//     time.extend(render1.0);
-//     time.extend(render2.0);
-//
-//     let mut gread = Vec::<f32>::new();
-//     gread.extend(render1.1);
-//     gread.extend(render2.1);
-//
-//     let mut gphase = Vec::<f32>::new();
-//     gphase.extend(render1.2);
-//     gphase.extend(render2.2);
-//
-//     let mut gslice = Vec::<f32>::new();
-//     gslice.extend(render1.3);
-//     gslice.extend(render2.3);
-//
-//     let t_resample = linspace(0.0,echo_time,n);
-//     let dt = t_resample[1] - t_resample[0];
-//
-//     let mut gread = resample(&time,&gread,&t_resample);
-//     let mut gphase = resample(&time,&gphase,&t_resample);
-//     let mut gslice = resample(&time,&gslice,&t_resample);
-//
-//     gread.iter_mut().for_each(|dac| *dac = grad_cal::dac_to_tesla_per_meter(*dac as i16));
-//     gphase.iter_mut().for_each(|dac| *dac = grad_cal::dac_to_tesla_per_meter(*dac as i16));
-//     gslice.iter_mut().for_each(|dac| *dac = grad_cal::dac_to_tesla_per_meter(*dac as i16));
-//
-//     let f_read = cumptrapz(&gread,dt);
-//     let f_phase = cumptrapz(&gphase,dt);
-//     let f_slice = cumptrapz(&gslice,dt);
-//
-//     let mut fsq = Vec::<f32>::with_capacity(f_read.len());
-//     for i in 0..f_read.len() {
-//         let v = (f_read[i],f_phase[i],f_slice[i]);
-//         fsq.push(dot(v,v));
-//     }
-//
-//     let term1 = trapz(&fsq,dt);
-//
-//     let idx = f_read.len()/2;
-//     let ft_read = f_read[idx];
-//     let ft_phase = f_phase[idx];
-//     let ft_slice = f_slice[idx];
-//
-//     let f_read_h = f_read[idx..n].to_vec();
-//     let f_phase_h = f_phase[idx..n].to_vec();
-//     let f_slice_h = f_phase[idx..n].to_vec();
-//
-//     let v1 = (trapz(&f_read_h,dt),trapz(&f_phase_h,dt),trapz(&f_slice_h,dt));
-//     let v2 = (4.0*ft_read,4.0*ft_phase,4.0*ft_slice);
-//     let term2 = dot(v1,v2);
-//
-//     let term3 = 4.0*dot((ft_read,ft_phase,ft_slice),(ft_read,ft_phase,ft_slice))*(echo_time/2.0);
-//
-//     (grad_cal::GAMMA*2.0*PI).powi(2)*(term1 - term2 + term3)*1E-6
-// }
-
-
-
-
 
 
 fn resample(t:&Vec<f32>,x:&Vec<f32>,tq:&Vec<f32>) -> Vec<f32> {
