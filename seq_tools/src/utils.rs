@@ -43,3 +43,9 @@ pub fn argsort(data:Vec<i32>) -> Vec<usize> {
     indices.sort_by_key(|&i| &data[i]);
     indices
 }
+
+pub fn linspace(x0:f32, xend:f32, n: usize) -> Vec<f32> {
+    let to_float = |i: usize| i as f32;
+    let dx = (xend - x0) / to_float(n - 1);
+    (0..n).map(|i| x0 + to_float(i) * dx).collect()
+}

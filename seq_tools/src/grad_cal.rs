@@ -2,6 +2,7 @@
 pub const GRAD_MAX_READ:u32 = 101857;
 pub const GRAD_MAX_PHASE:u32 = 92456;
 pub const GRAD_MAX_SLICE:u32 = 112634;
+pub const GAMMA:f32 = 42.58e6;
 pub const GRAD_MIN:u32 = GRAD_MAX_PHASE;
 
 pub fn grad_to_dac(grad_hz_per_mm:f32) -> i16 {
@@ -11,7 +12,16 @@ pub fn grad_to_dac(grad_hz_per_mm:f32) -> i16 {
     dac as i16
 }
 
+// dac -> Hz/mm
 pub fn dac_to_grad(grad_dac:i16) -> u32 {
     let fraction = grad_dac as f32 / i16::MAX as f32;
     (GRAD_MIN as f32 * fraction) as u32
+}
+
+pub fn dac_to_hz_per_meter(grad_dac:i16) -> f32 {
+    (dac_to_grad(grad_dac) as f32)*1000.0
+}
+
+pub fn dac_to_tesla_per_meter(grad_dac:i16) -> f32 {
+    dac_to_hz_per_meter(grad_dac)/GAMMA
 }
