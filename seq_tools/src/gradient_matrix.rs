@@ -276,7 +276,8 @@ pub struct Matrix {
     kind:MatrixType,
     label:String,
     uid:u8,
-    pub adjustable:(bool,bool,bool)
+    pub adjustable:(bool,bool,bool),
+    pub disabled:bool
 }
 
 impl Matrix {
@@ -291,7 +292,8 @@ impl Matrix {
             kind: MatrixType::Static(dac_values),
             label: label.to_owned(),
             uid: (*uid).clone(),
-            adjustable:(false,false,false)
+            adjustable:(false,false,false),
+            disabled:false
         }
     }
     pub fn new_derived(label: &str, parent: &Rc<Matrix>, trans: LinTransform, uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
@@ -303,7 +305,8 @@ impl Matrix {
             kind: MatrixType::Derived(parent, trans),
             label: label.to_owned(),
             uid: (*uid).clone(),
-            adjustable:(false,false,false)
+            adjustable:(false,false,false),
+            disabled:false
         }
     }
     pub fn new_driven(label: &str, driver: MatrixDriver, trans: LinTransform, default_dac: DacValues, uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
@@ -314,7 +317,8 @@ impl Matrix {
             kind: MatrixType::Driven(driver.clone(), trans, default_dac),
             label: label.to_owned(),
             uid: (*uid).clone(),
-            adjustable:(false,false,false)
+            adjustable:(false,false,false),
+            disabled:false
         }
     }
     pub fn derive(&self, label: &str, trans: LinTransform, uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
@@ -325,7 +329,8 @@ impl Matrix {
             kind: MatrixType::Derived(Rc::new(self.clone()), trans),
             label: label.to_owned(),
             uid: (*uid).clone(),
-            adjustable:(false,false,false)
+            adjustable:(false,false,false),
+            disabled:false
         }
     }
     pub fn kind(&self) -> MatrixType {
@@ -338,24 +343,37 @@ impl Matrix {
         (format!("{}_read_adj", self.label), format!("{}_phase_adj", self.label), format!("{}_slice_adj", self.label))
     }
     pub fn create_matrix(&self) -> String {
-        let var_names = self.var_names();
-        let var_names_adj = self.var_names_adj();
-        let arg1 = match self.adjustable.0 {
-            true => format!("{}+{}",var_names.0,var_names_adj.0),
-            false => format!("{}",var_names.0)
-        };
-        let arg2 = match self.adjustable.1 {
-            true => format!("{}+{}",var_names.1,var_names_adj.1),
-            false => format!("{}",var_names.1)
-        };
-        let arg3 = match self.adjustable.1 {
-            true => format!("{}+{}",var_names.2,var_names_adj.2),
-            false => format!("{}",var_names.2)
-        };
-        vec![
-            format!("CREATE_MATRIX({},{},{},{})", self.label, arg3, arg2, arg1),
-            String::from("delay(100,us);")
-        ].join("\n")
+
+        match self.disabled {
+            true => {
+                vec![
+                    format!("CREATE_MATRIX({},0,0,0)", self.label),
+                    String::from("delay(100,us);")
+                ].join("\n")
+            }
+            false => {
+                let var_names = self.var_names();
+                let var_names_adj = self.var_names_adj();
+                let arg1 = match self.adjustable.0 {
+                    true => format!("{}+{}",var_names.0,var_names_adj.0),
+                    false => format!("{}",var_names.0)
+                };
+                let arg2 = match self.adjustable.1 {
+                    true => format!("{}+{}",var_names.1,var_names_adj.1),
+                    false => format!("{}",var_names.1)
+                };
+                let arg3 = match self.adjustable.2 {
+                    true => format!("{}+{}",var_names.2,var_names_adj.2),
+                    false => format!("{}",var_names.2)
+                };
+                vec![
+                    format!("CREATE_MATRIX({},{},{},{})", self.label, arg3, arg2, arg1),
+                    String::from("delay(100,us);")
+                ].join("\n")
+            }
+        }
+
+
     }
     pub fn parent_var_names(&self) -> Option<(String, String, String)> {
         match &self.kind {

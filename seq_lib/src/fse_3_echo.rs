@@ -25,9 +25,10 @@ fn test(){
     //let mut mep = MultiEcho3D::low_res_params();
     let mut mep = MultiEcho3D::low_res_params_2();
     mep.setup_mode = false;
+    mep.grad_off = false;
     let sim_mode = false;
     let acceleration = 2;
-    let output_dir = Path::new("/mnt/d/dev/221012");
+    let output_dir = Path::new("/mnt/d/dev/221014");
     let me = MultiEcho3D::new(mep);
     //me.plot_export(4,100,"/mnt/d/dev/plotter/output");
     //me.plot_export(4,0,"output");
@@ -42,7 +43,7 @@ fn test(){
 
     let ppr_filename = output_dir.join("setup.ppr");
     let mut outfile = File::create(ppr_filename).expect("cannot create file");
-    outfile.write_all(ppl.print_ppr(Path::new("d:/dev/221012/multi_echo.ppl")).as_bytes()).expect("cannot write to file");
+    outfile.write_all(ppl.print_ppr(Path::new("d:/dev/221014/multi_echo.ppl")).as_bytes()).expect("cannot write to file");
 
     //me.seq_export(4,".");
 }
@@ -58,7 +59,8 @@ pub struct MultiEcho3DParams {
     echo_time:f32,
     echo_time2:f32,
     rep_time:f32,
-    setup_mode:bool
+    setup_mode:bool,
+    grad_off:bool
 }
 
 pub struct MultiEcho3D {
@@ -105,7 +107,8 @@ impl MultiEcho3D {
             echo_time:13.0E-3,
             echo_time2:6.530E-3,
             rep_time:100.0E-3,
-            setup_mode:false
+            setup_mode:false,
+            grad_off:false
         }
     }
 
@@ -120,7 +123,8 @@ impl MultiEcho3D {
             echo_time:13.0E-3,
             echo_time2:7.0E-3,
             rep_time:80.0E-3,
-            setup_mode:false
+            setup_mode:false,
+            grad_off:false
         }
     }
 
@@ -131,11 +135,12 @@ impl MultiEcho3D {
             sample_discards:0,
             spectral_width:SpectralWidth::SW200kH,
             ramp_time:200E-6,
-            phase_encode_time:1E-3,
+            phase_encode_time:700E-6,
             echo_time:13.0E-3,
-            echo_time2:10E-3,
+            echo_time2:7E-3,
             rep_time:80.0E-3,
-            setup_mode:false
+            setup_mode:false,
+            grad_off:false
         }
     }
 
@@ -150,7 +155,8 @@ impl MultiEcho3D {
             echo_time:14.0E-3,
             echo_time2:7E-3,
             rep_time:100E-3,
-            setup_mode:false
+            setup_mode:false,
+            grad_off:false
         }
     }
 
@@ -186,7 +192,10 @@ impl MultiEcho3D {
         // Find correct readout dac value for the field of view and spectral width
         let read_grad_dac = spectral_width.fov_to_dac(fov_read);
         // define the matrix
-        let read_matrix = Matrix::new_static("read_mat",DacValues::new(Some(read_grad_dac),None,None),&mat_count);
+        let mut read_matrix = Matrix::new_static("read_mat",DacValues::new(Some(read_grad_dac),None,None),&mat_count);
+        if params.grad_off {
+            read_matrix.disabled = true;
+        }
         // define the waveform
         let read_waveform = Trapezoid::new(read_ramp_time,read_sample_time_sec);
         /* define the event only on the read channel. It is non-blocking to allow an acquisition event
@@ -353,23 +362,32 @@ impl MultiEcho3D {
             &mat_count
         );
         phase_encode_matrix1.adjustable = (true,false,false);
+        if params.grad_off {
+            phase_encode_matrix1.disabled = true;
+        }
 
         let static_crusher = DacValues::new(Some(crusher_dac),None,None);
-        let phase_encode_matrix2 = Matrix::new_driven(
+        let mut phase_encode_matrix2 = Matrix::new_driven(
             "c_pe_mat2",
             pe_driver2.clone(),
             transform,
             DacValues::new(Some(crusher_dac),None,None),
             &mat_count
         );
+        if params.grad_off {
+            phase_encode_matrix2.disabled = true;
+        }
 
-        let phase_encode_matrix3 = Matrix::new_driven(
+        let mut phase_encode_matrix3 = Matrix::new_driven(
             "c_pe_mat3",
             pe_driver3.clone(),
             transform,
             DacValues::new(Some(crusher_dac),None,None),
             &mat_count
         );
+        if params.grad_off {
+            phase_encode_matrix3.disabled = true;
+        }
 
         // let phase_encode_matrix4 = Matrix::new_driven(
         //     "c_pe_mat4",
@@ -426,6 +444,9 @@ impl MultiEcho3D {
             &mat_count
         );
         rewinder_matrix1.adjustable = (true,false,false);
+        if params.grad_off {
+            rewinder_matrix1.disabled = true;
+        }
 
         let mut rewinder_matrix2 = Matrix::new_derived(
             "c_rewind_mat2",
@@ -434,13 +455,19 @@ impl MultiEcho3D {
             &mat_count
         );
         rewinder_matrix2.adjustable = (true,false,false);
+        if params.grad_off {
+            rewinder_matrix2.disabled = true;
+        }
 
-        let rewinder_matrix3 = Matrix::new_derived(
+        let mut rewinder_matrix3 = Matrix::new_derived(
             "c_rewind_mat3",
             &Rc::new(phase_encode_matrix3.clone()),
             LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac), Some(0), Some(0))),
             &mat_count
         );
+        if params.grad_off {
+            rewinder_matrix3.disabled = true;
+        }
 
 
         let rewinder1 = GradEvent::new(
@@ -481,7 +508,11 @@ impl MultiEcho3D {
             true => 500,
             false => 0
         };
-        let diffusion_mat = Matrix::new_static("diffusion_mat",DacValues::new(Some(diffusion_dac),Some(0),Some(0)),&mat_count);
+        let mut diffusion_mat = Matrix::new_static("diffusion_mat",DacValues::new(Some(diffusion_dac),Some(0),Some(0)),&mat_count);
+        // if params.grad_off {
+        //     diffusion_mat.disabled = true;
+        // }
+
         let diffusion = GradEvent::new(
             (Some(diffusion_waveform),
              Some(diffusion_waveform),
@@ -518,8 +549,8 @@ impl MultiEcho3D {
 
         let read_locations = vec![
             te_us,
-            te_us2 + offset,
-            2*te_us2 + offset,
+            te_us2 + offset + 250,
+            2*te_us2 + offset + 500,
             3*te_us2 + offset,
         ];
         let refocus_locations = vec![
@@ -578,7 +609,7 @@ impl MultiEcho3D {
         let repetitions = 2;
         PPL::new(
             &mut self.place_events(),repetitions,averages,self.params.rep_time,base_frequency,
-            r"d:\dev\221012\civm_grad.seq",r"d:\dev\221012\civm_rf.seq",
+            r"d:\dev\221014\civm_grad.seq",r"d:\dev\221014\civm_rf.seq",
             orientation,GradClock::CPS20,PhaseUnit::Min,acceleration,simulation_mode)
     }
 
