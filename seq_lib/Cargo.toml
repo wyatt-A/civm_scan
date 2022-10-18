@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 seq_tools = {path = "../seq_tools"}
+build_sequence = {path ="../build_sequence"}

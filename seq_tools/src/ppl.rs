@@ -64,15 +64,18 @@ pub enum DspRoutine {
     Dsp
 }
 
+#[derive(Clone)]
 pub enum Orientation {
     CivmStandard,
     Simulation
 }
 
+#[derive(Clone)]
 pub enum GradClock {
     CPS20
 }
 
+#[derive(Clone)]
 pub enum PhaseUnit {
     PU90,
     Min
@@ -137,6 +140,7 @@ impl DspRoutine {
     }
 }
 
+#[derive(Clone)]
 pub enum BaseFrequency {
     Civm9p4T(f32)
 }
@@ -454,12 +458,12 @@ impl ScrollBar {
     }
     pub fn new_rf_phase_adj(label:&str,target_var:&str,default_val:i16) -> Self {
         Self {
-            title:format!("{} phase setting",label),
-            title_hint:String::from("% of 3"),
+            title:format!("{} phase adjustment",label),
+            title_hint:String::from("400=90deg"),
             target_var:String::from(target_var),
-            min:0,
-            max:3,
-            scale:100.0/3.0,
+            min:-800,
+            max:800,
+            scale:1.0,
             default:default_val
         }
     }

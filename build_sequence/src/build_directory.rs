@@ -12,7 +12,7 @@ const CONFIG_FILE:&str = "c:/workstation/civm_scan/config/build_sequence.json";
 
 
 #[derive(Serialize,Deserialize)]
-struct Config {
+pub struct Config {
     seq_template_dir:PathBuf,
     grad_template:String,
     rf_template:String,
@@ -38,21 +38,36 @@ impl Config {
         f.write_all(str.as_bytes()).expect("encountered error writing to file");
         cfg
     }
+    pub fn load() -> Self {
+        match Path::new(CONFIG_FILE).exists() {
+            true => {
+                let mut f = File::open(CONFIG_FILE).expect("trouble opening file");
+                let mut str = String::new();
+                f.read_to_string(&mut str).expect("encountered problem reading file");
+                serde_json::from_str(&str).expect("cannot deserialize config. Is it corrupt?")
+            },
+            false => {
+                Config::default()
+            }
+        }
+    }
+    pub fn grad_param_filename(&self) -> PathBuf {
+        Path::new(&self.grad_params).to_owned()
+    }
+    pub fn rf_param_filename(&self) -> PathBuf {
+        Path::new(&self.rf_params).to_owned()
+    }
+    pub fn grad_seq(&self) -> PathBuf {
+        Path::new(&self.grad_seq).to_owned()
+    }
+    pub fn rf_seq(&self) -> PathBuf {
+        Path::new(&self.rf_seq).to_owned()
+    }
 }
 
 pub fn build_directory(wd:&Path) {
 
-    let config = match Path::new(CONFIG_FILE).exists() {
-        true => {
-            let mut f = File::open(CONFIG_FILE).expect("trouble opening file");
-            let mut str = String::new();
-            f.read_to_string(&mut str).expect("encountered problem reading file");
-            serde_json::from_str(&str).expect("cannot deserialize config. Is it corrupt?")
-        },
-        false => {
-            Config::default()
-        }
-    };
+    let config = Config::load();
 
     let pattern = wd.join(&config.rf_params);
     let entries:Vec<PathBuf> = glob(pattern.to_str().unwrap()).expect("Failed to read glob pattern").flat_map(|m| m).collect();

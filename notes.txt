@@ -10,5 +10,9 @@ cargo test <package_name> <module_name>
 To test a sequence for development, run something like ...
 cargo test -p seq_lib fse_3_echo -- --nocapture
 
+To test a sequence for development but for windows target, run ...
+cargo test -p seq_lib fse_3_echo --target x86_64-pc-windows-gnu -- --nocapture
+Without specifying --target, it will run in wsl environment and nothing else will work
+
 To run the gui app in debug mode, run
 bash run_native_windows.bash

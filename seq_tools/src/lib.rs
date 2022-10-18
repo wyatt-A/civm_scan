@@ -26,3 +26,4 @@ pub mod grad_cal;
 pub mod diffusion;
 mod Multi6Echo;
 mod FSE4Echo;
+pub mod pe_table;

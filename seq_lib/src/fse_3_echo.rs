@@ -11,41 +11,66 @@ use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
 use seq_tools::ppl::BaseFrequency::Civm9p4T;
-use seq_tools::ppl::{BaseFrequency, GradClock, Orientation, PhaseUnit, PPL};
+use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
 use seq_tools::pulse::{CompositeHardpulse, Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
-use seq_tools::seqframe::SeqFrame;
 use seq_tools::utils;
 use seq_tools::utils::us_to_clock;
+use crate::pulse_sequence::{PulseSequence, PPLBaseParams};
 
 #[test]
 fn test(){
-    //let mut mep = MultiEcho3D::default_params();
-    //let mut mep = MultiEcho3D::low_res_params();
     let mut mep = MultiEcho3D::low_res_params_2();
+    mep.n_averages = 100;
+    mep.n_repetitions = 1;
+    mep.setup_mode = true;
+    mep.grad_off = true;
+    let mut me = MultiEcho3D::new(mep.clone());
+    let sim_mode = false;
+    let filepath = Path::new(r"d:\dev\221017\echo_align");
+    me.ppl_export(filepath,"setup",sim_mode,true);
+
+
+    mep.n_averages = 1;
+    mep.n_repetitions = 2000;
+    mep.setup_mode = true;
+    mep.grad_off = false;
+    let mut me = MultiEcho3D::new(mep.clone());
+    let sim_mode = false;
+    let filepath = Path::new(r"d:\dev\221017\setup");
+    me.ppl_export(filepath,"setup",sim_mode,true);
+
+    mep.n_averages = 1;
+    mep.n_repetitions = 14420;
     mep.setup_mode = false;
     mep.grad_off = false;
+    let mut me = MultiEcho3D::new(mep);
     let sim_mode = false;
-    let acceleration = 2;
-    let output_dir = Path::new("/mnt/d/dev/221014");
-    let me = MultiEcho3D::new(mep);
-    //me.plot_export(4,100,"/mnt/d/dev/plotter/output");
-    //me.plot_export(4,0,"output");
-    let ppl = me.ppl_export(Civm9p4T(0.0),Orientation::CivmStandard,acceleration,sim_mode);
+    let filepath = Path::new(r"d:\dev\221017\run");
+    me.ppl_export(filepath,"setup",sim_mode,true);
+}
 
-    let filename = output_dir.join("multi_echo.ppl");
-    let mut outfile = File::create(&filename).expect("cannot create file");
-    //let mut outfile = File::create("multi_echo.ppl").expect("cannot create file");
-    outfile.write_all(ppl.print().as_bytes()).expect("cannot write to file");
-    me.seq_export(4,output_dir.to_str().unwrap());
-
-
-    let ppr_filename = output_dir.join("setup.ppr");
-    let mut outfile = File::create(ppr_filename).expect("cannot create file");
-    outfile.write_all(ppl.print_ppr(Path::new("d:/dev/221014/multi_echo.ppl")).as_bytes()).expect("cannot write to file");
-
-    //me.seq_export(4,".");
+impl PulseSequence for MultiEcho3D {
+    fn place_events(&self) -> EventQueue {
+        self.place_events()
+    }
+    fn base_params(&self) -> PPLBaseParams {
+        PPLBaseParams {
+            n_averages: self.params.n_averages,
+            n_repetitions: self.params.n_repetitions,
+            rep_time: self.params.rep_time,
+            base_frequency: Civm9p4T(0.0),
+            orientation: Orientation::CivmStandard,
+            grad_clock: GradClock::CPS20,
+            phase_unit: PhaseUnit::Min,
+            acceleration: self.params.acceleration,
+            sample_period_us: 2
+        }
+    }
+    fn name(&self) -> String {
+        String::from("fse_3_echo")
+    }
 }
 
 #[derive(Clone)]
@@ -59,8 +84,11 @@ pub struct MultiEcho3DParams {
     echo_time:f32,
     echo_time2:f32,
     rep_time:f32,
+    n_averages:u16,
+    n_repetitions:u32,
     setup_mode:bool,
-    grad_off:bool
+    grad_off:bool,
+    acceleration:u16
 }
 
 pub struct MultiEcho3D {
@@ -107,6 +135,9 @@ impl MultiEcho3D {
             echo_time:13.0E-3,
             echo_time2:6.530E-3,
             rep_time:100.0E-3,
+            n_averages: 1,
+            n_repetitions: 28800,
+            acceleration:2,
             setup_mode:false,
             grad_off:false
         }
@@ -123,6 +154,9 @@ impl MultiEcho3D {
             echo_time:13.0E-3,
             echo_time2:7.0E-3,
             rep_time:80.0E-3,
+            n_averages: 1,
+            n_repetitions: 28800,
+            acceleration:2,
             setup_mode:false,
             grad_off:false
         }
@@ -139,6 +173,9 @@ impl MultiEcho3D {
             echo_time:13.0E-3,
             echo_time2:7E-3,
             rep_time:80.0E-3,
+            n_averages: 1,
+            n_repetitions: 28800,
+            acceleration:2,
             setup_mode:false,
             grad_off:false
         }
@@ -155,6 +192,9 @@ impl MultiEcho3D {
             echo_time:14.0E-3,
             echo_time2:7E-3,
             rep_time:100E-3,
+            n_averages: 1,
+            n_repetitions: 28800,
+            acceleration:2,
             setup_mode:false,
             grad_off:false
         }
@@ -249,15 +289,18 @@ impl MultiEcho3D {
 
         let ref_driver1 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(0));
         //let ref_driver1 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[0]));
-        let refocus_phase1 = RfStateType::Driven(ref_driver1);
+        //let refocus_phase1 = RfStateType::Driven(ref_driver1);
+        let refocus_phase1 = RfStateType::Adjustable(0);
 
-        let ref_driver2 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(1));
+        let ref_driver2 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(0));
         //let ref_driver2 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[1]));
-        let refocus_phase2 = RfStateType::Driven(ref_driver2);
+        //let refocus_phase2 = RfStateType::Driven(ref_driver2);
+        let refocus_phase2 = RfStateType::Adjustable(0);
 
-        let ref_driver3 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(2));
+        let ref_driver3 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(0));
         //let ref_driver3 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[2]));
-        let refocus_phase3 = RfStateType::Driven(ref_driver3);
+        //let refocus_phase3 = RfStateType::Driven(ref_driver3);
+        let refocus_phase3 = RfStateType::Adjustable(0);
 
         //let ref_driver4 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[3]));
         //let refocus_phase4 = RfStateType::Driven(ref_driver4);
@@ -595,36 +638,5 @@ impl MultiEcho3D {
                            grad_spoil,
         ]);
         EventQueue::new(&events)
-    }
-    // pub fn plot_export(&self,sample_period_us:usize,driver_val:u32,filename:&str){
-    //     let file = Path::new(filename);
-    //     let graphs = self.place_events().graphs_dynamic(sample_period_us,driver_val);
-    //     let s = serde_json::to_string_pretty(&graphs).expect("cannot serialize");
-    //     let mut f = File::create(file).expect("cannot create file");
-    //     f.write_all(&s.as_bytes()).expect("trouble writing to file");
-    // }
-    pub fn ppl_export(&self,base_frequency:BaseFrequency,orientation:Orientation,acceleration:u16,simulation_mode:bool) -> PPL {
-        let averages = 1;
-        //let repetitions = (self.params.samples.1 as u32*self.params.samples.2 as u32);
-        let repetitions = 2;
-        PPL::new(
-            &mut self.place_events(),repetitions,averages,self.params.rep_time,base_frequency,
-            r"d:\dev\221014\civm_grad.seq",r"d:\dev\221014\civm_rf.seq",
-            orientation,GradClock::CPS20,PhaseUnit::Min,acceleration,simulation_mode)
-    }
-
-    pub fn seq_export(&self,sample_period_us:usize,filepath:&str){
-        let q = self.place_events();
-        let (grad_params,rf_params) = q.ppl_seq_params(sample_period_us);
-        //let path = std::env::current_dir().expect("cannot get current dir");
-        let path = Path::new(filepath);
-        let grad_param = Path::new("civm_grad_params").with_extension("txt");
-        let grad_param_path = path.join(grad_param);
-        let rf_param = Path::new("civm_rf_params").with_extension("txt");
-        let rf_param_path = path.join(rf_param);
-        let mut rf_seq_file = File::create(rf_param_path).expect("cannot create file");
-        rf_seq_file.write_all(&SeqFrame::format_as_bytes(&rf_params.unwrap())).expect("trouble writing to file");
-        let mut grad_seq_file = File::create(grad_param_path).expect("cannot create file");
-        grad_seq_file.write_all(&SeqFrame::format_as_bytes(&grad_params.unwrap())).expect("trouble writing to file");
     }
 }

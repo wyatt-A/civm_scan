@@ -96,7 +96,10 @@ impl RfState {
                 format!("int {};",self.phase_var())
             }
             RfStateType::Adjustable(_) => {
-                format!("common int {};",self.adjust_phase_var())
+                vec![
+                    format!("common int {};",self.adjust_phase_var()),
+                    format!("int {};",self.phase_var())
+                ].join("\n")
             }
         }
     }
