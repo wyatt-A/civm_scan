@@ -1463,6 +1463,7 @@ name = "seq_lib"
 version = "0.1.0"
 dependencies = [
  "build_sequence",
+ "regex",
  "seq_tools",
 ]
 
@@ -1472,6 +1473,7 @@ version = "0.1.0"
 dependencies = [
  "encoding",
  "itertools",
+ "regex",
  "serde",
  "serde_json",
 ]

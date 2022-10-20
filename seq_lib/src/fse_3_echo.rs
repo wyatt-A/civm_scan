@@ -232,7 +232,7 @@ impl MultiEcho3D {
         // Find correct readout dac value for the field of view and spectral width
         let read_grad_dac = spectral_width.fov_to_dac(fov_read);
         // define the matrix
-        let mut read_matrix = Matrix::new_static("read_mat",DacValues::new(Some(read_grad_dac),None,None),&mat_count);
+        let mut read_matrix = Matrix::new_static("read_mat",DacValues::new(Some(read_grad_dac),None,None),(false,false,false),false,&mat_count);
         if params.grad_off {
             read_matrix.disabled = true;
         }
@@ -344,7 +344,7 @@ impl MultiEcho3D {
         /* the spoiler is active on all channels at the end of the echo train to de-phase any residual signal
          */
         let spoiler_waveform = Trapezoid::new(100E-6,1E-3);
-        let spoiler_matrix = Matrix::new_static("spoiler_mat",DacValues::new(Some(4000),Some(0),Some(0)),&mat_count);
+        let spoiler_matrix = Matrix::new_static("spoiler_mat",DacValues::new(Some(4000),Some(0),Some(0)),(false,false,false),false,&mat_count);
 
         let spoiler = GradEvent::new(
             (Some(spoiler_waveform),
@@ -402,6 +402,8 @@ impl MultiEcho3D {
             pe_driver1.clone(),
             transform,
             static_dac_vals,
+            (true,false,false),
+            false,
             &mat_count
         );
         phase_encode_matrix1.adjustable = (true,false,false);
@@ -415,6 +417,8 @@ impl MultiEcho3D {
             pe_driver2.clone(),
             transform,
             DacValues::new(Some(crusher_dac),None,None),
+            (false,false,false),
+            false,
             &mat_count
         );
         if params.grad_off {
@@ -426,6 +430,8 @@ impl MultiEcho3D {
             pe_driver3.clone(),
             transform,
             DacValues::new(Some(crusher_dac),None,None),
+            (false,false,false),
+            false,
             &mat_count
         );
         if params.grad_off {
@@ -484,6 +490,8 @@ impl MultiEcho3D {
             "c_rewind_mat1",
             &Rc::new(phase_encode_matrix1.clone()),
             LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac), Some(0), Some(0))),
+            (false,false,false),
+            false,
             &mat_count
         );
         rewinder_matrix1.adjustable = (true,false,false);
@@ -495,6 +503,8 @@ impl MultiEcho3D {
             "c_rewind_mat2",
             &Rc::new(phase_encode_matrix2.clone()),
             LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac), Some(0), Some(0))),
+            (true,false,false),
+            false,
             &mat_count
         );
         rewinder_matrix2.adjustable = (true,false,false);
@@ -506,6 +516,8 @@ impl MultiEcho3D {
             "c_rewind_mat3",
             &Rc::new(phase_encode_matrix3.clone()),
             LinTransform::new((Some(0.0),Some(-1.0),Some(-1.0)),(Some(crusher_dac), Some(0), Some(0))),
+            (true,false,false),
+            false,
             &mat_count
         );
         if params.grad_off {
@@ -551,7 +563,7 @@ impl MultiEcho3D {
             true => 500,
             false => 0
         };
-        let mut diffusion_mat = Matrix::new_static("diffusion_mat",DacValues::new(Some(diffusion_dac),Some(0),Some(0)),&mat_count);
+        let mut diffusion_mat = Matrix::new_static("diffusion_mat",DacValues::new(Some(diffusion_dac),Some(0),Some(0)),(true,false,false),false,&mat_count);
         // if params.grad_off {
         //     diffusion_mat.disabled = true;
         // }

@@ -7,6 +7,7 @@
  normalized power to calculate things like flip angle and k-space traversal.
  */
 
+use std::f32::consts::PI;
 use crate::execution::PlotTrace;
 use crate::pulse_function::{Function, FunctionParams};
 use crate::utils;
@@ -79,6 +80,38 @@ impl Pulse for Trapezoid {
         ]
     }
 }
+
+#[derive(Clone,Copy)]
+pub struct HalfSin {
+    pub duration:f32,
+}
+
+impl HalfSin {
+    pub fn new(duration:f32) -> HalfSin {
+        assert!(duration > 0.0,"duration must be positive");
+        HalfSin{duration}
+    }
+}
+
+impl Pulse for HalfSin {
+    fn duration(&self) -> f32 {
+        self.duration
+    }
+    fn function(&self, time_step_us: usize) -> Vec<Function> {
+        let params = FunctionParams::new(utils::sec_to_samples(self.duration,time_step_us),1.0);
+        vec![Function::HalfSin(params)]
+    }
+    fn power_net(&self, magnitude: f32) -> f32 {
+        2.0*magnitude*self.duration/PI
+    }
+    fn magnitude_net(&self, power_net: f32) -> f32 {
+        power_net*PI/(2.0*self.duration)
+    }
+    fn power_abs(&self, magnitude: f32) -> f32 {
+        2.0*magnitude*self.duration/PI
+    }
+}
+
 
 #[derive(Clone,Copy)]
 pub struct Hardpulse {

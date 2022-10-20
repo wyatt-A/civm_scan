@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::path::Path;
+use regex::Regex;
 use crate::command_string::CommandString;
 use crate::acq_event::SpectralWidth;
 use crate::event_block::EventQueue;
@@ -805,6 +807,66 @@ impl FlatLoopStructure {
         }
     }
 }
+
+
+pub fn ppr_var_map(ppr_string:&str) -> Option<HashMap<String,i16>> {
+    let reg = Regex::new(r":VAR (.*?), ([-0-9]+)").expect("invalid regex");
+
+    let mut map = HashMap::<String,i16>::new();
+
+    let mut str = ppr_string.to_owned();
+    let lines:Vec<String> = str.lines().map(|s| s.to_string()).collect();
+    lines.iter().for_each(|line| {
+        let captures = reg.captures(line);
+        match captures {
+            Some(capture) => {
+                let cap1 = capture.get(1).expect("ppr variable not found");
+                let cap2 = capture.get(2).expect("ppr value not found");
+                let var_name = cap1.as_str().to_string();
+                let value:i16 = cap2.as_str().parse().expect("cannot parse to int16");
+                map.insert(var_name,value);
+            },
+            None => {}
+        }
+    });
+    match map.is_empty() {
+        true => None,
+        false => Some(map)
+    }
+}
+
+pub fn update_ppr(ppr_string:&str,var_map:&HashMap<String,i16>) -> String {
+    let mut str = ppr_string.to_owned();
+    var_map.iter().for_each(|(key,value)| {
+        let mut lines:Vec<String> = str.lines().map(|s| s.to_string()).collect();
+        lines.iter_mut().for_each(|line| {
+            let u = update_ppr_line(line,key,*value);
+            match u {
+                Some((new_string,_)) => {
+                    *line = new_string;
+                }
+                None => {}
+            }
+        });
+        str = lines.join("\n")
+    });
+    str
+}
+
+fn update_ppr_line(line:&str,var_name:&str,new_value:i16) -> Option<(String,i16)> {
+    let reg = Regex::new(&format!(":VAR {}, ([-0-9]+)",var_name)).expect("invalid regex");
+    let captures = reg.captures(line);
+    match captures {
+        Some(capture) => {
+            let cap = capture.get(1).expect("ppr value not found");
+            let old_value = cap.as_str().parse().expect("cannot parse to int16");
+            Some((format!(":VAR {}, {}",var_name,new_value),old_value))
+        },
+        None => None
+    }
+}
+
+
 
 
 #[test]

@@ -234,14 +234,14 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
     }
     fn block_initialization(&self) -> CommandString {
         let mut cmds = Vec::<String>::new();
-        match self.matrix.kind(){
-            MatrixType::Static(_) => cmds.push(self.matrix.set_vars()),
-            _ => {}
-        };
-        match self.matrix.kind(){
-            MatrixType::Static(_) => cmds.push(self.matrix.create_matrix()),
-            _ => {}
-        };
+        // match self.matrix.kind(){
+        //     MatrixType::Static(_) => cmds.push(self.matrix.set_vars()),
+        //     _ => {}
+        // };
+        // match self.matrix.kind(){
+        //     MatrixType::Static(_) => cmds.push(self.matrix.create_matrix()),
+        //     _ => {}
+        // };
         match self.init_list(Channel::Read) {
             Some(cmd) => cmds.push(cmd),
             None => {}
@@ -280,11 +280,11 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
     fn block_calculation(&self) -> Option<CommandString> {
         // only applies to matrices of type driven and derived
         let set_matrix_vars = match self.matrix.kind(){
-            MatrixType::Driven(_,_,_) | MatrixType::Derived(_,_) => Some(self.matrix.set_vars()),
+            MatrixType::Driven(_,_,_) | MatrixType::Derived(_,_) | MatrixType::Static(_) => Some(self.matrix.set_vars()),
             _ => None
         };
         let create_matrix = match self.matrix.kind(){
-            MatrixType::Driven(_,_,_) | MatrixType::Derived(_,_) => Some(self.matrix.create_matrix()),
+            MatrixType::Driven(_,_,_) | MatrixType::Derived(_,_) | MatrixType::Static(_) => Some(self.matrix.create_matrix()),
             _ => None
         };
         let mut cmds = Vec::<String>::new();

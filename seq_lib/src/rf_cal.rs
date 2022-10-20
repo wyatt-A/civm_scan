@@ -117,7 +117,9 @@ impl RfCal {
         let duration = params.tau_1*3.0 + params.tau_2 + 3.0E-3;
         let slice_select_waveform = Trapezoid::new(400E-6,duration);
         let slice_select_dac = 500;
-        let slice_select_mat = Matrix::new_static("slice_select_mat",DacValues::new(Some(0),Some(0),Some(slice_select_dac)),&mat_count);
+        let slice_select_mat = Matrix::new_static("slice_select_mat",DacValues::new(Some(0),Some(0),Some(slice_select_dac)),
+                                                  (false,false,false),false,
+                                                  &mat_count);
         let slice_select = GradEvent::new(
             (None,
              None,

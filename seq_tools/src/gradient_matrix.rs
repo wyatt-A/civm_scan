@@ -284,7 +284,7 @@ impl Matrix {
     pub fn new_tracker() -> Rc<RefCell<u8>> {
         Rc::new(RefCell::<u8>::new(1))
     }
-    pub fn new_static(label: &str, dac_values: DacValues, uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
+    pub fn new_static(label: &str, dac_values: DacValues, adjustable:(bool,bool,bool),disabled:bool,uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
         let uid_tracker = uid_tracker.clone();
         let mut uid = uid_tracker.borrow_mut();
         *uid += 1;
@@ -292,11 +292,11 @@ impl Matrix {
             kind: MatrixType::Static(dac_values),
             label: label.to_owned(),
             uid: (*uid).clone(),
-            adjustable:(false,false,false),
-            disabled:false
+            adjustable,
+            disabled
         }
     }
-    pub fn new_derived(label: &str, parent: &Rc<Matrix>, trans: LinTransform, uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
+    pub fn new_derived(label: &str, parent: &Rc<Matrix>, trans: LinTransform, adjustable:(bool,bool,bool),disabled:bool,uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
         let parent = Rc::clone(parent);
         let uid_tracker = uid_tracker.clone();
         let mut uid = uid_tracker.borrow_mut();
@@ -305,11 +305,11 @@ impl Matrix {
             kind: MatrixType::Derived(parent, trans),
             label: label.to_owned(),
             uid: (*uid).clone(),
-            adjustable:(false,false,false),
-            disabled:false
+            adjustable,
+            disabled
         }
     }
-    pub fn new_driven(label: &str, driver: MatrixDriver, trans: LinTransform, default_dac: DacValues, uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
+    pub fn new_driven(label: &str, driver: MatrixDriver, trans: LinTransform, default_dac: DacValues,adjustable:(bool,bool,bool),disabled:bool, uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
         let uid_tracker = uid_tracker.clone();
         let mut uid = uid_tracker.borrow_mut();
         *uid += 1;
@@ -317,11 +317,11 @@ impl Matrix {
             kind: MatrixType::Driven(driver.clone(), trans, default_dac),
             label: label.to_owned(),
             uid: (*uid).clone(),
-            adjustable:(false,false,false),
-            disabled:false
+            adjustable,
+            disabled
         }
     }
-    pub fn derive(&self, label: &str, trans: LinTransform, uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
+    pub fn derive(&self, label: &str, trans: LinTransform, adjustable:(bool,bool,bool),disabled:bool,uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
         let uid_tracker = uid_tracker.clone();
         let mut uid = uid_tracker.borrow_mut();
         *uid += 1;
@@ -329,8 +329,8 @@ impl Matrix {
             kind: MatrixType::Derived(Rc::new(self.clone()), trans),
             label: label.to_owned(),
             uid: (*uid).clone(),
-            adjustable:(false,false,false),
-            disabled:false
+            adjustable,
+            disabled
         }
     }
     pub fn kind(&self) -> MatrixType {

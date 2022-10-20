@@ -1,4 +1,4 @@
-use crate::pulse::{Pulse,Trapezoid};
+use crate::pulse::{HalfSin, Pulse, Trapezoid};
 use crate::pulse_function::Function;
 use crate::seqframe::{self, SeqFrame, FrameType, SeqFrameExpression};
 use crate::utils;
@@ -20,6 +20,7 @@ pub trait GradFrame:Pulse {
 }
 
 impl GradFrame for Trapezoid {}
+impl GradFrame for HalfSin {}
 
 #[test]
 fn test(){
