@@ -251,7 +251,7 @@ impl SpinEchoDW {
             "excitation",
             1,
             w.excitation,
-            RfStateType::Adjustable(400),
+            RfStateType::Adjustable(400,None),
             RfStateType::Static(0)
         );
 
@@ -259,7 +259,7 @@ impl SpinEchoDW {
             "refocus",
             2,
             w.refocus,
-            RfStateType::Adjustable(800),
+            RfStateType::Adjustable(800,None),
             RfStateType::Driven(RfDriver::new(DriverVar::Repetition,RfDriverType::PhaseCycle3D(PhaseCycleStrategy::CycleCPMG(1)),None)),
         );
 

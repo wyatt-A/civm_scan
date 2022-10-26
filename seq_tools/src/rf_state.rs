@@ -1,6 +1,6 @@
 use crate::gradient_matrix::{LUT_INDEX_VAR_NAME, LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, LONG_TEMPVAL_VAR_NAME, DriverVar};
 use crate::command_string::{CommandString,Command};
-use crate::ppl::ScrollBar;
+use crate::ppl::{ScrollBar, VIEW_LOOP_COUNTER_VAR};
 
 #[derive(Clone,Debug)]
 pub struct RfState {
@@ -35,7 +35,7 @@ pub enum PhaseCycleStrategy{
 #[derive(Clone,Debug)]
 pub enum RfStateType {
     Static(i16),
-    Adjustable(i16),
+    Adjustable(i16,Option<PhaseCycleStrategy>),
     Driven(RfDriver)
 }
 
@@ -75,14 +75,14 @@ impl RfState {
     pub fn header_declaration(&self) -> Option<Vec<ScrollBar>> {
         let mut scrollbars = Vec::<ScrollBar>::new();
         match &self.power {
-            Some(RfStateType::Adjustable(init_dac)) => {
+            Some(RfStateType::Adjustable(init_dac,_)) => {
                 let scrollbar = ScrollBar::new_rf_pow_adj(&self.label,&self.adjust_power_var(),*init_dac);
                 scrollbars.push(scrollbar);
             }
             _=> {}
         };
         match &self.phase {
-            RfStateType::Adjustable(init_dac) => {
+            RfStateType::Adjustable(init_dac,_) => {
                 let scrollbar = ScrollBar::new_rf_phase_adj(&self.label,&self.adjust_phase_var(),*init_dac);
                 scrollbars.push(scrollbar);
             }
@@ -95,7 +95,7 @@ impl RfState {
             RfStateType::Static(_) | RfStateType::Driven(_) => {
                 format!("int {};",self.phase_var())
             }
-            RfStateType::Adjustable(_) => {
+            RfStateType::Adjustable(_,_) => {
                 vec![
                     format!("common int {};",self.adjust_phase_var()),
                     format!("int {};",self.phase_var())
@@ -108,7 +108,7 @@ impl RfState {
             Some(RfStateType::Static(_)) | Some(RfStateType::Driven(_)) => {
                 Some(format!("int {};",self.power_var()))
             }
-            Some(RfStateType::Adjustable(_)) => {
+            Some(RfStateType::Adjustable(_,_)) => {
                 Some(vec![
                     format!("common int {};",self.adjust_power_var()),
                     format!("int {};",self.power_var()),
@@ -145,8 +145,18 @@ impl RfState {
             RfStateType::Static(phase) => {
                 format!("{} = {};",self.phase_var(),phase)
             }
-            RfStateType::Adjustable(_) => {
-                format!("{} = {};",self.phase_var(),self.adjust_phase_var())
+            RfStateType::Adjustable(_,strategy) => {
+                match strategy {
+                    Some(strat) => {
+                        match strat {
+                            PhaseCycleStrategy::CycleCPMG(acceleration) => {
+                                format!("{} = {} + 800*(({}/{})%2);", self.phase_var(),self.adjust_phase_var(), VIEW_LOOP_COUNTER_VAR, acceleration)
+                            }
+                            _=> panic!("phase cycle strategy no yet implemented for user adjustments")
+                        }
+                    }
+                    None => format!("{} = {};", self.phase_var(), self.adjust_phase_var())
+                }
             }
             RfStateType::Driven(driver) => {
                 match &driver.kind {
@@ -188,7 +198,7 @@ impl RfState {
             Some(RfStateType::Static(dac)) => {
                 Some(format!("{} = {};",self.power_var(),dac))
             }
-            Some(RfStateType::Adjustable(_)) => {
+            Some(RfStateType::Adjustable(_,_)) => {
                 Some(format!("{} = {};",self.power_var(),self.adjust_power_var()))
             }
             Some(RfStateType::Driven(driver)) => {

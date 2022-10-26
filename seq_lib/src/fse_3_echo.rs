@@ -265,7 +265,7 @@ impl MultiEcho3D {
         to 0
         */
         let excite_waveform = Hardpulse::new(100E-6);
-        let excite_power = RfStateType::Adjustable(513);
+        let excite_power = RfStateType::Adjustable(513,None);
         let excite_phase = RfStateType::Static(0);
         let excitation = RfEvent::new(
             "excitation",
@@ -280,7 +280,7 @@ impl MultiEcho3D {
         /* REFOCUS */
         /* Composite hard pulse that gets a different phase depending on k-space coordinate read from a LUT */
         let refocus_waveform = CompositeHardpulse::new_180(200E-6);
-        let refocus_power = RfStateType::Adjustable(897);
+        let refocus_power = RfStateType::Adjustable(897,None);
         let rf_phase_cycle_strategy = PhaseCycleStrategy::CycleCPMG(2);
         // 90  270  90  270
         // 270  90  270  90
@@ -290,17 +290,17 @@ impl MultiEcho3D {
         let ref_driver1 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(0));
         //let ref_driver1 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[0]));
         //let refocus_phase1 = RfStateType::Driven(ref_driver1);
-        let refocus_phase1 = RfStateType::Adjustable(0);
+        let refocus_phase1 = RfStateType::Adjustable(0,None);
 
         let ref_driver2 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(0));
         //let ref_driver2 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[1]));
         //let refocus_phase2 = RfStateType::Driven(ref_driver2);
-        let refocus_phase2 = RfStateType::Adjustable(0);
+        let refocus_phase2 = RfStateType::Adjustable(0,None);
 
         let ref_driver3 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(0));
         //let ref_driver3 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[2]));
         //let refocus_phase3 = RfStateType::Driven(ref_driver3);
-        let refocus_phase3 = RfStateType::Adjustable(0);
+        let refocus_phase3 = RfStateType::Adjustable(0,None);
 
         //let ref_driver4 = RfDriver::new(DriverVar::Repetition, cycle.clone(), Some(echo_index[3]));
         //let refocus_phase4 = RfStateType::Driven(ref_driver4);

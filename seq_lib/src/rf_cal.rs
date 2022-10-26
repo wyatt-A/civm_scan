@@ -102,7 +102,7 @@ impl RfCal {
         to 0
         */
         let excite_waveform = Hardpulse::new(100E-6);
-        let excite_power = RfStateType::Adjustable(513);
+        let excite_power = RfStateType::Adjustable(513,None);
         let excite_phase = RfStateType::Static(0);
         let excitation = RfEvent::new(
             "excitation",

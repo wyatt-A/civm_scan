@@ -97,6 +97,9 @@ impl Event {
     pub fn set_post_delay(&mut self,extension:i32) {
         self.post_delay = extension;
     }
+    pub fn center(&self) -> i32 {
+        self.center
+    }
 }
 
 /** Queue of sequence events that will be executed in a loop */
