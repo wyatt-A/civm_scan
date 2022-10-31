@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use crate::command_string::CommandString;
 use crate::acq_event::SpectralWidth;
 use crate::event_block::EventQueue;
@@ -66,18 +67,18 @@ pub enum DspRoutine {
     Dsp
 }
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum Orientation {
     CivmStandard,
     Simulation
 }
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum GradClock {
     CPS20
 }
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum PhaseUnit {
     PU90,
     Min
@@ -115,6 +116,7 @@ impl Orientation {
     }
 }
 
+
 impl PhaseUnit{
     pub fn value(&self) -> i16 {
         match self {
@@ -142,27 +144,33 @@ impl DspRoutine {
     }
 }
 
-#[derive(Clone)]
-pub enum BaseFrequency {
-    Civm9p4T(f32)
+
+// pub enum BaseFrequency {
+//     Civm9p4T(f32)
+// }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct BaseFrequency {
+    base_freq:f32,
+    obs_offset:f32
 }
 
 
 impl BaseFrequency {
-    fn print(&self) -> String {
-        match self {
-            BaseFrequency::Civm9p4T(offset) =>
-                format!("OBSERVE_FREQUENCY \"9.4T 1H\",{},{},{},MHz, kHz, Hz, rx1MHz;",
-                        FREQ_OFFSET_MIN,FREQ_OFFSET_MAX,offset)
+
+    pub fn civm9p4t(offset:f32) -> Self {
+        Self {
+            base_freq:30171576.0,
+            obs_offset:offset
         }
     }
+    fn print(&self) -> String {
+                format!("OBSERVE_FREQUENCY \"9.4T 1H\",{},{},{},MHz, kHz, Hz, rx1MHz;",
+                        FREQ_OFFSET_MIN,FREQ_OFFSET_MAX,self.obs_offset)
+    }
     fn print_ppr(&self) -> String {
-        match self {
-            BaseFrequency::Civm9p4T(offset) =>
                 format!(":OBSERVE_FREQUENCY \"9.4T 1H\", {:.1}, MHz, kHz, Hz, rx1MHz"
-                        ,30171576.0+offset)
-
-        }
+                        ,self.base_freq+self.obs_offset)
     }
     pub fn set_freq_buffer(&self) -> String {
         ppl_function::set_base_freq()
@@ -874,7 +882,7 @@ fn test(){
     let h = Header{
         dsp_routine:DspRoutine::Dsp,
         receiver_mask:1,
-        base_frequency:BaseFrequency::Civm9p4T(0.0),
+        base_frequency:BaseFrequency::civm9p4t(0.0),
         samples:788,
         spectral_width: SpectralWidth::SW200kH,
         sample_discards:0,

@@ -10,7 +10,7 @@ use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin,
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
-use seq_tools::ppl::BaseFrequency::Civm9p4T;
+use seq_tools::ppl::BaseFrequency;
 use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
 use seq_tools::pulse::{CompositeHardpulse, Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
@@ -60,12 +60,12 @@ impl PulseSequence for MultiEcho3D {
             n_averages: self.params.n_averages,
             n_repetitions: self.params.n_repetitions,
             rep_time: self.params.rep_time,
-            base_frequency: Civm9p4T(0.0),
+            base_frequency: BaseFrequency::civm9p4t(0.0),
             orientation: Orientation::CivmStandard,
             grad_clock: GradClock::CPS20,
             phase_unit: PhaseUnit::Min,
-            acceleration: self.params.acceleration,
-            sample_period_us: 2
+            view_acceleration: self.params.acceleration,
+            wavform_sample_period_us: 2
         }
     }
     fn name(&self) -> String {

@@ -9,3 +9,6 @@ edition = "2021"
 seq_tools = {path = "../seq_tools"}
 build_sequence = {path ="../build_sequence"}
 regex = "1"
+serde = { version = "1.0.144", features = ["derive"] }
+toml = "0.5"
+serde_json = "1.0.87"

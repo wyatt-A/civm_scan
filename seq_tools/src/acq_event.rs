@@ -9,6 +9,7 @@ use crate::pulse::Trapezoid;
 use crate::gradient_event::GradEvent;
 use std::cell::RefCell;
 use std::rc::Rc;
+use serde::{Deserialize, Serialize};
 use crate::gradient_matrix::{Matrix, DacValues};
 use crate::event_block::GradEventType;
 use crate::utils::sec_to_clock;
@@ -26,7 +27,7 @@ const MAX_DISCARD:u16 = 16;
 const MIN_SAMPLES:u16 = 8;
 const MAX_SAMPLES:u16 = 65535;
 
-#[derive(Clone,PartialEq)]
+#[derive(Clone,PartialEq,Serialize,Deserialize)]
 pub enum SpectralWidth {
     SW100kH,
     SW200kH,

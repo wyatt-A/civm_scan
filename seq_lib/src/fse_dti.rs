@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{Read, Write};
 use seq_tools::grad_cal;
@@ -11,68 +11,224 @@ use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin,
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
-use seq_tools::ppl::BaseFrequency::Civm9p4T;
+use seq_tools::ppl::BaseFrequency;
 use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
 use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
 use seq_tools::utils::{clock_to_sec, sec_to_clock, us_to_clock};
-use crate::pulse_sequence::{PulseSequence, PPLBaseParams};
+use crate::pulse_sequence::{Build, PPLBaseParams, PulseSequence};
+use serde_json;
+use serde::{Serialize,Deserialize};
+
+
+/*
+civm_scan new_study -> "/d/smis/20221031"
+(creates a study directory and sets up file structure)
+
+civm_scan scout "/d/smis/20221031"
+(runs a basic scout localizer, writing to cfl images)
+
+civm_scan pre_scan "/d/smis/20221031" -> "/d/smis/20221031/setup.txt"
+(finds base frequency offset and runs rf power calibration. Writes to a setup text file)
+
+civm_scan new_protocol 20.5xFAD.01 -> "/d/smis/20221031/_01"
+(creates a sub-directory for the protocol, loads in parameters and writes sequences to the directory)
+
+civm_scan setup_protocol "/d/smis/20221031/_01"
+(starts the setup sequence for the manual tuning process)
+
+civm_scan run_protocol "/d/smis/20221031/_01"
+()
+
+
+ */
 
 #[test]
 fn test(){
-    //let mut mep = SpinEchoDW::_25um();
-    // let mut mep = SpinEchoDW::_45um();
+    // let mut mep = SpinEchoDW::_25um();
     // mep.n_averages = 1;
     // mep.n_repetitions = 2000;
-    // mep.read_extension = 0.0;
     // mep.setup_mode = false;
     // let sim_mode = false;
     // mep.grad_off = false;
+    // mep.phase_encode_time = 800E-6;
     //
+    // mep.n_repetitions = 2;
     // let mut me = SpinEchoDW::new(mep.clone());
-    // let filepath = Path::new(r"d:\dev\221020\fse");
-    // me.ppl_export(filepath,"setup",sim_mode,true);
+    // me.ppl_export(Path::new(r"d:\dev\221031\fse\sim"),"setup",true,true);
+    //
+    // // Rf Power/Gradient tuning
+    // mep.grad_off = false;
+    // mep.n_averages = 2000;
+    // mep.setup_mode = false;
+    // let mut me = SpinEchoDW::new(mep.clone());
+    // me.ppl_export(Path::new(r"d:\dev\221031\fse\acquire"),"setup",false,true);
+    //
+    // // Rf Power/Gradient tuning
+    // mep.grad_off = false;
+    // mep.n_averages = 1;
+    // mep.n_repetitions = 2000;
+    // mep.setup_mode = true;
+    // let mut me = SpinEchoDW::new(mep.clone());
+    // me.ppl_export(Path::new(r"d:\dev\221031\fse\rf_power"),"setup",false,true);
+    //
+    // // Spin Echo Tuning
+    // mep.grad_off = true;
+    // mep.n_averages = 50;
+    // mep.n_repetitions = 2;
+    // let mut me = SpinEchoDW::new(mep.clone());
+    // me.ppl_export(Path::new(r"d:\dev\221031\fse\se_timing"),"setup",false,true);
 
-    let mut mep = SpinEchoDW::_25um();
-    mep.n_averages = 1;
-    mep.n_repetitions = 2000;
-    mep.setup_mode = false;
-    let sim_mode = false;
-    mep.grad_off = false;
-    mep.phase_encode_time = 800E-6;
 
-    mep.n_repetitions = 2;
-    let mut me = SpinEchoDW::new(mep.clone());
-    me.ppl_export(Path::new(r"d:\dev\221025\sim"),"setup",true,true);
+    let mut sequence = SpinEchoDW::default();
 
+    sequence.params.setup_mode = false;
+    sequence.params.n_repetitions = 2000;
+    sequence.to_file(Path::new(r"D:\dev\221031\protocols\20.5xfad.01.json"));
 
-    // Rf Power/Gradient tuning
-    mep.grad_off = false;
-    mep.n_averages = 2000;
-    mep.setup_mode = false;
-    let mut me = SpinEchoDW::new(mep.clone());
-    me.ppl_export(Path::new(r"d:\dev\221025\acquire"),"setup",false,true);
+    let b_table = Path::new(r"C:\workstation\data\diffusion_table\ICO61_6b0.txt");
+
+    let mut f = File::open(b_table).expect("b_vec table not found");
+    let mut file_string = String::new();
+    f.read_to_string(&mut file_string).expect("trouble reading from file");
+    println!("{}",file_string);
 
 
-    // Rf Power/Gradient tuning
-    mep.grad_off = false;
-    mep.n_averages = 2000;
-    mep.setup_mode = true;
-    let mut me = SpinEchoDW::new(mep.clone());
-    me.ppl_export(Path::new(r"d:\dev\221025\rf_power"),"setup",false,true);
 
-    // Spin Echo Tuning
-    mep.grad_off = true;
-    mep.n_averages = 50;
-    mep.n_repetitions = 2;
-    let mut me = SpinEchoDW::new(mep.clone());
-    me.ppl_export(Path::new(r"d:\dev\221025\se_timing"),"setup",false,true);
+    let mut b_table = Vec::<(f32,f32,f32,f32)>::new();
+    file_string.lines().for_each(|line| {
+        if !line.starts_with("#") && !line.is_empty() {
+            let s = line.split(", ");
+            let values:Vec<f32> = s.map(|elem| elem.parse().expect(&format!("unable to parse {}",elem))).collect();
+            if values.len() == 4 {
+                b_table.push((values[0],values[1],values[2],values[3]));
+            }
+        }
+    });
 
+    let mut s = SpinEchoDW::from_file(Path::new(r"D:\dev\221031\protocols\20.5xfad.01.json"));
+    let b_val = s.params.b_value;
+    let experiments:Vec<SpinEchoDW> = b_table.iter().map(|exp| {
+        let scale = exp.0;
+        let direction = (exp.1,exp.2,exp.3);
+        s.params.b_value = b_val*scale;
+        s.params.b_vec = direction;
+        s.clone()
+    }).collect();
+
+
+
+}
+
+impl DiffusionSeries for SpinEchoDW {}
+
+pub trait DiffusionSeries:DiffusionWeighted {
+    fn read_table(table:&Path) -> Vec<(f32,f32,f32,f32)>{
+        let mut f = File::open(table).expect("b_vec table not found");
+        let mut file_string = String::new();
+        f.read_to_string(&mut file_string).expect("trouble reading from file");
+        let mut b_table = Vec::<(f32,f32,f32,f32)>::new();
+        file_string.lines().for_each(|line| {
+            if !line.starts_with("#") && !line.is_empty() {
+                let s = line.split(", ");
+                let values:Vec<f32> = s.map(|elem| elem.parse().expect(&format!("unable to parse {}",elem))).collect();
+                if values.len() == 4 {
+                    b_table.push((values[0],values[1],values[2],values[3]));
+                }
+            }
+        });
+        b_table
+    }
+    fn build(&self,table_path:&Path) -> Vec<Rc<&Self>>{
+        let tab = Self::read_table(table_path);
+        let mut s = self.clone();
+        let bval = s.bvalue();
+        tab.iter().map(|exp| {
+            let scale = exp.0;
+            let direction = (exp.1,exp.2,exp.3);
+            s.set_balue(bval*scale);
+            s.set_bvec(direction);
+            Rc::new(s.clone())
+        }).collect()
+
+    }
+}
+
+
+pub trait DiffusionWeighted: Build {
+    fn bvalue(&self) -> f32;
+    fn set_balue(&mut self,b_value:f32);
+    fn b_vec(&self) -> (f32,f32,f32);
+    fn set_bvec(&mut self,b_vec:(f32,f32,f32));
+}
+
+impl DiffusionWeighted for SpinEchoDW {
+    fn bvalue(&self) -> f32 {
+        self.params.b_value
+    }
+    fn set_balue(&mut self, b_value: f32) {
+        self.params.b_value = b_value;
+    }
+    fn b_vec(&self) -> (f32, f32, f32) {
+        self.params.b_vec.clone()
+    }
+    fn set_bvec(&mut self, b_vec: (f32, f32, f32)) {
+        self.params.b_vec = b_vec;
+    }
 }
 
 
 impl PulseSequence for SpinEchoDW {
+    fn name() -> String {
+        String::from("fse_dw")
+    }
+    fn default() -> Self {
+        let params = SpinEchoDWParams {
+            name:SpinEchoDW::name(),
+            view_table:Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned(),
+            b_value:3000.0,
+            b_vec:(1.0,0.0,0.0),
+            fov:(19.7,12.0,12.0),
+            samples:(788,480,480),
+            sample_discards:0,
+            spectral_width:SpectralWidth::SW200kH,
+            rf_90_duration:140E-6,
+            rf_180_duration:280E-6,
+            diff_pulse_duration:3.5E-3,
+            diff_pulse_separation:4E-3,
+            spoil_duration:600E-6,
+            ramp_time:140E-6,
+            read_extension: 0.0,
+            phase_encode_time:550E-6,
+            echo_time:13.98E-3,
+            echo_spacing:7.2E-3,
+            obs_freq_offset: 0.0,
+            rep_time:80E-3,
+            n_averages: 1,
+            n_repetitions: 28800,
+            setup_mode:false,
+            grad_off:false
+        };
+        SpinEchoDW::new(params)
+    }
+    fn to_file(&self,filepath:&Path) {
+        let json_str = serde_json::to_string_pretty(&self.params).unwrap();
+        let mut f  = File::create(filepath).expect(&format!("Cannot create file {:?}",filepath));
+        f.write_all(json_str.as_bytes()).expect("trouble writing to file");
+    }
+    fn from_file(filepath:&Path) -> Self {
+        let mut f = File::open(filepath).expect("cannot open file");
+        let mut str = String::new();
+        f.read_to_string(&mut str).expect("trouble reading from file");
+        let params:SpinEchoDWParams = serde_json::from_str(&str).expect("cannot deserialize data format");
+        Self::new(params)
+    }
+}
+
+
+impl Build for SpinEchoDW {
+
     fn place_events(&self) -> EventQueue {
         self.place_events()
     }
@@ -81,34 +237,37 @@ impl PulseSequence for SpinEchoDW {
             n_averages: self.params.n_averages,
             n_repetitions: self.params.n_repetitions,
             rep_time: self.params.rep_time,
-            base_frequency: Civm9p4T(-781.2),
+            base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset),
             orientation: Orientation::CivmStandard,
             grad_clock: GradClock::CPS20,
             phase_unit: PhaseUnit::Min,
-            acceleration: 2,
-            sample_period_us: 2
+            view_acceleration: 2,
+            waveform_sample_period_us: 2
         }
-    }
-    fn name(&self) -> String {
-        String::from("spin_echo_dw")
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub struct SpinEchoDWParams {
+    name:String,
+    view_table:PathBuf,
+    b_value:f32,
+    b_vec:(f32,f32,f32),
     fov: (f32, f32, f32),
     samples: (u16, u16, u16),
     sample_discards: u16,
     spectral_width: SpectralWidth,
     rf_90_duration:f32,
     rf_180_duration:f32,
-    diffusion_duration:f32,
+    diff_pulse_duration:f32,
+    diff_pulse_separation:f32,
     spoil_duration:f32,
     ramp_time:f32,
     read_extension:f32,
     phase_encode_time:f32,
     echo_time:f32,
     echo_spacing:f32,
+    obs_freq_offset:f32,
     rep_time:f32,
     n_averages:u16,
     n_repetitions:u32,
@@ -116,21 +275,23 @@ pub struct SpinEchoDWParams {
     grad_off:bool,
 }
 
+#[derive(Clone)]
 pub struct SpinEchoDW {
     params: SpinEchoDWParams,
     events: SpinEchoDWEvents,
 }
 
+#[derive(Clone)]
 pub struct SpinEchoDWEvents {
-    excitation:RfEvent<Hardpulse>,
-    diffusion:GradEvent<HalfSin>,
-    refocus1:RfEvent<CompositeHardpulse>,
-    refocus2:RfEvent<CompositeHardpulse>,
-    phase_encode1:GradEvent<Trapezoid>,
-    phase_encode2:GradEvent<Trapezoid>,
-    readout:GradEvent<Trapezoid>,
-    acquire:AcqEvent,
-    spoiler:GradEvent<Trapezoid>,
+    excitation: RfEvent<Hardpulse>,
+    diffusion: GradEvent<HalfSin>,
+    refocus1: RfEvent<CompositeHardpulse>,
+    refocus2: RfEvent<CompositeHardpulse>,
+    phase_encode1: GradEvent<Trapezoid>,
+    phase_encode2: GradEvent<Trapezoid>,
+    readout: GradEvent<Trapezoid>,
+    acquire: AcqEvent,
+    spoiler: GradEvent<Trapezoid>,
     refocus3: RfEvent<CompositeHardpulse>,
     phase_encode3: GradEvent<Trapezoid>,
     rewind1: GradEvent<Trapezoid>,
@@ -159,52 +320,57 @@ struct GradMatrices {
 
 impl SpinEchoDW {
 
-    pub fn _25um() -> SpinEchoDWParams {
-        SpinEchoDWParams {
-            fov:(19.7,12.0,12.0),
-            samples:(788,480,480),
-            sample_discards:0,
-            spectral_width:SpectralWidth::SW200kH,
-            rf_90_duration:140E-6,
-            rf_180_duration:280E-6,
-            diffusion_duration:3.5E-3,
-            spoil_duration:600E-6,
-            ramp_time:140E-6,
-            read_extension: 0.0,
-            phase_encode_time:550E-6,
-            echo_time:13.98E-3,
-            echo_spacing:7.2E-3,
-            //echo_spacing:9E-3,
-            rep_time:80E-3,
-            n_averages: 1,
-            n_repetitions: 28800,
-            setup_mode:false,
-            grad_off:false
-        }
-    }
-
-    pub fn _45um() -> SpinEchoDWParams {
-        SpinEchoDWParams {
-            fov:(19.7,12.0,12.0),
-            samples:(420,256,256),
-            sample_discards:0,
-            spectral_width:SpectralWidth::SW133kH,
-            rf_90_duration:140E-6,
-            rf_180_duration:280E-6,
-            diffusion_duration:4.28E-3,
-            spoil_duration:600E-6,
-            ramp_time:100E-6,
-            read_extension: 0.0,
-            phase_encode_time:600E-6,
-            echo_time:14.13E-3,
-            echo_spacing: 14.13E-3,
-            rep_time:80.0E-3,
-            n_averages: 1,
-            n_repetitions: 28800,
-            setup_mode:false,
-            grad_off:false
-        }
-    }
+    // pub fn _25um() -> SpinEchoDWParams {
+    //     SpinEchoDWParams {
+    //         view_table:Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned(),
+    //         fov:(19.7,12.0,12.0),
+    //         samples:(788,480,480),
+    //         sample_discards:0,
+    //         spectral_width:SpectralWidth::SW200kH,
+    //         rf_90_duration:140E-6,
+    //         rf_180_duration:280E-6,
+    //         diff_pulse_duration:3.5E-3,
+    //         diff_pulse_separation:4E-3,
+    //         spoil_duration:600E-6,
+    //         ramp_time:140E-6,
+    //         read_extension: 0.0,
+    //         phase_encode_time:550E-6,
+    //         echo_time:13.98E-3,
+    //         echo_spacing:7.2E-3,
+    //         obs_freq_offset: 0.0,
+    //         rep_time:80E-3,
+    //         n_averages: 1,
+    //         n_repetitions: 28800,
+    //         setup_mode:false,
+    //         grad_off:false
+    //     }
+    // }
+    //
+    // pub fn _45um() -> SpinEchoDWParams {
+    //     SpinEchoDWParams {
+    //         view_table:Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS256_8x_pa18_pb54").to_owned(),
+    //         fov:(19.7,12.0,12.0),
+    //         samples:(420,256,256),
+    //         sample_discards:0,
+    //         spectral_width:SpectralWidth::SW133kH,
+    //         rf_90_duration:140E-6,
+    //         rf_180_duration:280E-6,
+    //         diff_pulse_duration:4.28E-3,
+    //         diff_pulse_separation: 5.0E-3,
+    //         spoil_duration:600E-6,
+    //         ramp_time:100E-6,
+    //         read_extension: 0.0,
+    //         phase_encode_time:600E-6,
+    //         echo_time:14.13E-3,
+    //         echo_spacing: 7.2E-3,
+    //         obs_freq_offset: 0.0,
+    //         rep_time:100.0E-3,
+    //         n_averages: 1,
+    //         n_repetitions: 28800,
+    //         setup_mode:false,
+    //         grad_off:false
+    //     }
+    // }
 
     pub fn new(params: SpinEchoDWParams) -> SpinEchoDW {
         let events = Self::events(&params);
@@ -220,7 +386,7 @@ impl SpinEchoDW {
         let excitation = Hardpulse::new(params.rf_90_duration);
         let refocus = CompositeHardpulse::new_180(params.rf_180_duration);
         let readout = Trapezoid::new(params.ramp_time,read_sample_time_sec);
-        let diffusion = HalfSin::new(params.diffusion_duration);
+        let diffusion = HalfSin::new(params.diff_pulse_duration);
         let phase_encode = Trapezoid::new(params.ramp_time,params.phase_encode_time);
         let spoiler = Trapezoid::new(params.ramp_time,params.spoil_duration);
         Waveforms {
@@ -364,7 +530,7 @@ impl SpinEchoDW {
             3,
             w.refocus.clone(),
             RfStateType::Adjustable(800,None),
-            RfStateType::Adjustable(120,Some(PhaseCycleStrategy::CycleCPMG(2))),
+            RfStateType::Adjustable(120,None),
             //RfStateType::Driven(RfDriver::new(DriverVar::Repetition,RfDriverType::PhaseCycle3D(PhaseCycleStrategy::CycleCPMG(1)),None)),
         );
 
@@ -373,7 +539,7 @@ impl SpinEchoDW {
             4,
             w.refocus.clone(),
             RfStateType::Adjustable(800,None),
-            RfStateType::Adjustable(80,Some(PhaseCycleStrategy::CycleCPMG(2))),
+            RfStateType::Adjustable(80,None),
             //RfStateType::Driven(RfDriver::new(DriverVar::Repetition,RfDriverType::PhaseCycle3D(PhaseCycleStrategy::CycleCPMG(1)),None)),
         );
 
@@ -441,7 +607,6 @@ impl SpinEchoDW {
             "spoiler"
         );
 
-
         SpinEchoDWEvents {
             excitation,
             diffusion,
@@ -492,16 +657,15 @@ impl SpinEchoDW {
 
         let spoiler = Event::new(self.events.spoiler.as_reference(),After(acquire3.clone(),0));
 
-
         let diffusion2 = Event::new(self.events.diffusion.as_reference(),Before(phase_encode1.clone(),0));
         let c2 = diffusion2.borrow().center();
-        let sep = sec_to_clock(0.004);
+        let sep = sec_to_clock(self.params.diff_pulse_separation);
         let c1 = c2 - sep;
-        let diffision1 = Event::new(self.events.diffusion.as_reference(),ExactFromOrigin(c1));
+        let diffusion1 = Event::new(self.events.diffusion.as_reference(),ExactFromOrigin(c1));
         EventQueue::new(
             &vec![
                 excitation,
-                diffision1,
+                diffusion1,
                 refocus1,refocus2,refocus3,
                 diffusion2,
                 phase_encode1,phase_encode2,phase_encode3,

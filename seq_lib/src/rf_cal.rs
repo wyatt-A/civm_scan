@@ -10,7 +10,6 @@ use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin,
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
-use seq_tools::ppl::BaseFrequency::Civm9p4T;
 use seq_tools::ppl::{BaseFrequency, GradClock, Orientation, PhaseUnit, PPL};
 use seq_tools::pulse::{CompositeHardpulse, Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
@@ -26,7 +25,7 @@ fn test(){
     let acceleration = 1;
     let output_dir = Path::new("/mnt/d/dev/rf_cal");
     let me = RfCal::new(mep);
-    let ppl = me.ppl_export(Civm9p4T(0.0),Orientation::CivmStandard,acceleration,sim_mode);
+    let ppl = me.ppl_export(BaseFrequency::civm9p4t(0.0),Orientation::CivmStandard,acceleration,sim_mode);
     let filename = output_dir.join("rf_cal.ppl");
     let mut outfile = File::create(&filename).expect("cannot create file");
     outfile.write_all(ppl.print().as_bytes()).expect("cannot write to file");
