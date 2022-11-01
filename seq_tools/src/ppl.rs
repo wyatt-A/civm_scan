@@ -1,5 +1,9 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use encoding::all::ISO_8859_1;
+use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use crate::command_string::CommandString;
@@ -816,6 +820,31 @@ impl FlatLoopStructure {
     }
 }
 
+
+pub fn sync_pprs(ppr_template:&Path,to_sync:&Vec<PathBuf>) {
+    let template = read_ppr(ppr_template);
+    let map = ppr_var_map(&template).expect("no ppr parameters found!");
+
+    to_sync.iter().for_each(|file| {
+        let mut to_modify = read_ppr(file);
+        to_modify = update_ppr(&to_modify,&map);
+        write_ppr(file,&to_modify);
+    });
+
+}
+
+pub fn read_ppr(ppr_file:&Path) -> String {
+    let mut f = File::open(ppr_file).expect("cannot open file");
+    let mut bytes = Vec::<u8>::new();
+    f.read_to_end(&mut bytes).expect("cannot read file");
+    ISO_8859_1.decode(&bytes, DecoderTrap::Strict).expect("cannot decode ppr bytes")
+}
+
+pub fn write_ppr(ppr_file:&Path,ppr_string:&str) {
+    let mut f = File::create(ppr_file).expect("cannot create file");
+    let bytes = ISO_8859_1.encode(ppr_string,EncoderTrap::Strict).expect("cannot encode string");
+    f.write_all(&bytes).expect("trouble writing to file");
+}
 
 pub fn ppr_var_map(ppr_string:&str) -> Option<HashMap<String,i16>> {
     let reg = Regex::new(r":VAR (.*?), ([-0-9]+)").expect("invalid regex");

@@ -42,6 +42,10 @@ pub trait PulseSequence {
     fn to_file(&self,filepath:&Path);
 }
 
+pub trait Setup {
+    fn setup(dir:&Path);
+}
+
 pub trait Build {
     fn place_events(&self) -> EventQueue;
     fn base_params(&self) -> PPLBaseParams;
@@ -58,7 +62,7 @@ pub trait Build {
         grad_seq_file.write_all(&SeqFrame::format_as_bytes(&grad_params.unwrap())).expect("trouble writing to file");
     }
     fn ppl_export(&mut self,filepath:&Path,ppr_name:&str,sim_mode:bool,build:bool) {
-        let name = Path::new(&Self::name()).with_extension("ppl");
+        let name = Path::new(ppr_name).with_extension("ppl");
         let base_params = self.base_params();
         let config = Config::load();
         let grad_seq_path = Path::new(filepath).join(config.grad_seq());
@@ -78,9 +82,7 @@ pub trait Build {
             base_params.view_acceleration,
             sim_mode
         );
-
         let filename = filepath.join(name);
-
         let ppr_filename = filepath.join(ppr_name).with_extension("ppr");
         let ppr_str = ppl.print_ppr(&filename);
         let mut out_ppr = File::create(&ppr_filename).expect("cannot create file");
