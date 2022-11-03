@@ -491,44 +491,44 @@ impl Matrix {
     }
 }
 
-#[test]
-fn test(){
-    // pointer that keeps track of incrementing matrix uids
-    let m_tracker = Matrix::new_tracker();
-
-    /*
-        Create a static matrix with some dac values. This matrix state will
-        never change after it's set. Useful for readout, spoiler, crusher gradients
-     */
-    let dac_vals = DacValues::new(None,Some(500),Some(500));
-    let static_mat = Matrix::new_static("static_mat",dac_vals,&m_tracker);
-    /*
-        Create a driven matrix with a special matrix driver and a set of
-        transforms. The driver has a LUT encoding strategy where LUT values are read
-        and transformed with the supplied linear transform. Table lookup is driven by
-        the completed views variable. If a dac channel is not set by the driver, it will
-        inherit a supplied default dac value that will also be transformed
-     */
-    let driver_type = MatrixDriverType::PhaseEncode(EncodeStrategy::LUT(Dimension::_3D,vec![0,0]));
-    let driver = MatrixDriver::new(DriverVar::Repetition,driver_type,None);
-    let default_dacs = DacValues::new(None,None,None);
-    let fov_transform = LinTransform{
-        read:TransCoeffs{scale:0.0,offset:0},
-        phase:TransCoeffs{scale:30.0,offset:0},
-        slice:TransCoeffs{scale:30.0,offset:0},
-    };
-    let phase_encode_mat = Matrix::new_driven("pe3_mat",driver,fov_transform,default_dacs,&m_tracker);
-    /*
-        Create a derived matrix from a pre-existing one. It is not recommended to derive a matrix
-        from already derived matrix. I may force this to be an error condition. All we need is a parent
-        matrix and a set of transforms. Lets create a re-winder from the previous phase encode
-        matrix
-     */
-    let phase_reverse_transform = LinTransform{
-        read:TransCoeffs{scale:0.0,offset:0},
-        phase:TransCoeffs{scale:-1.0,offset:0},
-        slice:TransCoeffs{scale:-1.0,offset:0},
-    };
-    let rewinder_mat = phase_encode_mat.derive("phase_rewind",phase_reverse_transform,&m_tracker);
-
-}
+// #[test]
+// fn test(){
+//     // pointer that keeps track of incrementing matrix uids
+//     let m_tracker = Matrix::new_tracker();
+//
+//     /*
+//         Create a static matrix with some dac values. This matrix state will
+//         never change after it's set. Useful for readout, spoiler, crusher gradients
+//      */
+//     let dac_vals = DacValues::new(None,Some(500),Some(500));
+//     let static_mat = Matrix::new_static("static_mat",dac_vals,&m_tracker);
+//     /*
+//         Create a driven matrix with a special matrix driver and a set of
+//         transforms. The driver has a LUT encoding strategy where LUT values are read
+//         and transformed with the supplied linear transform. Table lookup is driven by
+//         the completed views variable. If a dac channel is not set by the driver, it will
+//         inherit a supplied default dac value that will also be transformed
+//      */
+//     let driver_type = MatrixDriverType::PhaseEncode(EncodeStrategy::LUT(Dimension::_3D,vec![0,0]));
+//     let driver = MatrixDriver::new(DriverVar::Repetition,driver_type,None);
+//     let default_dacs = DacValues::new(None,None,None);
+//     let fov_transform = LinTransform{
+//         read:TransCoeffs{scale:0.0,offset:0},
+//         phase:TransCoeffs{scale:30.0,offset:0},
+//         slice:TransCoeffs{scale:30.0,offset:0},
+//     };
+//     let phase_encode_mat = Matrix::new_driven("pe3_mat",driver,fov_transform,default_dacs,&m_tracker);
+//     /*
+//         Create a derived matrix from a pre-existing one. It is not recommended to derive a matrix
+//         from already derived matrix. I may force this to be an error condition. All we need is a parent
+//         matrix and a set of transforms. Lets create a re-winder from the previous phase encode
+//         matrix
+//      */
+//     let phase_reverse_transform = LinTransform{
+//         read:TransCoeffs{scale:0.0,offset:0},
+//         phase:TransCoeffs{scale:-1.0,offset:0},
+//         slice:TransCoeffs{scale:-1.0,offset:0},
+//     };
+//     let rewinder_mat = phase_encode_mat.derive("phase_rewind",phase_reverse_transform,&m_tracker);
+//
+// }

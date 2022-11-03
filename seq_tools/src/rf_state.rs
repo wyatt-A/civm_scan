@@ -222,8 +222,3 @@ impl RfState {
         self.power.clone().expect("rf event must have a power field. What happened??")
     }
 }
-
-#[test]
-fn test(){
-    let r = RfState::new("excitation_pulse",RfStateType::Adjustable(400),RfStateType::Static(0));
-}

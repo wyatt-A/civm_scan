@@ -2,8 +2,10 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{thread,time};
 use regex::Regex;
-use clap::Parser;
+use clap::{Parser,Arg,Subcommand};
+use glob::glob;
 
 const DIR:&str = "C:/workstation/civm_scan/vb_script";
 const STATUS_VBS:&str = "status.vbs";
@@ -14,83 +16,188 @@ const RUN_VBS:&str = "run.vbs";
 const UPLOAD_VBS:&str = "load_table.vbs";
 const SET_MRD_VBS:&str = "set_mrd.vbs";
 
-/* To see all available methods for a new vbscript, run the following in powershell
-    New-Object -ComObject Scan.Application | Get-Member
-*/
 
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    sub_command:String,
-    vargs:Vec<String>
+#[derive(clap::Parser,Debug)]
+struct ScanControlArgs {
+    #[command(subcommand)]
+    action: Action,
 }
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct ArgsSetPPR {
-    parent_command:String,
-    ppr_file:String
+#[derive(clap::Subcommand,Debug)]
+pub enum Action {
+    /// upload a lookup table for compressed sensing
+    UploadTable(PathArgs),
+    /// set the ppr for the scan
+    SetPPR(PathArgs),
+    /// set the output mrd for data collection
+    SetMRD(PathArgs),
+    /// get the status of the scan supervisor
+    Status,
+    /// run in continuous setup mode with no data collection
+    RunSetup,
+    /// run the current ppr to generate a mrd file
+    RunScan,
+    /// finds all pprs nested in the parent directory and runs them
+    RunDirectory(PathArgs),
+    /// abort the scan
+    Abort
 }
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct ArgsSetMRD {
-    parent_command:String,
-    mrd_file:String
+#[derive(clap::Args,Debug)]
+pub struct PathArgs {
+    path:String
 }
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct ArgsUpload {
-    parent_command:String,
-    table_file:String
+
+//
+// #[derive(Debug,Subcommand)]
+// pub enum SubCommand {
+//     SetPPR(SetPPRArgs),
+//     SetMRD(SetMrdArgs)
+//
+// }
+//
+// #[derive(Debug,Arg)]
+// pub struct SetPPRArgs {
+//     #[clap(subcommand)]
+//     ppr_path:String
+// }
+//
+// #[derive(Debug,Arg)]
+// pub struct SetMrdArgs {
+//     #[clap(subcommand)]
+//     mrd_path:String
+// }
+//
+// #[derive(Debug,Arg)]
+// pub struct TableUploadArgs {
+//     #[clap(subcommand)]
+//     table_path:String
+// }
+
+
+
+#[test]
+fn test(){
+    let base_dir = Path::new(r"D:\dev\221101\acq");
+
+    let depth = 2;
+
+    let pattern = (0..depth).map(|_| r"*\").collect::<String>();
+    let pattern = format!("{}*.ppr",pattern);
+
+    let pat = base_dir.join(pattern);
+    let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
+
+    let pairs:Vec<(PathBuf,PathBuf)> = paths.iter().map(|ppr| (ppr.clone(),ppr.with_extension("mrd"))).collect();
+
+    pairs.iter().for_each(|pair| {
+        set_ppr(&pair.0);
+        set_mrd(&pair.1);
+    });
 }
 
-fn main() {
 
-    let args = Args::parse();
-    match args.sub_command.as_str() {
-        "status" => {
+fn main(){
+    let args = ScanControlArgs::parse();
+
+    match args.action {
+        Action::UploadTable(path_str) => {
+            upload_table(Path::new(&path_str.path))
+        }
+        Action::SetPPR(path_str) => {
+            println!("Setting ppr ...");
+            set_ppr(Path::new(&path_str.path));
+        }
+        Action::SetMRD(path_str) => {
+            println!("Setting mrd ...");
+            set_mrd(Path::new(&path_str.path));
+        }
+        Action::Status => {
             let stat = scan_status();
-            println!("{:?}",stat);
-            //todo!(make enum of all status' to report what's happening in english)
+            println!("scan_status: {:?}",stat);
         }
-        "set_ppr" => {
-            let args = ArgsSetPPR::parse();
-            let ppr_file = Path::new(&args.ppr_file);
-            let stat = set_ppr(&ppr_file);
-            match stat {
-                false => println!("failed to set ppr"),
-                true => {}
-            }
-        }
-        "set_mrd" => {
-            let args = ArgsSetMRD::parse();
-            let mrd_file = Path::new(&args.mrd_file);
-            let stat = set_mrd(&mrd_file);
-            match stat {
-                false => println!("failed to set mrd"),
-                true => {}
-            }
-        }
-        "run_setup" => {
+        Action::RunSetup => {
             run_setup()
         }
-        "run" => {
+        Action::RunScan => {
             run_acquisition()
         }
-        "abort" => {
+        Action::Abort => {
             abort()
         }
-        "upload" => {
-            let args:ArgsUpload = ArgsUpload::parse();
-            let table_file = Path::new(&args.table_file);
-            upload_table(table_file);
+        Action::RunDirectory(path_str) => {
+            let base_dir = Path::new(&path_str.path);
+            let depth = 1;
+            let pattern = (0..depth).map(|_| r"*\").collect::<String>();
+            let pattern = format!("{}*.ppr",pattern);
+            let pat = base_dir.join(pattern);
+            let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
+            let pairs:Vec<(PathBuf,PathBuf)> = paths.iter().map(|ppr| (ppr.clone(),ppr.with_extension("mrd"))).collect();
+            pairs.iter().for_each(|pair| {
+                loop {
+                    match scan_status() {
+                        Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => {
+                            thread::sleep(time::Duration::from_secs(1));
+                        }
+                        _=> break
+                    }
+                }
+                set_ppr(&pair.0);
+                set_mrd(&pair.1);
+                run_acquisition();
+            });
         }
-        _=> println!("command not recognized")
     }
+
 }
+
+
+// fn main() {
+//
+//     let args = Args::parse();
+//     match args.sub_command.as_str() {
+//         "status" => {
+//             let stat = scan_status();
+//             println!("{:?}",stat);
+//             //todo!(make enum of all status' to report what's happening in english)
+//         }
+//         "set_ppr" => {
+//             let args = ArgsSetPPR::parse();
+//             let ppr_file = Path::new(&args.ppr_file);
+//             let stat = set_ppr(&ppr_file);
+//             match stat {
+//                 false => println!("failed to set ppr"),
+//                 true => {}
+//             }
+//         }
+//         "set_mrd" => {
+//             let args = ArgsSetMRD::parse();
+//             let mrd_file = Path::new(&args.mrd_file);
+//             let stat = set_mrd(&mrd_file);
+//             match stat {
+//                 false => println!("failed to set mrd"),
+//                 true => {}
+//             }
+//         }
+//         "run_setup" => {
+//             run_setup()
+//         }
+//         "run" => {
+//             run_acquisition()
+//         }
+//         "abort" => {
+//             abort()
+//         }
+//         "upload" => {
+//             let args:ArgsUpload = ArgsUpload::parse();
+//             let table_file = Path::new(&args.table_file);
+//             upload_table(table_file);
+//         }
+//         _=> println!("command not recognized")
+//     }
+// }
 
 //196095
 fn upload_table(path_to_table:&Path){

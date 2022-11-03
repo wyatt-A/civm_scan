@@ -8,21 +8,22 @@ use crate::event_block::{Event, GradEventType};
 use crate::event_block::EventPlacementType::{After, Origin, ExactFromOrigin};
 use crate::execution::{ExecutionBlock, PlotTrace, WaveformData};
 use crate::grad_cal;
+use crate::grad_cal::tesla_per_mm_to_dac;
 use crate::gradient_event::GradEvent;
 use crate::gradient_matrix::{DacValues, Matrix};
-use crate::pulse::{Pulse, Trapezoid};
+use crate::pulse::{HalfSin, Pulse, Trapezoid};
 use crate::utils::linspace;
 
-#[test]
-fn test(){
-    println!("diffusion test");
-
-    let diffusion_waveform = Trapezoid::new(500E-6,4E-3);
-
-    let channel_dacs = solve_dac(Rc::new(Box::new(diffusion_waveform)),10E-3,20E-3,30E-3,(1.0,0.0,0.0),3000.0);
-
-    println!("{:?}",channel_dacs);
-}
+// #[test]
+// fn test(){
+//     println!("diffusion test");
+//
+//     let diffusion_waveform = Trapezoid::new(500E-6,4E-3);
+//
+//     let channel_dacs = solve_dac(Rc::new(Box::new(diffusion_waveform)),10E-3,20E-3,30E-3,(1.0,0.0,0.0),3000.0);
+//
+//     println!("{:?}",channel_dacs);
+// }
 
 fn solve_dac(diff_pulse:Rc<Box<dyn Pulse>>,pulse1_center:f32,pulse2_center:f32,echo_time:f32,direction:(f32,f32,f32),bvalue:f32) -> (i16,i16,i16) {
     let mut max_dac = 32767;
@@ -117,7 +118,7 @@ fn find_bvalue(diff_pulse:&Box<dyn Pulse>,pulse1_center:f32,pulse2_center:f32,ec
 
     let term3 = 4.0*dot((ft_read,ft_phase,ft_slice),(ft_read,ft_phase,ft_slice))*(echo_time/2.0);
 
-    (grad_cal::GAMMA*2.0*PI).powi(2)*(term1 - term2 + term3)*1E-6
+    (grad_cal::GAMMA_BAR *2.0*PI).powi(2)*(term1 - term2 + term3)*1E-6
 
 }
 
@@ -222,4 +223,24 @@ fn look(a: &Vec<f32>, target_value: f32) -> Option<usize> {
         }
     }
     None
+}
+
+
+
+#[test]
+fn test(){
+    let g = b_val_to_grad(PulseShape::HalfSin,3000.0,3.5E-3,4E-3);
+    println!("{}",g);
+
+    let b_vec:(f32,f32,f32) = (1.0,-1.0,1.0);
+    let mag = (b_vec.0.powi(2) + b_vec.1.powi(2) + b_vec.2.powi(2)).sqrt();
+    let b_vec_norm = (b_vec.0/mag,b_vec.1/mag,b_vec.2/mag);
+    let g_vec = (b_vec_norm.0*g,b_vec_norm.1*g,b_vec_norm.2*g);
+    println!("mag = {:?}",g_vec);
+
+
+    let dacs = b_val_to_dac(PulseShape::HalfSin,3000.0,3.8E-3,7.2E-3,(1.0,0.0,0.0));
+
+    println!("dacs = {:?}",dacs);
+
 }
