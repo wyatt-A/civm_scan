@@ -47,24 +47,6 @@ fn read_b_table(b_table:&Path) -> Vec<(f32,f32,f32,f32)>{
     b_table
 }
 
-// pub fn build_dw_cs_experiment<T>(sequence:&T, b_table:&Path, work_dir:&Path) -> Vec<PathBuf>
-// where T:Clone + DiffusionWeighted + CompressedSensing + Build {
-//     let mut diff_experiment = generate_experiment(sequence,b_table);
-//     let n = diff_experiment.len();
-//     let w = ((n-1) as f32).log10().floor() as usize + 1;
-//     let formatter = |index:usize| format!("m{:0width$ }",index,width=w);
-//     let mut dirs = Vec::<PathBuf>::new();
-//     diff_experiment.iter_mut().enumerate().for_each(|(index, item)| {
-//         let label = formatter(index);
-//         let d = work_dir.join(&label);
-//         dirs.push(d.clone());
-//         create_dir_all(&d).expect("trouble building directory");
-//         item.ppl_export(&d,&label,false,true);
-//         item.cs_table().copy_to(&d,"cs_table");
-//         //item.to_file(&d);
-//     });
-//     dirs
-// }
 
 pub fn build_cs_experiment<T>(sequence_array:&mut Vec<T>,work_dir:&Path) -> Vec<PathBuf>
 where T:CompressedSensing + Build
@@ -80,12 +62,11 @@ where T:CompressedSensing + Build
         create_dir_all(&d).expect("trouble building directory");
         item.set_cs_table();
         item.ppl_export(&d,&label,false,true);
+        item.param_export(&d);
         CSTable::open(&item.cs_table()).copy_to(&d,"cs_table");
-        //item.to_file(&d);
     });
     dirs
 }
-
 
 
 

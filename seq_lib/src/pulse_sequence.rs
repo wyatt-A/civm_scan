@@ -42,6 +42,13 @@ pub trait PulseSequence {
     fn to_file(&self,filepath:&Path);
 }
 
+pub trait Protocol {
+    fn default() -> Self;
+    fn write_default(params_file: &Path);
+    fn load(params_file:&Path) -> Self;
+    fn write(&self,params_file:&Path);
+}
+
 pub trait Setup {
     fn set_mode(&mut self);
     fn set_repetitions(&mut self,n_reps:u32);
@@ -95,4 +102,5 @@ pub trait Build {
             build_directory(filepath);
         }
     }
+    fn param_export(&self,filepath:&Path);
 }

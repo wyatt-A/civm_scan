@@ -39,14 +39,21 @@ pub enum Action {
     /// run the current ppr to generate a mrd file
     RunScan,
     /// finds all pprs nested in the parent directory and runs them
-    RunDirectory(PathArgs),
+    RunDirectory(RunDirectoryArgs),
     /// abort the scan
     Abort
 }
 
 #[derive(clap::Args,Debug)]
 pub struct PathArgs {
-    path:String
+    path:String,
+}
+
+#[derive(clap::Args,Debug)]
+pub struct RunDirectoryArgs {
+    path:String,
+    #[clap(short, long)]
+    cs_table:Option<String>
 }
 
 
@@ -127,30 +134,50 @@ fn main(){
         Action::Abort => {
             abort()
         }
-        Action::RunDirectory(path_str) => {
-            let base_dir = Path::new(&path_str.path);
-            let depth = 1;
-            let pattern = (0..depth).map(|_| r"*\").collect::<String>();
-            let pattern = format!("{}*.ppr",pattern);
-            let pat = base_dir.join(pattern);
-            let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
-            let pairs:Vec<(PathBuf,PathBuf)> = paths.iter().map(|ppr| (ppr.clone(),ppr.with_extension("mrd"))).collect();
-            pairs.iter().for_each(|pair| {
-                loop {
-                    match scan_status() {
-                        Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => {
-                            thread::sleep(time::Duration::from_secs(1));
-                        }
-                        _=> break
-                    }
-                }
-                set_ppr(&pair.0);
-                set_mrd(&pair.1);
-                run_acquisition();
-            });
+        Action::RunDirectory(args) => {
+            run_directory(args)
         }
     }
 
+}
+
+
+fn run_directory(args:RunDirectoryArgs){
+    let base_dir = Path::new(&args.path);
+    let depth = 1;
+    let pattern = (0..depth).map(|_| r"*\").collect::<String>();
+    let pattern = format!("{}*.ppr",pattern);
+
+    let pat = base_dir.join(pattern);
+    let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
+    let pairs:Vec<(PathBuf,PathBuf)> = paths.iter().map(|ppr| (ppr.clone(),ppr.with_extension("mrd"))).collect();
+    pairs.iter().for_each(|pair| {
+        loop {
+            match scan_status() {
+                Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => {
+                    thread::sleep(time::Duration::from_secs(1));
+                }
+                _=> break
+            }
+        }
+        match &args.cs_table {
+            Some(table_pat) => {
+                let pat = pair.0.with_file_name(format!("*{}*",table_pat));
+                let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
+                if paths.len() < 1 {
+                    println!("no cs table found that matches pattern! table will not be uploaded");
+                }
+                else{
+                    upload_table(&paths[0]);
+                    println!("cs table uploaded");
+                }
+            }
+            None => {}
+        };
+        set_ppr(&pair.0);
+        set_mrd(&pair.1);
+        run_acquisition();
+    });
 }
 
 

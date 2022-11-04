@@ -18,7 +18,7 @@ use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid}
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
 use seq_tools::utils::{clock_to_sec, sec_to_clock, us_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, PulseSequence, Setup};
+use crate::pulse_sequence::{Build, PPLBaseParams, Protocol, PulseSequence, Setup};
 use serde_json;
 use serde::{Serialize,Deserialize};
 use crate::compressed_sensing::{CompressedSensing, CSTable};
@@ -53,40 +53,6 @@ civm_scan run_protocol "/d/smis/20221031/_01"
 
 #[test]
 fn test() {
-    // let mut mep = SpinEchoDW::_25um();
-    // mep.n_averages = 1;
-    // mep.n_repetitions = 2000;
-    // mep.setup_mode = false;
-    // let sim_mode = false;
-    // mep.grad_off = false;
-    // mep.phase_encode_time = 800E-6;
-    //
-    // mep.n_repetitions = 2;
-    // let mut me = SpinEchoDW::new(mep.clone());
-    // me.ppl_export(Path::new(r"d:\dev\221031\fse\sim"),"setup",true,true);
-    //
-    // // Rf Power/Gradient tuning
-    // mep.grad_off = false;
-    // mep.n_averages = 2000;
-    // mep.setup_mode = false;
-    // let mut me = SpinEchoDW::new(mep.clone());
-    // me.ppl_export(Path::new(r"d:\dev\221031\fse\acquire"),"setup",false,true);
-    //
-    // // Rf Power/Gradient tuning
-    // mep.grad_off = false;
-    // mep.n_averages = 1;
-    // mep.n_repetitions = 2000;
-    // mep.setup_mode = true;
-    // let mut me = SpinEchoDW::new(mep.clone());
-    // me.ppl_export(Path::new(r"d:\dev\221031\fse\rf_power"),"setup",false,true);
-    //
-    // // Spin Echo Tuning
-    // mep.grad_off = true;
-    // mep.n_averages = 50;
-    // mep.n_repetitions = 2;
-    // let mut me = SpinEchoDW::new(mep.clone());
-    // me.ppl_export(Path::new(r"d:\dev\221031\fse\se_timing"),"setup",false,true);
-
 
     //let cs_table = Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54");
     let cs_table = Path::new(r"C:\workstation\data\petableCS_stream\fse\dummy_table");
@@ -102,7 +68,7 @@ fn test() {
 
     let mut seqs:Vec<FseDti> = exp_params.iter().map(|params| FseDti::new(params.clone())).collect();
 
-    let build_dirs = build_cs_experiment(&mut seqs,cs_table,work_dir);
+    let build_dirs = build_cs_experiment(&mut seqs, cs_table);
 
 
     // let mut sequence = SpinEchoDW::new(sequence_params);
@@ -172,11 +138,6 @@ impl CompressedSensing for FseDti {
     }
 }
 
-pub trait Protocol {
-    fn default() -> Self;
-    fn write_default(params_file: &Path);
-    fn load(params_file:&Path) -> Self;
-}
 
 impl Protocol for FseDtiParams {
     fn default() -> Self {
@@ -212,6 +173,12 @@ impl Protocol for FseDtiParams {
     fn write_default(params_file: &Path){
         let params = Self::default();
         let str = serde_json::to_string_pretty(&params).expect("cannot serialize struct");
+        let mut f = File::create(params_file).expect("cannot create file");
+        f.write_all(str.as_bytes()).expect("trouble writing to file");
+    }
+
+    fn write(&self,params_file: &Path){
+        let str = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
         let mut f = File::create(params_file).expect("cannot create file");
         f.write_all(str.as_bytes()).expect("trouble writing to file");
     }
@@ -289,7 +256,12 @@ impl Build for FseDti {
                 waveform_sample_period_us: 2
             }
         }
+    fn param_export(&self, filepath: &Path) {
+        let params = self.params.clone();
+        let name = params.name.clone();
+        params.write(&filepath.join(name).with_extension("json"));
     }
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct FseDtiParams {
