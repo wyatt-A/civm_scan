@@ -8,7 +8,7 @@ pub struct CSTable {
     elements:Vec<i16>,
 }
 
-struct KspaceCoord {
+pub struct KspaceCoord {
     k_phase:i16,
     k_slice:i16
 }
@@ -67,8 +67,8 @@ impl CSTable {
 
 // sets number of repetitions accordingly
 pub trait CompressedSensing {
-    fn set_cs_table(&mut self,cs_table:&Path);
-    fn cs_table(&self) -> CSTable;
+    fn set_cs_table(&mut self);
+    fn cs_table(&self) -> PathBuf;
 }
 
 #[test]

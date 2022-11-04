@@ -43,7 +43,8 @@ pub trait PulseSequence {
 }
 
 pub trait Setup {
-    fn setup(dir:&Path);
+    fn set_mode(&mut self);
+    fn set_repetitions(&mut self,n_reps:u32);
 }
 
 pub trait Build {

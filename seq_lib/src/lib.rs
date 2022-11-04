@@ -5,5 +5,5 @@ extern crate core;
 pub mod pulse_sequence;
 //pub mod se_dti;
 pub mod fse_dti;
-mod diffusion;
-mod compressed_sensing;
+pub mod diffusion;
+pub mod compressed_sensing;

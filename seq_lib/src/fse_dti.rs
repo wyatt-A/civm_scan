@@ -96,11 +96,11 @@ fn test() {
 
     //SpinEchoDW::setup(&work_dir.join("setup"));
 
-    let sequence_params = SpinEchoDWParams::default();
+    let sequence_params = FseDtiParams::default();
 
     let mut exp_params = generate_experiment(&sequence_params,b_table);
 
-    let mut seqs:Vec<SpinEchoDW> = exp_params.iter().map(|params| SpinEchoDW::new(params.clone())).collect();
+    let mut seqs:Vec<FseDti> = exp_params.iter().map(|params| FseDti::new(params.clone())).collect();
 
     let build_dirs = build_cs_experiment(&mut seqs,cs_table,work_dir);
 
@@ -117,25 +117,23 @@ fn test() {
         glob(pat).expect("failed to read glob pattern").flat_map(|m| m)
     }).collect();
 
-    //sync_pprs(Path::new(r"D:\dev\221101\setup\setup.ppr"),&entries);
+    sync_pprs(Path::new(r"D:\dev\221101\setup\setup.ppr"),&entries);
 
 
 }
 
 
-impl Setup for SpinEchoDW {
-    fn setup(dir:&Path) {
-        let mut params = SpinEchoDWParams::default();
-        params.setup_mode = true;
-        params.n_repetitions = 2000;
-        let mut s = SpinEchoDW::new(params);
-        create_dir_all(dir).expect("unable to create directory");
-        s.ppl_export(dir,"setup",false,true);
+impl Setup for FseDtiParams {
+    fn set_mode(&mut self) {
+        self.setup_mode = true;
+    }
+    fn set_repetitions(&mut self,n_reps:u32) {
+        self.n_repetitions = n_reps;
     }
 }
 
 
-impl DiffusionWeighted for SpinEchoDWParams {
+impl DiffusionWeighted for FseDtiParams {
     fn b_value(&self) -> f32 {
         self.b_value
     }
@@ -160,30 +158,31 @@ impl DiffusionWeighted for SpinEchoDWParams {
 }
 
 
-impl CompressedSensing for SpinEchoDW {
+impl CompressedSensing for FseDti {
 
-    fn set_cs_table(&mut self,cs_table:&Path) {
-        self.params.cs_table = Some(cs_table.to_owned());
+    fn set_cs_table(&mut self) {
         let bp = self.base_params();
-        let cs_table = self.cs_table();
-        let n_reps = cs_table.n_views() as u32/bp.view_acceleration as u32;
+        let table = CSTable::open(&self.cs_table());
+        let n_reps = table.n_views() as u32/bp.view_acceleration as u32;
         self.params.n_repetitions = n_reps as u32;
     }
 
-    fn cs_table(&self) -> CSTable {
-        CSTable::open(&self.params.cs_table.clone().unwrap())
+    fn cs_table(&self) -> PathBuf {
+        self.params.cs_table.clone()
     }
 }
 
 pub trait Protocol {
     fn default() -> Self;
+    fn write_default(params_file: &Path);
+    fn load(params_file:&Path) -> Self;
 }
 
-impl Protocol for SpinEchoDWParams {
+impl Protocol for FseDtiParams {
     fn default() -> Self {
-        SpinEchoDWParams {
+        FseDtiParams {
             name: "fse_dti".to_string(),
-            cs_table: Some(Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned()),
+            cs_table: Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned(),
             //b_value: 3000.0,
             b_value: 1000.0,
             b_vec: (1.0, 0.0, 0.0),
@@ -209,6 +208,19 @@ impl Protocol for SpinEchoDWParams {
             setup_mode: false,
             grad_off: false
         }
+    }
+    fn write_default(params_file: &Path){
+        let params = Self::default();
+        let str = serde_json::to_string_pretty(&params).expect("cannot serialize struct");
+        let mut f = File::create(params_file).expect("cannot create file");
+        f.write_all(str.as_bytes()).expect("trouble writing to file");
+    }
+
+    fn load(params_file: &Path) -> Self {
+        let mut f = File::open(params_file).expect("cannot open file");
+        let mut json_str = String::new();
+        f.read_to_string(&mut json_str).expect("trouble reading file");
+        serde_json::from_str(&json_str).expect("cannot deserialize string")
     }
 }
 
@@ -260,7 +272,7 @@ impl Protocol for SpinEchoDWParams {
 //         }
 //     }
 
-impl Build for SpinEchoDW {
+impl Build for FseDti {
         fn place_events(&self) -> EventQueue {
             self.place_events()
         }
@@ -280,9 +292,9 @@ impl Build for SpinEchoDW {
     }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct SpinEchoDWParams {
+pub struct FseDtiParams {
         name: String,
-        cs_table: Option<PathBuf>,
+        cs_table: PathBuf,
         b_value: f32,
         b_vec: (f32, f32, f32),
         fov: (f32, f32, f32),
@@ -308,13 +320,13 @@ pub struct SpinEchoDWParams {
     }
 
 #[derive(Clone)]
-pub struct SpinEchoDW {
-        params: SpinEchoDWParams,
-        events: SpinEchoDWEvents,
-    }
+pub struct FseDti {
+    params: FseDtiParams,
+    events: FseDtiEvents,
+}
 
 #[derive(Clone)]
-pub struct SpinEchoDWEvents {
+pub struct FseDtiEvents {
         excitation: RfEvent<Hardpulse>,
         diffusion: GradEvent<HalfSin>,
         refocus1: RfEvent<CompositeHardpulse>,
@@ -350,9 +362,9 @@ struct GradMatrices {
         phase_encode3: Matrix,
     }
 
-impl SpinEchoDW {
+impl FseDti {
 
-        pub fn new(params: SpinEchoDWParams) -> SpinEchoDW {
+        pub fn new(params: FseDtiParams) -> FseDti {
             let events = Self::events(&params);
             Self {
                 events,
@@ -360,7 +372,7 @@ impl SpinEchoDW {
             }
         }
 
-        fn waveforms(params: &SpinEchoDWParams) -> Waveforms {
+        fn waveforms(params: &FseDtiParams) -> Waveforms {
             let n_read = params.samples.0;
             let read_sample_time_sec = params.spectral_width.sample_time(n_read + params.sample_discards) + params.read_extension;
             let excitation = Hardpulse::new(params.rf_90_duration);
@@ -379,7 +391,7 @@ impl SpinEchoDW {
             }
         }
 
-        fn gradient_matrices(params: &SpinEchoDWParams) -> GradMatrices {
+        fn gradient_matrices(params: &FseDtiParams) -> GradMatrices {
             let waveforms = Self::waveforms(params);
             let mat_count = Matrix::new_tracker();
             let n_read = params.samples.0;
@@ -490,7 +502,7 @@ impl SpinEchoDW {
             }
         }
 
-        fn events(params: &SpinEchoDWParams) -> SpinEchoDWEvents {
+        fn events(params: &FseDtiParams) -> FseDtiEvents {
             let w = Self::waveforms(params);
             let m = Self::gradient_matrices(params);
 
@@ -593,7 +605,7 @@ impl SpinEchoDW {
                 "spoiler"
             );
 
-            SpinEchoDWEvents {
+            FseDtiEvents {
                 excitation,
                 diffusion,
                 refocus1,

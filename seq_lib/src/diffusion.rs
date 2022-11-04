@@ -3,7 +3,7 @@ use std::fs::{create_dir_all, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use seq_tools::grad_cal::{GAMMA, tesla_per_mm_to_dac};
-use crate::compressed_sensing::CompressedSensing;
+use crate::compressed_sensing::{CompressedSensing, CSTable};
 use crate::pulse_sequence::{Build, PulseSequence};
 
 pub fn generate_experiment<T>(sequence_params:&T, b_table:&Path) -> Vec<T>
@@ -66,7 +66,7 @@ fn read_b_table(b_table:&Path) -> Vec<(f32,f32,f32,f32)>{
 //     dirs
 // }
 
-pub fn build_cs_experiment<T>(sequence_array:&mut Vec<T>,cs_table:&Path,work_dir:&Path) -> Vec<PathBuf>
+pub fn build_cs_experiment<T>(sequence_array:&mut Vec<T>,work_dir:&Path) -> Vec<PathBuf>
 where T:CompressedSensing + Build
 {
     let n = sequence_array.len();
@@ -78,15 +78,13 @@ where T:CompressedSensing + Build
         let d = work_dir.join(&label);
         dirs.push(d.clone());
         create_dir_all(&d).expect("trouble building directory");
-        item.set_cs_table(cs_table);
+        item.set_cs_table();
         item.ppl_export(&d,&label,false,true);
-        item.cs_table().copy_to(&d,"cs_table");
+        CSTable::open(&item.cs_table()).copy_to(&d,"cs_table");
         //item.to_file(&d);
     });
     dirs
 }
-
-
 
 
 
