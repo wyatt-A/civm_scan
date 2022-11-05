@@ -5,7 +5,8 @@ members = [
     "seq_lib",
     "scan_ui",
     "scan_control",
-    "build_sequence"
+    "build_sequence",
+    "recon"
 ]
 
 # this determines which package is the entry point for cargo run

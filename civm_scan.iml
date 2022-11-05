@@ -9,6 +9,7 @@
       <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/scan_control/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/build_sequence/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/recon/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
