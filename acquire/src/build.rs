@@ -1,0 +1,328 @@
+use std::collections::HashMap;
+use std::f32::consts::PI;
+use std::fs::{create_dir_all, File};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use cs_table::cs_table::CSTable;
+use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims};
+use dyn_clone::clone_box;
+use encoding::all::ISO_8859_1;
+use encoding::{DecoderTrap, EncoderTrap, Encoding};
+use glob::glob;
+use regex::Regex;
+use seq_lib::fse_dti::FseDtiParams;
+use crate::args::{ApplySetupArgs, NewArgs, NewConfigArgs, NewDiffusionExperimentArgs};
+use std::fs::copy;
+
+//const SEQUENCE_LIB:&str = r"C:\\workstation\\civm_scan\\sequence_library";
+const SEQUENCE_LIB:&str = "/home/wyatt/projects/test_data/build_test";
+const BUILD:bool = false;
+
+pub enum Sequence {
+    FseDti,
+    SeDti,
+    MGRE,
+    GRE,
+}
+
+impl Sequence {
+    pub fn list() -> String{
+        vec![
+            Self::decode(&Self::FseDti),
+            Self::decode(&Self::SeDti),
+            Self::decode(&Self::MGRE),
+            Self::decode(&Self::GRE),
+        ].join("\n")
+    }
+    pub fn encode(name:&str) -> Self {
+        match name {
+            "fse_dti" => Self::FseDti,
+            "se_dti" => Self::SeDti,
+            "mgre" => Self::MGRE,
+            "gre" => Self::GRE,
+            _=> panic!("name not recognized")
+        }
+    }
+    pub fn decode(&self) -> String {
+        match &self {
+            Self::FseDti => String::from("fse_dti"),
+            Self::SeDti => String::from("se_dti"),
+            Self::MGRE => String::from("mgre"),
+            Self::GRE => String::from("gre"),
+        }
+    }
+}
+
+pub fn acq_dims(cfg_file:&Path) -> AcqDims {
+    load_params(cfg_file).acq_dims()
+}
+
+fn load_params(cfg_file:&Path) -> Box<dyn SequenceParameters> {
+    let cfg_str = read_to_string(cfg_file);
+    match find_seq_name_from_config(&cfg_str) {
+        Sequence::FseDti => {
+            Box::new(FseDtiParams::load(&cfg_file))
+        },
+        _=> panic!("not yet implemented")
+    }
+}
+
+fn load_dw_params(cfg_file:&Path) -> Box<dyn DWSequenceParameters> {
+    let cfg_str = read_to_string(cfg_file);
+    match find_seq_name_from_config(&cfg_str) {
+        Sequence::FseDti => {
+            Box::new(FseDtiParams::load(&cfg_file))
+        },
+        _=> panic!("not yet implemented")
+    }
+}
+
+pub fn new_simulation(args:&NewArgs) {
+    let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
+    let params = load_params(&cfg_file);
+    build_simulation(params,&args.destination,BUILD);
+}
+
+pub fn new(args:&NewArgs) {
+    let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
+    let params = load_params(&cfg_file);
+    build(params,&args.destination,BUILD);
+
+}
+
+pub fn new_setup(args:&NewArgs) {
+    let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
+    let params = load_params(&cfg_file);
+    build_setup(params,&args.destination,BUILD);
+}
+
+
+pub fn new_config(args:&NewConfigArgs){
+    let seq = Sequence::encode(&args.name);
+    let path_out = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
+    if path_out.exists(){
+        println!("{} already exists. Choose a different alias.",&args.alias);
+        return
+    }
+    match seq {
+        Sequence::FseDti => {
+            FseDtiParams::write_default(&path_out);
+        }
+        _=> panic!("not yet implemented")
+    }
+}
+
+pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
+    let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
+    let b_table = Path::new(&args.b_table);
+    if !b_table.exists() {
+        println!("cannot find specified b-table {:?}",b_table);
+        return
+    }
+    let params = load_dw_params(&cfg_file);
+    build_diffusion_experiment(params, &args.destination, b_table, BUILD);
+}
+
+
+pub fn apply_setup(args:&ApplySetupArgs) {
+    if args.children.is_file() {
+        sync_pprs(&args.setup_ppr,&vec![args.children.clone()]);
+        if args.recursive.is_some(){
+            let r = args.recursive.unwrap();
+            let entries = find_files(&args.children, ".ppr", r);
+            sync_pprs(&args.setup_ppr,&entries);
+        }
+    }
+    else {
+        let r = args.recursive.unwrap_or(0);
+        let entries = find_files(&args.children, ".ppr", r);
+        sync_pprs(&args.setup_ppr,&entries);
+        println!("updating {} ppr files",entries.len());
+    }
+}
+
+pub fn find_seq_name_from_config(config_str:&str) -> Sequence {
+    let reg_pat = r#""*name"*\s*:\s*"*(.*\w.*)""#;
+    let reg = Regex::new(reg_pat).unwrap();
+    let caps = reg.captures(&config_str);
+    let name:String = caps.expect("name field not found in config!").get(1).map_or("", |m| m.as_str()).to_string();
+    Sequence::encode(&name)
+}
+
+pub fn find_files(base_dir:&Path, pattern:&str, depth:u16) -> Vec<PathBuf> {
+    let pattern_rep = (0..depth).map(|_| r"*\").collect::<String>();
+    let pattern = format!("{}*{}",pattern_rep,pattern);
+    let pat = base_dir.join(pattern);
+    glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect()
+}
+
+pub fn read_to_string(file_path:&Path) -> String {
+    let mut f = File::open(file_path).expect("cannot open file");
+    let mut s = String::new();
+    f.read_to_string(&mut s).expect("cannot read from file");
+    s
+}
+
+pub fn sync_pprs(ppr_template:&Path,to_sync:&Vec<PathBuf>) {
+    let template = read_ppr(ppr_template);
+    let map = ppr_var_map(&template).expect("no ppr parameters found!");
+
+    to_sync.iter().for_each(|file| {
+        let mut to_modify = read_ppr(file);
+        to_modify = update_ppr(&to_modify,&map);
+        write_ppr(file,&to_modify);
+    });
+
+}
+
+pub fn read_ppr(ppr_file:&Path) -> String {
+    let mut f = File::open(ppr_file).expect("cannot open file");
+    let mut bytes = Vec::<u8>::new();
+    f.read_to_end(&mut bytes).expect("cannot read file");
+    ISO_8859_1.decode(&bytes, DecoderTrap::Strict).expect("cannot decode ppr bytes")
+}
+
+pub fn write_ppr(ppr_file:&Path,ppr_string:&str) {
+    let mut f = File::create(ppr_file).expect("cannot create file");
+    let bytes = ISO_8859_1.encode(ppr_string,EncoderTrap::Strict).expect("cannot encode string");
+    f.write_all(&bytes).expect("trouble writing to file");
+}
+
+pub fn ppr_var_map(ppr_string:&str) -> Option<HashMap<String,i16>> {
+    let reg = Regex::new(r":VAR (.*?), ([-0-9]+)").expect("invalid regex");
+    let mut map = HashMap::<String,i16>::new();
+    let mut str = ppr_string.to_owned();
+    let lines:Vec<String> = str.lines().map(|s| s.to_string()).collect();
+    lines.iter().for_each(|line| {
+        let captures = reg.captures(line);
+        match captures {
+            Some(capture) => {
+                let cap1 = capture.get(1).expect("ppr variable not found");
+                let cap2 = capture.get(2).expect("ppr value not found");
+                let var_name = cap1.as_str().to_string();
+                let value:i16 = cap2.as_str().parse().expect("cannot parse to int16");
+                map.insert(var_name,value);
+            },
+            None => {}
+        }
+    });
+    match map.is_empty() {
+        true => None,
+        false => Some(map)
+    }
+}
+
+pub fn update_ppr(ppr_string:&str,var_map:&HashMap<String,i16>) -> String {
+    let mut str = ppr_string.to_owned();
+    var_map.iter().for_each(|(key,value)| {
+        let mut lines:Vec<String> = str.lines().map(|s| s.to_string()).collect();
+        lines.iter_mut().for_each(|line| {
+            let u = update_ppr_line(line,key,*value);
+            match u {
+                Some((new_string,_)) => {
+                    *line = new_string;
+                }
+                None => {}
+            }
+        });
+        str = lines.join("\n")
+    });
+    str
+}
+
+fn update_ppr_line(line:&str,var_name:&str,new_value:i16) -> Option<(String,i16)> {
+    let reg = Regex::new(&format!(":VAR {}, ([-0-9]+)",var_name)).expect("invalid regex");
+    let captures = reg.captures(line);
+    match captures {
+        Some(capture) => {
+            let cap = capture.get(1).expect("ppr value not found");
+            let old_value = cap.as_str().parse().expect("cannot parse to int16");
+            Some((format!(":VAR {}, {}",var_name,new_value),old_value))
+        },
+        None => None
+    }
+}
+
+pub fn build_simulation(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
+    let params = clone_box(&*sequence_params);
+    let mut to_build = params.instantiate();
+    create_dir_all(work_dir).expect("trouble building directory");
+    let label = format!("{}_simulation",params.name());
+    to_build.ppl_export(work_dir,&label,true,build);
+}
+
+pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
+    let params = clone_box(&*sequence_params);
+    let mut to_build = params.instantiate();
+    create_dir_all(work_dir).expect("trouble building directory");
+    to_build.ppl_export(work_dir,&params.name(),false,build);
+    match params.is_cs(){
+        true =>{
+            let table = &params.cs_table().unwrap();
+            copy(table,work_dir.join("cs_table")).expect("unable to copy cs table to destination");
+        }
+        _=> {}
+    }
+}
+
+pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
+    let mut setup_params = clone_box(&*sequence_params);
+    setup_params.configure_setup();
+    let mut to_build = setup_params.instantiate();
+    create_dir_all(work_dir).expect("trouble building directory");
+    let label = format!("{}_setup",setup_params.name());
+    to_build.ppl_export(work_dir,&label,false,build);
+    match setup_params.is_cs(){
+        true =>{
+            let table = &setup_params.cs_table().unwrap();
+            copy(table,work_dir.join("cs_table")).expect("unable to copy cs table to destination");
+        }
+        _=> {}
+    }
+}
+
+pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>, work_dir:&Path, b_table:&Path, build:bool) {
+    let mut s = clone_box(&*sequence_params);
+    let b_val = s.b_value();
+    let b_table = read_b_table(b_table);
+    let n = b_table.len();
+    let w = ((n-1) as f32).log10().floor() as usize + 1;
+    let formatter = |index:usize| format!("m{:0width$ }",index,width=w);
+    b_table.iter().enumerate().for_each(|(index,exp)| {
+        let scale = exp.0;
+        let direction = (exp.1,exp.2,exp.3);
+        s.set_b_value(b_val*scale);
+        s.set_b_vec(direction);
+        s.set_cs_table();
+        let label = formatter(index);
+        let dir = work_dir.join(&label);
+        create_dir_all(&dir).expect("trouble building directory");
+        let mut to_build = s.instantiate();
+        to_build.ppl_export(&dir,&label,false,build);
+        to_build.param_export(&dir);
+        match s.is_cs() {
+            true => {
+                let table = &s.cs_table().unwrap();
+                copy(table,dir.join("cs_table")).expect("unable to copy cs table to destination");
+            }
+            false => {}
+        }
+    })
+}
+
+pub fn read_b_table(b_table:&Path) -> Vec<(f32,f32,f32,f32)>{
+    let mut f = File::open(b_table).expect("b_vec table not found");
+    let mut file_string = String::new();
+    f.read_to_string(&mut file_string).expect("trouble reading from file");
+    let mut b_table = Vec::<(f32,f32,f32,f32)>::new();
+    file_string.lines().for_each(|line| {
+        if !line.starts_with("#") && !line.is_empty() {
+            let s = line.split(",");
+            let values:Vec<f32> = s.map(|elem| elem.trim().parse().expect(&format!("unable to parse {}",elem))).collect();
+            if values.len() == 4 {
+                b_table.push((values[0],values[1],values[2],values[3]));
+            }
+        }
+    });
+    b_table
+}

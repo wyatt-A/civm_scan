@@ -1,9 +1,6 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::path::{Path, PathBuf};
-use std::fs::{create_dir_all, File};
-use std::future::pending;
+use std::fs::{File};
 use std::io::{Read, Write};
 use seq_tools::grad_cal;
 use seq_tools::acq_event::{AcqEvent, SpectralWidth};
@@ -12,92 +9,25 @@ use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin,
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
-use seq_tools::ppl::{BaseFrequency, ppr_var_map, read_ppr, sync_pprs, update_ppr, write_ppr};
-use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
+use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
 use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
-use seq_tools::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
-use seq_tools::utils::{clock_to_sec, sec_to_clock, us_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, Protocol, PulseSequence, Setup};
+use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
+use seq_tools::utils::{sec_to_clock};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters};
 use serde_json;
 use serde::{Serialize,Deserialize};
-use crate::compressed_sensing::{CompressedSensing, CSTable};
-use crate::diffusion::{self, b_val_to_dac, build_cs_experiment, DiffusionWeighted, generate_experiment, PulseShape};
-
-use encoding::{Encoding, EncoderTrap, DecoderTrap};
-use encoding::all::ISO_8859_1;
-use glob::glob;
-
-
-/*
-civm_scan new_study -> "/d/smis/20221031"
-(creates a study directory and sets up file structure)
-
-civm_scan scout "/d/smis/20221031"
-(runs a basic scout localizer, writing to cfl images)
-
-civm_scan pre_scan "/d/smis/20221031" -> "/d/smis/20221031/setup.txt"
-(finds base frequency offset and runs rf power calibration. Writes to a setup text file)
-
-civm_scan new_protocol 20.5xFAD.01 -> "/d/smis/20221031/_01"
-(creates a sub-directory for the protocol, loads in parameters and writes sequences to the directory)
-
-civm_scan setup_protocol "/d/smis/20221031/_01"
-(starts the setup sequence for the manual tuning process)
-
-civm_scan run_protocol "/d/smis/20221031/_01"
-()
-
-
- */
-
-#[test]
-fn test() {
-
-    //let cs_table = Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54");
-    let cs_table = Path::new(r"C:\workstation\data\petableCS_stream\fse\dummy_table");
-    let b_table = Path::new(r"C:\workstation\data\diffusion_table\ICO61_6b0.txt");
-    let work_dir = Path::new(r"D:\dev\221101\acq");
-
-
-    //SpinEchoDW::setup(&work_dir.join("setup"));
-
-    let sequence_params = FseDtiParams::default();
-
-    let mut exp_params = generate_experiment(&sequence_params,b_table);
-
-    let mut seqs:Vec<FseDti> = exp_params.iter().map(|params| FseDti::new(params.clone())).collect();
-
-    let build_dirs = build_cs_experiment(&mut seqs, cs_table);
-
-
-    // let mut sequence = SpinEchoDW::new(sequence_params);
-    // sequence.set_cs_table(cs_table);
-    // let build_dirs = build_dw_cs_experiment(&sequence, b_table, work_dir);
-
-    let patterns:Vec<String> = build_dirs.iter().map(|dir| {
-        dir.join("*.ppr").to_str().unwrap().to_owned()
-    }).collect();
-
-    let entries:Vec<PathBuf> = patterns.iter().flat_map(|pat| {
-        glob(pat).expect("failed to read glob pattern").flat_map(|m| m)
-    }).collect();
-
-    sync_pprs(Path::new(r"D:\dev\221101\setup\setup.ppr"),&entries);
-
-
-}
+use cs_table::cs_table::CSTable;
 
 
 impl Setup for FseDtiParams {
     fn set_mode(&mut self) {
         self.setup_mode = true;
     }
-    fn set_repetitions(&mut self,n_reps:u32) {
-        self.n_repetitions = n_reps;
+    fn set_repetitions(&mut self) {
+        self.n_repetitions = 2000;
     }
 }
-
 
 impl DiffusionWeighted for FseDtiParams {
     fn b_value(&self) -> f32 {
@@ -112,8 +42,8 @@ impl DiffusionWeighted for FseDtiParams {
     fn set_b_vec(&mut self, b_vec: (f32, f32, f32)) {
             self.b_vec = b_vec;
         }
-    fn pulse_shape(&self) -> PulseShape {
-        PulseShape::HalfSin
+    fn pulse_shape(&self) -> DiffusionPulseShape {
+        DiffusionPulseShape::HalfSin
     }
     fn pulse_separation(&self) -> f32 {
         self.diff_pulse_separation
@@ -123,23 +53,43 @@ impl DiffusionWeighted for FseDtiParams {
     }
 }
 
-
-impl CompressedSensing for FseDti {
-
-    fn set_cs_table(&mut self) {
-        let bp = self.base_params();
-        let table = CSTable::open(&self.cs_table());
-        let n_reps = table.n_views() as u32/bp.view_acceleration as u32;
-        self.params.n_repetitions = n_reps as u32;
+impl CompressedSense for FseDtiParams {
+    fn is_cs(&self) -> bool {
+        true
     }
-
-    fn cs_table(&self) -> PathBuf {
-        self.params.cs_table.clone()
+    fn set_cs_table(&mut self) {
+        let n_reps = CSTable::open(
+            &self.cs_table().unwrap(),
+            self.samples.1 as i16,self.samples.2 as i16)
+            .n_views() as u32/self.view_acceleration as u32;
+        self.n_repetitions = n_reps;
+    }
+    fn cs_table(&self) -> Option<PathBuf> {
+        Some(self.cs_table.clone())
     }
 }
 
 
-impl Protocol for FseDtiParams {
+impl Simulate for FseDtiParams {
+    fn set_repetitions(&mut self) {
+        self.n_repetitions = 2;
+    }
+}
+
+impl AcqDimensions for FseDtiParams {
+    fn acq_dims(&self) -> AcqDims {
+        AcqDims {
+            n_read: self.samples.0 as i32,
+            n_phase1: self.samples.1 as i32,
+            n_phase2: self.samples.2 as i32,
+            n_slices: 1,
+            n_echos: 3,
+            n_experiments: 1
+        }
+    }
+}
+
+impl Initialize for FseDtiParams {
     fn default() -> Self {
         FseDtiParams {
             name: "fse_dti".to_string(),
@@ -166,9 +116,16 @@ impl Protocol for FseDtiParams {
             rep_time: 80E-3,
             n_averages: 1,
             n_repetitions: 2000,
+            view_acceleration : 2,
             setup_mode: false,
             grad_off: false
         }
+    }
+    fn load(params_file: &Path) -> Self {
+        let mut f = File::open(params_file).expect("cannot open file");
+        let mut json_str = String::new();
+        f.read_to_string(&mut json_str).expect("trouble reading file");
+        serde_json::from_str(&json_str).expect("cannot deserialize string")
     }
     fn write_default(params_file: &Path){
         let params = Self::default();
@@ -176,86 +133,42 @@ impl Protocol for FseDtiParams {
         let mut f = File::create(params_file).expect("cannot create file");
         f.write_all(str.as_bytes()).expect("trouble writing to file");
     }
+}
 
+
+impl DWSequenceParameters for FseDtiParams{}
+impl SequenceParameters for FseDtiParams {
+    fn name(&self) -> String {
+        String::from("fse_dti")
+    }
     fn write(&self,params_file: &Path){
         let str = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
         let mut f = File::create(params_file).expect("cannot create file");
         f.write_all(str.as_bytes()).expect("trouble writing to file");
     }
-
-    fn load(params_file: &Path) -> Self {
-        let mut f = File::open(params_file).expect("cannot open file");
-        let mut json_str = String::new();
-        f.read_to_string(&mut json_str).expect("trouble reading file");
-        serde_json::from_str(&json_str).expect("cannot deserialize string")
+    fn instantiate(&self) -> Box<dyn Build> {
+        Box::new(FseDti::new(self.clone()))
     }
 }
 
 
-// impl  for SpinEchoDWParams {
-//         fn name() -> String {
-//             String::from("fse_dw")
-//         }
-//         fn default() -> Self {
-//             SpinEchoDWParams {
-//                 name: SpinEchoDWParams::name(),
-//                 cs_table: Some(Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned()),
-//                 b_value: 3000.0,
-//                 b_vec: (1.0, 0.0, 0.0),
-//                 fov: (19.7, 12.0, 12.0),
-//                 samples: (788, 480, 480),
-//                 sample_discards: 0,
-//                 spectral_width: SpectralWidth::SW200kH,
-//                 rf_90_duration: 140E-6,
-//                 rf_180_duration: 280E-6,
-//                 diff_pulse_duration: 3.5E-3,
-//                 diff_pulse_separation: 4E-3,
-//                 spoil_duration: 600E-6,
-//                 ramp_time: 140E-6,
-//                 read_extension: 0.0,
-//                 phase_encode_time: 550E-6,
-//                 echo_time: 13.98E-3,
-//                 echo_spacing: 7.2E-3,
-//                 obs_freq_offset: 0.0,
-//                 rep_time: 80E-3,
-//                 n_averages: 1,
-//                 n_repetitions: 2000,
-//                 setup_mode: false,
-//                 grad_off: false
-//             }
-//         }
-//         fn to_file(&self, filepath: &Path) {
-//             let file_name = Self::name();
-//             let json_str = serde_json::to_string_pretty(&self.params).unwrap();
-//             let mut f = File::create(filepath.join(file_name)).expect(&format!("Cannot create file {:?}", filepath));
-//             f.write_all(json_str.as_bytes()).expect("trouble writing to file");
-//         }
-//         fn from_file(filepath: &Path) -> Self {
-//             let mut f = File::open(filepath).expect("cannot open file");
-//             let mut str = String::new();
-//             f.read_to_string(&mut str).expect("trouble reading from file");
-//             let params: SpinEchoDWParams = serde_json::from_str(&str).expect("cannot deserialize data format");
-//             Self::new(params)
-//         }
-//     }
-
 impl Build for FseDti {
-        fn place_events(&self) -> EventQueue {
-            self.place_events()
+    fn place_events(&self) -> EventQueue {
+        self.place_events()
+    }
+    fn base_params(&self) -> PPLBaseParams {
+        PPLBaseParams {
+            n_averages: self.params.n_averages,
+            n_repetitions: self.params.n_repetitions,
+            rep_time: self.params.rep_time,
+            base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset),
+            orientation: Orientation::CivmStandard,
+            grad_clock: GradClock::CPS20,
+            phase_unit: PhaseUnit::Min,
+            view_acceleration: self.params.view_acceleration,
+            waveform_sample_period_us: 2
         }
-        fn base_params(&self) -> PPLBaseParams {
-            PPLBaseParams {
-                n_averages: self.params.n_averages,
-                n_repetitions: self.params.n_repetitions,
-                rep_time: self.params.rep_time,
-                base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset),
-                orientation: Orientation::CivmStandard,
-                grad_clock: GradClock::CPS20,
-                phase_unit: PhaseUnit::Min,
-                view_acceleration: 2,
-                waveform_sample_period_us: 2
-            }
-        }
+    }
     fn param_export(&self, filepath: &Path) {
         let params = self.params.clone();
         let name = params.name.clone();
@@ -287,6 +200,7 @@ pub struct FseDtiParams {
         rep_time: f32,
         n_averages: u16,
         n_repetitions: u32,
+        view_acceleration : u16,
         setup_mode: bool,
         grad_off: bool,
     }
@@ -449,11 +363,11 @@ impl FseDti {
             let diffusion = match params.setup_mode {
                 true =>{
                     println!("SETUP MODE ON");
-                    let diff_dacs = b_val_to_dac(PulseShape::HalfSin,20.0,params.diff_pulse_duration,params.diff_pulse_separation,(1.0,0.0,0.0));
+                    let diff_dacs = b_val_to_dac(DiffusionPulseShape::HalfSin,20.0,params.diff_pulse_duration,params.diff_pulse_separation,(1.0,0.0,0.0));
                     Matrix::new_static("diffusion_mat", DacValues::new(Some(diff_dacs.0), None, None), (true, false, false), params.grad_off, &mat_count)
                 },
                 false =>{
-                    let diff_dacs = b_val_to_dac(PulseShape::HalfSin,params.b_value,params.diff_pulse_duration,params.diff_pulse_separation,params.b_vec);
+                    let diff_dacs = b_val_to_dac(DiffusionPulseShape::HalfSin,params.b_value,params.diff_pulse_duration,params.diff_pulse_separation,params.b_vec);
                     Matrix::new_static("diffusion_mat", DacValues::new(Some(diff_dacs.0), Some(diff_dacs.1), Some(diff_dacs.2)), (false, false, false), params.grad_off, &mat_count)
                 }
             };

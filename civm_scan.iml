@@ -10,6 +10,9 @@
       <sourceFolder url="file://$MODULE_DIR$/scan_control/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/build_sequence/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/recon/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/acquire/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cs_table/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mr_data/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -6,15 +6,16 @@ use std::path::{Path, PathBuf};
 pub struct CSTable {
     source:PathBuf,
     elements:Vec<i16>,
+    matrix_size:(i16,i16)
 }
 
 pub struct KspaceCoord {
-    k_phase:i16,
-    k_slice:i16
+    pub k_phase:i16,
+    pub k_slice:i16
 }
 
 impl CSTable {
-    pub fn open(source:&Path) -> Self {
+    pub fn open(source: &Path,n_phase1:i16,n_phase2:i16) -> Self {
         if !source.exists() {
             panic!("cs table not found!");
         }
@@ -27,6 +28,7 @@ impl CSTable {
         Self {
             source:source.to_owned(),
             elements:e,
+            matrix_size:(n_phase1,n_phase2)
         }
     }
 
@@ -52,6 +54,12 @@ impl CSTable {
             )
         }
         coords
+    }
+
+    pub fn indices(&self) -> Vec<(i16,i16)> {
+        let phase_off = self.matrix_size.0/2 as i16;
+        let slice_off = self.matrix_size.1/2 as i16;
+        self.coordinates().iter().map(|coord| (coord.k_phase + phase_off,coord.k_slice + slice_off)).collect()
     }
 
     pub fn copy_to(&self,dest:&Path,file_name:&str) {

@@ -7,7 +7,7 @@ use glob::GlobResult;
 use serde::{Serialize,Deserialize};
 use serde_json;
 
-// this should be replaced with an environemnt variable once I know what im doing
+// this should be replaced with an environment variable once I know what im doing
 const CONFIG_FILE:&str = "c:/workstation/civm_scan/config/build_sequence.json";
 
 

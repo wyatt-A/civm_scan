@@ -6,7 +6,10 @@ members = [
     "scan_ui",
     "scan_control",
     "build_sequence",
-    "recon"
+    "recon",
+    "mr_data",
+    "cs_table",
+    "acquire",
 ]
 
 # this determines which package is the entry point for cargo run
