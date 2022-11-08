@@ -157,7 +157,7 @@ pub fn find_files(base_dir:&Path, pattern:&str, depth:u16) -> Vec<PathBuf> {
 }
 
 pub fn read_to_string(file_path:&Path) -> String {
-    let mut f = File::open(file_path).expect("cannot open file");
+    let mut f = File::open(file_path).expect(&format!("cannot open {:?}",file_path));
     let mut s = String::new();
     f.read_to_string(&mut s).expect("cannot read from file");
     s

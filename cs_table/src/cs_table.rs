@@ -40,26 +40,27 @@ impl CSTable {
         self.elements.len()/2
     }
 
-    pub fn coordinates(&self) -> Vec<KspaceCoord> {
+    pub fn coordinates(&self,read_element_offset:usize) -> Vec<KspaceCoord> {
         if (self.n_elements() % 2) != 0 {
             panic!("table must have an even number of elements");
         }
         let mut coords = Vec::<KspaceCoord>::with_capacity(self.n_elements()/2);
-        for i in 0..self.n_elements()/2 {
+        let range = read_element_offset..self.n_elements()/2;
+        for i in range {
             coords.push(
                 KspaceCoord {
-                    k_phase:self.elements[i],
-                    k_slice:self.elements[i+1],
+                    k_phase:self.elements[2*i],
+                    k_slice:self.elements[2*i+1],
                 }
             )
         }
         coords
     }
 
-    pub fn indices(&self) -> Vec<(i16,i16)> {
+    pub fn indices(&self,read_element_offset:usize) -> Vec<(i16,i16)> {
         let phase_off = self.matrix_size.0/2 as i16;
         let slice_off = self.matrix_size.1/2 as i16;
-        self.coordinates().iter().map(|coord| (coord.k_phase + phase_off,coord.k_slice + slice_off)).collect()
+        self.coordinates(read_element_offset).iter().map(|coord| (coord.k_phase + phase_off,coord.k_slice + slice_off)).collect()
     }
 
     pub fn copy_to(&self,dest:&Path,file_name:&str) {

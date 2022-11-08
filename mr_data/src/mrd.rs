@@ -1,14 +1,15 @@
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use seq_lib::pulse_sequence::AcqDims;
 use acquire::build::acq_dims;
 use cs_table::cs_table::CSTable;
 use byteorder::{LittleEndian,ByteOrder};
-use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate};
+use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate, Ix};
 use ndarray::{Array, ArrayView, array, Axis};
 use ndarray::iter::Axes;
+use ndarray::Order::RowMajor;
 
 const OFFSET_TO_DATA:usize = 512;
 const HEADER_SIZE:usize = 256;
@@ -20,30 +21,131 @@ const N_SLICE_BYTES:Range<usize> = 12..16;
 const N_ECHOS_BYTES:Range<usize> = 152..156;
 const N_EXPERIMENT_BYTES:Range<usize> = 156..160;
 
+pub struct RawToKspaceParams {
+    pub n_read:usize,
+    pub n_phase1:usize,
+    pub n_phase2:usize,
+    pub n_views:usize,
+    pub view_acceleration:usize,
+    pub dummy_excitations:usize,
+    pub n_vols:usize // for MGRE or multi-echo data
+}
+
 #[test]
 fn test(){
-    let p = Path::new("/home/wyatt/projects/test_data/acq/m00/m00.mrd");
-    let table = Path::new("/home/wyatt/projects/test_data/acq/m00/cs_table");
-    let param_file = Path::new("/home/wyatt/projects/test_data/acq/m00/fse_dti.json");
 
-    let dims = acq_dims(param_file);
+    // FSE kspace formatting
 
-    let mrd = MRData::new(p);
+    let ksp_fse = RawToKspaceParams {
+        n_read:788,
+        n_phase1:480,
+        n_phase2:480,
+        n_views:28800,
+        view_acceleration:2,
+        dummy_excitations:20,
+        n_vols:1
+    };
+    let mrd_path = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq/m01/m01.mrd");
+    let table = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq/m01/cs_table");
+    let out_base = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq/m01/mgre_ksp");
+    fse_raw_to_cfl(mrd_path,table,out_base,&ksp_fse);
 
-    let cs_table = CSTable::open(table, dims.n_phase1 as i16, dims.n_phase2 as i16);
 
-    println!("{:?}",dims);
-    println!("{}",mrd.n_views());
-    println!("{}",mrd.n_samples());
+    // Single echo/multi echo formatting
+
+/*
+    let ksp = RawToKspaceParams {
+        n_read:788,
+        n_phase1:480,
+        n_phase2:480,
+        n_views:28800,
+        view_acceleration:1,
+        dummy_excitations:0,
+        n_vols:4
+    };
+
+    let data_path = Path::new("/Users/Wyatt/IdeaProjects/test_data/mgre/mgre.mrd");
+    let table = Path::new("/Users/Wyatt/IdeaProjects/test_data/se/stream_CS480_8x_pa18_pb54");
+    let out_base = Path::new("/Users/Wyatt/IdeaProjects/test_data/mgre/mgre_ksp");
+    multi_echo_raw_to_cfl(data_path,table,out_base,&ksp)
+*/
+}
 
 
-    let a = ArrayD::<f32>::from_shape_vec(IxDyn(&mrd.char_dim_array()),mrd.float_stream()).expect("unexpected number of samples");
-    let e1 = a.slice(s![..,..,..,..,..,0,..]);
-    let mut v1 = a.slice(s![..,..,..,..,..,1,..]).to_owned();
-    let v2 = a.slice(s![..,..,..,..,..,2,..]);
-    v1 += &v2;
-    let f = concatenate(Axis(5),&[e1,v1.view()]);
-    println!("{:?}",f);
+fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out:&Path,params:&RawToKspaceParams) {
+    let formatted = format_fse_raw(mrd,params.n_read,params.n_views,params.dummy_excitations);
+    let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
+    write_cfl_vol(&vol,cfl_out);
+}
+
+fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&RawToKspaceParams) {
+    let fname = cfl_out_base_name.file_name().expect(&format!("cannot determine base name from {:?}",cfl_out_base_name)).to_str().unwrap();
+    let n = params.n_vols;
+    let w = ((n-1) as f32).log10().floor() as usize + 1;
+    let formatter = |index:usize| format!("m{:0width$ }",index,width=w);
+    for i in 0..n {
+        let postfix = formatter(i);
+        let qualified_name = format!("{}_{}",fname,postfix);
+        let cfl = cfl_out_base_name.with_file_name(qualified_name);
+        let formatted = format_multi_echo_raw(mrd,params.n_read,params.n_views,params.dummy_excitations,i);
+        let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
+        write_cfl_vol(&vol,&cfl);
+    }
+}
+
+
+fn format_fse_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize) -> Array<f32, Dim<[Ix; 3]>> {
+    let mrd = MRData::new(mrd);
+    let mut mrd_dims = mrd.char_dim_array().to_vec();
+    mrd_dims.reverse();
+    let mrd_array = ArrayD::<f32>::from_shape_vec(IxDyn(&mrd_dims), mrd.float_stream()).expect("unexpected number of samples");
+    let echo1 = mrd_array.slice(s![..,0,..,..,..,..,..]);
+    let mut echo2 = mrd_array.slice(s![..,1,..,..,..,..,..]).to_owned();
+    let echo3 = mrd_array.slice(s![..,2,..,..,..,..,..]);
+    echo2 += &echo3;
+    let combined_echos = concatenate(Axis(1), &[echo1, echo2.view()]).expect("unable to concatenate arrays").permuted_axes([0,3,2,1,4,5]);
+    let trimmed = combined_echos.slice(s![..,n_dummy_excitations..,..,..,..,..]).to_owned();
+    trimmed.to_shape(((n_views,n_read,2), Order::RowMajor)).expect("cannot reshape array").to_owned()
+}
+
+
+fn format_multi_echo_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize,vol_index:usize) -> Array<f32, Dim<[Ix; 3]>> {
+    let mrd = MRData::new(mrd);
+    let mut mrd_dims = mrd.char_dim_array().to_vec();
+    mrd_dims.reverse();
+    let mrd_array = ArrayD::<f32>::from_shape_vec(IxDyn(&mrd_dims), mrd.float_stream()).expect("unexpected number of samples");
+    let echo = mrd_array.slice(s![..,vol_index,..,..,..,..,..]).to_owned().permuted_axes([0,3,2,1,4,5]);
+    let trimmed = echo.slice(s![..,n_dummy_excitations..,..,..,..,..]).to_owned();
+    trimmed.to_shape(((n_views,n_read,2), Order::RowMajor)).expect("cannot reshape array").to_owned()
+}
+
+
+fn zero_fill(array:&Array<f32, Dim<[Ix; 3]>>,
+             cs_table:&Path,
+             dims:(usize,usize,usize),
+             dummy_excitations:usize,
+             view_acceleration:usize) ->  Array<f32, Dim<[Ix; 4]>>{
+    let cs_table = CSTable::open(cs_table,dims.1 as i16,dims.2 as i16);
+    let mut zf_arr = Array4::<f32>::zeros([dims.2,dims.1,dims.0,2]);
+    for (i,index) in cs_table.indices(dummy_excitations*view_acceleration).iter().enumerate() {
+        let mut zf_slice = zf_arr.slice_mut(s![index.0 as usize,index.1 as usize,..,..]);
+        zf_slice += &array.slice(s![i,..,..]);
+    }
+    zf_arr
+}
+
+fn write_cfl_vol(complex_volume:&Array<f32, Dim<[Ix; 4]>>,filename:&Path) {
+    let shape = complex_volume.shape();
+    let numel = shape[0]*shape[1]*shape[2]*shape[3];
+    let hdr_str = format!("# Dimensions\n{} {} {} 1 1",shape[2],shape[1],shape[0]);
+    let flat = complex_volume.to_shape((numel,Order::RowMajor)).expect("cannot flatten with specified number of elements").to_vec();
+    let n_bytes = flat.len()*4;
+    let mut byte_buff:Vec<u8> = vec![0;n_bytes];
+    LittleEndian::write_f32_into(&flat,&mut byte_buff);
+    let mut cfl = File::create(filename.with_extension("cfl")).expect("cannot create file");
+    cfl.write_all(&byte_buff).expect("problem writing to file");
+    let mut hdr = File::create(filename.with_extension("hdr")).expect("cannot create file");
+    hdr.write_all(hdr_str.as_bytes()).expect("a problem occurred writing to cfl header");
 }
 
 
@@ -142,6 +244,9 @@ impl MRData {
     }
 
     pub fn float_stream(&self) -> Vec<f32> {
+        if self.bit_depth() != 4 {
+            panic!("mrd data type is incompatible with floating point. Bit depth is {}",self.bit_depth());
+        }
         let mut floats:Vec<f32> = vec![0.0;self.n_chars()];
         LittleEndian::read_f32_into(&self.byte_stream(),&mut floats);
         floats
@@ -184,26 +289,6 @@ impl MRData {
         bit_depth
     }
 
-    // pub fn zero_fill(&self,pe_table:&Petable) -> Vec<f32>{
-    //     // Array for raw floats
-    //     let mut raw_floats:Vec<f32> = vec![0.0;self.n_chars()];
-    //     LittleEndian::read_f32_into(&self.vol_bytes,&mut raw_floats);
-    //     let raw_arr = Array3::from_shape_vec((2,self.n_read(),self.n_views()), raw_floats).expect("raw floats cannot fit into shape");
-    //     let r = self.dimension[0] as usize;
-    //     let zf_dims = (pe_table.size,pe_table.size,r,self.complex_mult());
-    //     let numel = zf_dims.0*zf_dims.1*zf_dims.2*zf_dims.3;
-    //     let mut zf_arr = Array4::<f32>::zeros(zf_dims);
-    //     println!("zero-filling compressed data ...");
-    //     let indices = pe_table.indices();
-    //     for (i,index) in indices.iter().enumerate() {
-    //         let mut zf_slice = zf_arr.slice_mut(s![index.0,index.1,..,..]);
-    //         zf_slice += &raw_arr.slice(s![i,..,..]);
-    //     }
-    //     println!("reshaping zero-filled ...");
-    //     let flat = zf_arr.to_shape((numel,Order::RowMajor)).expect("unexpected data size");
-    //     println!("flattening ...");
-    //     return flat.to_vec();
-    // }
 }
 
 fn bytes_to_long(byte_slice:&[u8]) -> i32 {

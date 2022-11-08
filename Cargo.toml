@@ -12,5 +12,5 @@ members = [
     "acquire",
 ]
 
-# this determines which package is the entry point for cargo run
+# this determines which package is the entry point for cargo run (if multiple binaries exist)
 default-members = ["scan_ui"]
