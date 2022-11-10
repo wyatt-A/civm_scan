@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
-use seq_lib::pulse_sequence::AcqDims;
+use seq_lib::pulse_sequence::{AcqDims, MrdFormat, MrdToKspaceParams};
 use acquire::build::acq_dims;
 use cs_table::cs_table::CSTable;
 use byteorder::{LittleEndian,ByteOrder};
@@ -10,6 +10,7 @@ use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate, Ix};
 use ndarray::{Array, ArrayView, array, Axis};
 use ndarray::iter::Axes;
 use ndarray::Order::RowMajor;
+
 
 const OFFSET_TO_DATA:usize = 512;
 const HEADER_SIZE:usize = 256;
@@ -21,29 +22,22 @@ const N_SLICE_BYTES:Range<usize> = 12..16;
 const N_ECHOS_BYTES:Range<usize> = 152..156;
 const N_EXPERIMENT_BYTES:Range<usize> = 156..160;
 
-pub struct RawToKspaceParams {
-    pub n_read:usize,
-    pub n_phase1:usize,
-    pub n_phase2:usize,
-    pub n_views:usize,
-    pub view_acceleration:usize,
-    pub dummy_excitations:usize,
-    pub n_vols:usize // for MGRE or multi-echo data
-}
+
 
 #[test]
 fn test(){
 
     // FSE kspace formatting
 
-    let ksp_fse = RawToKspaceParams {
+    let ksp_fse = MrdToKspaceParams {
+        mrd_format: MrdFormat::FseCSVol,
         n_read:788,
         n_phase1:480,
         n_phase2:480,
         n_views:28800,
         view_acceleration:2,
         dummy_excitations:20,
-        n_vols:1
+        n_objects:1
     };
     let mrd_path = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq/m01/m01.mrd");
     let table = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq/m01/cs_table");
@@ -72,15 +66,15 @@ fn test(){
 }
 
 
-fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out:&Path,params:&RawToKspaceParams) {
+pub fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out:&Path,params:&MrdToKspaceParams) {
     let formatted = format_fse_raw(mrd,params.n_read,params.n_views,params.dummy_excitations);
     let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
     write_cfl_vol(&vol,cfl_out);
 }
 
-fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&RawToKspaceParams) {
+fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&MrdToKspaceParams) {
     let fname = cfl_out_base_name.file_name().expect(&format!("cannot determine base name from {:?}",cfl_out_base_name)).to_str().unwrap();
-    let n = params.n_vols;
+    let n = params.n_objects;
     let w = ((n-1) as f32).log10().floor() as usize + 1;
     let formatter = |index:usize| format!("m{:0width$ }",index,width=w);
     for i in 0..n {

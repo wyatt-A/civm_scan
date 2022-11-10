@@ -5,6 +5,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use cs_table::cs_table::CSTable;
 use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims};
+use seq_lib::headfile::Headfile;
 use dyn_clone::clone_box;
 use encoding::all::ISO_8859_1;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
@@ -15,7 +16,8 @@ use crate::args::{ApplySetupArgs, NewArgs, NewConfigArgs, NewDiffusionExperiment
 use std::fs::copy;
 
 //const SEQUENCE_LIB:&str = r"C:\\workstation\\civm_scan\\sequence_library";
-const SEQUENCE_LIB:&str = "/home/wyatt/projects/test_data/build_test";
+//const SEQUENCE_LIB:&str = "/home/wyatt/projects/test_data/build_test";
+const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
 const BUILD:bool = false;
 
 pub enum Sequence {
@@ -95,7 +97,6 @@ pub fn new_setup(args:&NewArgs) {
     let params = load_params(&cfg_file);
     build_setup(params,&args.destination,BUILD);
 }
-
 
 pub fn new_config(args:&NewConfigArgs){
     let seq = Sequence::encode(&args.name);
@@ -256,6 +257,9 @@ pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bo
     let mut to_build = params.instantiate();
     create_dir_all(work_dir).expect("trouble building directory");
     to_build.ppl_export(work_dir,&params.name(),false,build);
+    params.mrd_to_kspace_params().to_file(&work_dir.join("mrd_to_kspace"));
+    let hdr = Headfile::hash_to_txt(params.headfile().to_hash());
+    to_build.param_export(&work_dir);
     match params.is_cs(){
         true =>{
             let table = &params.cs_table().unwrap();
@@ -298,6 +302,7 @@ pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>,
         let dir = work_dir.join(&label);
         create_dir_all(&dir).expect("trouble building directory");
         let mut to_build = s.instantiate();
+        s.mrd_to_kspace_params().to_file(&work_dir.join("mrd_to_kspace"));
         to_build.ppl_export(&dir,&label,false,build);
         to_build.param_export(&dir);
         match s.is_cs() {

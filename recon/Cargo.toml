@@ -7,3 +7,12 @@ edition = "2021"
 
 [dependencies]
 seq_lib = {path = "../seq_lib"}
+mr_data = {path = "../mr_data"}
+ndarray = "0.15.4"
+byteorder = "1.4.3"
+toml = "0.5.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.85"
+whoami = "1.2.1"
+regex = "1.6.0"
+clap = { version = "3.2.17", features = ["derive"] }

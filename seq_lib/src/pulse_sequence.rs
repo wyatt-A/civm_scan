@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -65,9 +66,9 @@ pub trait Initialize {
     fn write_default(params_file: &Path);
 }
 
-pub trait DWSequenceParameters:SequenceParameters + DiffusionWeighted + DynClone {}
+pub trait DWSequenceParameters:SequenceParameters + DiffusionWeighted + DynClone + DiffusionHeadfile {}
 pub trait SequenceParameters:
-CompressedSense+Simulate+AcqDimensions+DynClone+Setup {
+CompressedSense+Simulate+AcqDimensions+DynClone+MrdToKspace+Setup+Headfile {
     fn name(&self) -> String;
     fn write(&self,params_file:&Path);
     fn instantiate(&self) -> Box<dyn Build>;
@@ -98,6 +99,132 @@ pub struct AcqDims {
     pub n_echos:i32,
     pub n_experiments:i32,
 }
+
+#[derive(Serialize,Deserialize)]
+pub enum MrdFormat {
+    FseCSVol, // 3-D accelerated compressed sensing
+    StandardCSVol, // 3-D compressed sensing (single or multi-echo)
+    StandardVol,// 3-D standard imaging (single or multi-echo)
+    StandardSlice // 2-D imaging (single or multi-echo)
+}
+
+// this is an attempt to provide info to unify the reconstruction process for any
+// raw mrd file. This will likely grow as we need more fields
+#[derive(Serialize,Deserialize)]
+pub struct MrdToKspaceParams {
+    pub mrd_format:MrdFormat,
+    pub n_read:usize,
+    pub n_phase1:usize,
+    pub n_phase2:usize,
+    pub n_views:usize,
+    pub view_acceleration:usize,
+    pub dummy_excitations:usize,
+    pub n_objects:usize // for MGRE or any multi-echo data
+}
+
+impl MrdToKspaceParams {
+    pub fn from_file(file_path:&Path) -> Self{
+        let mut f = File::open(file_path).expect("cannot open file");
+        let mut textstr = String::new();
+        f.read_to_string(&mut textstr).expect("cannot read from file");
+        serde_json::from_str(&textstr).expect("cannot deserialize json")
+    }
+    pub fn to_file(&self,file_path:&Path) {
+        let ext = "mtk";
+        let full_name = file_path.with_extension(ext);
+        let mut f = File::create(full_name).expect("unable to create file");
+        let out_str = serde_json::to_string_pretty(&self).expect("cannot serialize");
+        f.write_all(out_str.as_bytes()).expect("trouble writing to file");
+    }
+}
+
+pub trait MrdToKspace {
+    fn mrd_to_kspace_params(&self) -> MrdToKspaceParams;
+}
+
+pub trait Headfile {
+    fn headfile(&self) -> AcqHeadfileParams;
+}
+
+pub trait DiffusionHeadfile:Headfile {
+    fn headfile(&self) -> DWHeadfileParams;
+}
+
+
+pub struct AcqHeadfileParams {
+    pub dim_x:i32,
+    pub dim_y:i32,
+    pub dim_z:i32,
+    pub fovx_mm:f32,
+    pub fovy_mm:f32,
+    pub fovz_mm:f32,
+    pub te_ms:f32,
+    pub tr_us:f32,
+    pub alpha:f32,
+    pub bw:f32,
+    pub n_echos:i32,
+    pub S_PSDname:String,
+}
+
+pub struct DWHeadfileParams {
+    pub bvalue:f32,
+    pub bval_dir:(f32,f32,f32)
+}
+
+
+impl AcqHeadfileParams {
+    pub fn to_hash(&self) -> HashMap<String,String> {
+        let mut h = HashMap::<String,String>::new();
+        h.insert(String::from("dim_X"),self.dim_x.to_string());
+        h.insert(String::from("dim_Y"),self.dim_y.to_string());
+        h.insert(String::from("dim_Y"),self.dim_z.to_string());
+        h.insert(String::from("fovx"),self.fovx_mm.to_string());
+        h.insert(String::from("fovy"),self.fovy_mm.to_string());
+        h.insert(String::from("fovz"),self.fovz_mm.to_string());
+        h.insert(String::from("te"),self.te_ms.to_string());
+        h.insert(String::from("bw"),self.bw.to_string());
+        h.insert(String::from("ne"),self.n_echos.to_string());
+        h.insert(String::from("S_PSDname"),self.te_ms.to_string());
+        h
+    }
+}
+
+impl DWHeadfileParams {
+    pub fn to_hash(&self) -> HashMap<String,String> {
+        let mut h = HashMap::<String,String>::new();
+        let bval_dir = format!("3:1,{} {} {}",self.bval_dir.0,self.bval_dir.1,self.bval_dir.2);
+        h.insert(String::from("bval_dir"),bval_dir);
+        h.insert(String::from("bvalue"),self.bvalue.to_string());
+        h
+    }
+}
+
+
+
+
+/*
+transcribe_numeric(meta_hash,"fov_read","fovx",1000.0 as f32);
+        transcribe_numeric(meta_hash,"fov_phase","fovy",1000.0 as f32);
+        transcribe_numeric(meta_hash,"fov_slice","fovz",1000.0 as f32);
+        transcribe_numeric(meta_hash,"echo_time","te",1000.0 as f32);
+        transcribe_numeric(meta_hash,"rep_time","tr",1000000.0 as f32);
+        transcribe_numeric(meta_hash,"flip","alpha",1.0 as f32);
+        transcribe_numeric(meta_hash,"bandwidth","bw",0.5 as f32);
+        transcribe_numeric(meta_hash,"ppr_no_echoes","ne",1 as i32);
+        transcribe_string(meta_hash,"acq_Sequence","S_PSDname");
+                        hf.append_field("dim_X", dims[0]);
+                hf.append_field("dim_Y", dims[1]);
+                hf.append_field("dim_Z", dims[2]);
+
+
+
+bval_dir=3:1,0.579607171122 0.278002034221 0.7660093969090001
+bvalue=3000
+ */
+
+
+
+
 
 pub trait AcqDimensions {
     fn acq_dims(&self) -> AcqDims;

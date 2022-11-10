@@ -14,7 +14,7 @@ use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid}
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, Headfile, AcqHeadfileParams, DiffusionHeadfile, DWHeadfileParams};
 use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
@@ -93,7 +93,8 @@ impl Initialize for FseDtiParams {
     fn default() -> Self {
         FseDtiParams {
             name: "fse_dti".to_string(),
-            cs_table: Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned(),
+            //cs_table: Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned(),
+            cs_table: Path::new(r"/Users/Wyatt/IdeaProjects/test_data/data/petableCS_stream/fse/stream_CS480_8x_pa18_pb54").to_owned(),
             //b_value: 3000.0,
             b_value: 1000.0,
             b_vec: (1.0, 0.0, 0.0),
@@ -136,7 +137,55 @@ impl Initialize for FseDtiParams {
 }
 
 
+impl Headfile for FseDtiParams {
+    fn headfile(&self) -> AcqHeadfileParams {
+        AcqHeadfileParams {
+            dim_x: self.samples.0 as i32,
+            dim_y: self.samples.1 as i32,
+            dim_z: self.samples.2 as i32,
+            fovx_mm: self.fov.0,
+            fovy_mm: self.fov.1,
+            fovz_mm: self.fov.2,
+            te_ms: 1E3*self.echo_time,
+            tr_us: 1E6*self.rep_time,
+            alpha: 90.0,
+            bw: self.spectral_width.hertz() as f32 /2.0,
+            n_echos: 3,
+            S_PSDname: self.name()
+        }
+    }
+}
+
+impl DiffusionHeadfile for FseDtiParams {
+    fn headfile(&self) -> DWHeadfileParams {
+        DWHeadfileParams {
+            bvalue: self.b_value,
+            bval_dir: self.b_vec,
+        }
+    }
+}
+
 impl DWSequenceParameters for FseDtiParams{}
+
+// This is pretty bad, but im not sure of the best way to encode more information into cs table
+// we probably need to use the name of the file because we can't use a header
+impl MrdToKspace for FseDtiParams {
+    fn mrd_to_kspace_params(&self) -> MrdToKspaceParams {
+        let table_compression = 8;
+        let n_views = (self.samples.1 as usize*self.samples.2 as usize)/table_compression;
+        MrdToKspaceParams {
+            mrd_format:MrdFormat::FseCSVol,
+            n_read: self.samples.0 as usize,
+            n_phase1: self.samples.1 as usize,
+            n_phase2: self.samples.2 as usize,
+            n_views,
+            view_acceleration: self.view_acceleration as usize,
+            dummy_excitations: 20,
+            n_objects: 1
+        }
+    }
+}
+
 impl SequenceParameters for FseDtiParams {
     fn name(&self) -> String {
         String::from("fse_dti")
