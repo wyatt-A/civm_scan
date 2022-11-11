@@ -9,7 +9,7 @@ use crate::slurm::BatchScript;
 use std::process::Command;
 use std::error::Error;
 use crate::cfl;
-use seq_lib::headfile::Headfile;
+use headfile::headfile::Headfile;
 use crate::config::Recon;
 
 const VOLUME_MANAGER_FILENAME:&str = "volume-manager";
@@ -175,52 +175,6 @@ impl VolumeManager {
                         }
                     },
                 };
-                let mrd_meta = Path::new(&vm.mrd);
-                let base = mrd_meta.parent().unwrap();
-                let mrd_name = mrd_meta.file_stem().unwrap().to_str().unwrap();
-                let meta_name = format!("{}_meta.txt",mrd_name);
-
-                let meta_path = base.join(&meta_name);
-                println!("meta path: {:?}",meta_path);
-                let mut hf = Headfile::from_mrd_meta(&meta_path);
-                let headfile = outdir.join(&format!("{}.headfile",&imgname));
-                
-            
-                /*
-                headfile=mrs_meta_data(mrd);
-                headfile.dti_vols = n_volumes;
-                headfile.U_code = project_code;
-                headfile.U_civmid = civm_userid;
-                headfile.U_specid = specimen_id;
-                headfile.scanner_vendor = scanner_vendor;
-                headfile.U_runno = strcat(run_number,'_',mnum);
-                headfile.dim_X = vol_size(1);
-                headfile.dim_Y = vol_size(2);
-                headfile.dim_Z = vol_size(3);
-                headfile.civm_image_code = 't9';
-                headfile.civm_image_source_tag = 'imx';
-                headfile.engine_work_directory = pwd;
-                */
-                let volpath = &vm.imspace.clone().unwrap();
-                let dims = cfl::get_dims(&Path::new(volpath));
-                if dims.len() < 3 {panic!("what happend to the dimensions of the volume??")}
-                // inject more last-minute info into the headfile... this is a bit messy
-                if r.n_volumes.is_some(){
-                    hf.append_field("dti_vols",&r.n_volumes.unwrap());
-                }
-                hf.append_field("dim_X", dims[0]);
-                hf.append_field("dim_Y", dims[1]);
-                hf.append_field("dim_Z", dims[2]);
-                hf.append_field("U_code", &r.project.project_code);
-                hf.append_field("U_civmid",&r.recon_person);
-                hf.append_field("U_specid", &r.specimen_id);
-                hf.append_field("scanner_vendor", &r.scanner.vendor);
-                hf.append_field("U_runno", &r.run_number);
-                hf.append_field("civm_image_code", &r.scanner.image_code);
-                hf.append_field("civm_image_source_tag", &r.scanner.image_source_tag);
-                hf.append_field("engine_work_directory", &r.engine_work_dir.to_str().unwrap());
-                hf.write_headfile(&headfile);
-
             }
             Done => {/*no op*/}
             NotInstantiated => {/* null case. This state exists for external use only */}

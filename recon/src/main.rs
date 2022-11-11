@@ -2,8 +2,8 @@
     cs_recon main is the entry point for the civm reconstruction pipeline that is using BART under
     the hood.
 */
-use recon::volume_manager::{launch_volume_manager,re_launch_volume_manager};
-use recon::test::{main_test_cluster};
+//use recon::volume_manager::{launch_volume_manager,re_launch_volume_manager};
+//use recon::test::{main_test_cluster};
 use clap::Parser;
 use std::path::Path;
 use recon::test::test_updated;
@@ -55,20 +55,20 @@ struct MrdToCflArgs{
 fn main(){
     let args = Args::parse();
     match args.sub_cmd.as_str(){
-        "volume-manager" => {
-            let a = VolumeManagerArgs::parse();
-            launch_volume_manager(
-                &a.working_directory,
-                &a.mrd_file,
-                &a.phase_encode_stream_table,
-                a.volume_offset,
-                &Path::new(&a.reco_settings_json)
-            );
-        }
-        "volume-manager-relaunch" => {
-            let a = VolumeManagerRelaunchArgs::parse();
-            re_launch_volume_manager(&a.working_directory);
-        },
+        // "volume-manager" => {
+        //     let a = VolumeManagerArgs::parse();
+        //     launch_volume_manager(
+        //         &a.working_directory,
+        //         &a.mrd_file,
+        //         &a.phase_encode_stream_table,
+        //         a.volume_offset,
+        //         &Path::new(&a.reco_settings_json)
+        //     );
+        // }
+        // "volume-manager-relaunch" => {
+        //     let a = VolumeManagerRelaunchArgs::parse();
+        //     re_launch_volume_manager(&a.working_directory);
+        // },
         "cluster-test" => {
             test_updated();
         },

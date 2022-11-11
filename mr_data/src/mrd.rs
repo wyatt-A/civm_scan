@@ -66,6 +66,15 @@ fn test(){
 }
 
 
+pub fn cs_mrd_to_kspace(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKspaceParams) {
+    match params.mrd_format {
+        MrdFormat::FseCSVol => fse_raw_to_cfl(mrd,cs_table,cfl_base,params),
+        MrdFormat::StandardCSVol => multi_echo_raw_to_cfl(mrd,cs_table,cfl_base,params),
+        _=> panic!("not yet implemented")
+    }
+}
+
+
 pub fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out:&Path,params:&MrdToKspaceParams) {
     let formatted = format_fse_raw(mrd,params.n_read,params.n_views,params.dummy_excitations);
     let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);

@@ -11,6 +11,7 @@ use serde_json;
 use serde::{Serialize,Deserialize};
 use seq_tools::grad_cal::{GAMMA, tesla_per_mm_to_dac};
 use dyn_clone::DynClone;
+use headfile::headfile::{AcqHeadfile, DWHeadfile};
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -66,9 +67,9 @@ pub trait Initialize {
     fn write_default(params_file: &Path);
 }
 
-pub trait DWSequenceParameters:SequenceParameters + DiffusionWeighted + DynClone + DiffusionHeadfile {}
+pub trait DWSequenceParameters:SequenceParameters + DiffusionWeighted + DynClone + DWHeadfile {}
 pub trait SequenceParameters:
-CompressedSense+Simulate+AcqDimensions+DynClone+MrdToKspace+Setup+Headfile {
+CompressedSense+Simulate+AcqDimensions+DynClone+MrdToKspace+Setup+AcqHeadfile {
     fn name(&self) -> String;
     fn write(&self,params_file:&Path);
     fn instantiate(&self) -> Box<dyn Build>;
@@ -141,64 +142,6 @@ impl MrdToKspaceParams {
 pub trait MrdToKspace {
     fn mrd_to_kspace_params(&self) -> MrdToKspaceParams;
 }
-
-pub trait Headfile {
-    fn headfile(&self) -> AcqHeadfileParams;
-}
-
-pub trait DiffusionHeadfile:Headfile {
-    fn headfile(&self) -> DWHeadfileParams;
-}
-
-
-pub struct AcqHeadfileParams {
-    pub dim_x:i32,
-    pub dim_y:i32,
-    pub dim_z:i32,
-    pub fovx_mm:f32,
-    pub fovy_mm:f32,
-    pub fovz_mm:f32,
-    pub te_ms:f32,
-    pub tr_us:f32,
-    pub alpha:f32,
-    pub bw:f32,
-    pub n_echos:i32,
-    pub S_PSDname:String,
-}
-
-pub struct DWHeadfileParams {
-    pub bvalue:f32,
-    pub bval_dir:(f32,f32,f32)
-}
-
-
-impl AcqHeadfileParams {
-    pub fn to_hash(&self) -> HashMap<String,String> {
-        let mut h = HashMap::<String,String>::new();
-        h.insert(String::from("dim_X"),self.dim_x.to_string());
-        h.insert(String::from("dim_Y"),self.dim_y.to_string());
-        h.insert(String::from("dim_Y"),self.dim_z.to_string());
-        h.insert(String::from("fovx"),self.fovx_mm.to_string());
-        h.insert(String::from("fovy"),self.fovy_mm.to_string());
-        h.insert(String::from("fovz"),self.fovz_mm.to_string());
-        h.insert(String::from("te"),self.te_ms.to_string());
-        h.insert(String::from("bw"),self.bw.to_string());
-        h.insert(String::from("ne"),self.n_echos.to_string());
-        h.insert(String::from("S_PSDname"),self.te_ms.to_string());
-        h
-    }
-}
-
-impl DWHeadfileParams {
-    pub fn to_hash(&self) -> HashMap<String,String> {
-        let mut h = HashMap::<String,String>::new();
-        let bval_dir = format!("3:1,{} {} {}",self.bval_dir.0,self.bval_dir.1,self.bval_dir.2);
-        h.insert(String::from("bval_dir"),bval_dir);
-        h.insert(String::from("bvalue"),self.bvalue.to_string());
-        h
-    }
-}
-
 
 
 

@@ -14,10 +14,11 @@ use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid}
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, Headfile, AcqHeadfileParams, DiffusionHeadfile, DWHeadfileParams};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat };
 use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
+use headfile::headfile::{DWHeadfile, DWHeadfileParams, AcqHeadfile, AcqHeadfileParams};
 
 
 impl Setup for SeDtiParams {
@@ -90,8 +91,8 @@ impl AcqDimensions for SeDtiParams {
     }
 }
 
-impl Headfile for SeDtiParams {
-    fn headfile(&self) -> AcqHeadfileParams {
+impl AcqHeadfile for SeDtiParams {
+    fn acq_params(&self) -> AcqHeadfileParams {
         AcqHeadfileParams {
             dim_x: self.samples.0 as i32,
             dim_y: self.samples.1 as i32,
@@ -109,8 +110,8 @@ impl Headfile for SeDtiParams {
     }
 }
 
-impl DiffusionHeadfile for SeDtiParams {
-    fn headfile(&self) -> DWHeadfileParams {
+impl DWHeadfile for SeDtiParams {
+    fn diffusion_params(&self) -> DWHeadfileParams {
         DWHeadfileParams {
             bvalue: self.b_value,
             bval_dir: self.b_vec,

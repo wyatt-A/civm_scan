@@ -6,7 +6,7 @@ use std::process::{Command, CommandArgs};
 use toml;
 use crate::utils::{self, vec_to_string};
 use crate::cfl;
-use crate::mrd::{mrd_to_cfl};
+//use crate::mrd::{mrd_to_cfl};
 
 #[derive(Debug,Deserialize,Serialize)]
 pub struct BartPicsSettings{
@@ -146,20 +146,20 @@ pub fn bart_pics(kspace_cfl:&str,img_cfl:&str,settings:&mut BartPicsSettings){
     if !results.status.success(){panic!("bart pics failed!");}    
 }
 
-#[test]
-fn test(){
-    // configure BartPicsSettings
-    let p = "./def_recon";
-    let mut s = BartPicsSettings::quick();
-    s.to_file(p);
-    let mut r_settings = BartPicsSettings::from_file(p);
-    r_settings.set_bart_binary("/home/wyatt/bart-0.7.00/bart");
-    r_settings.to_file(p);
-
-    mrd_to_cfl("/home/wyatt/testdata/220521T03_m00.mrd", 
-    "0", "/home/wyatt/petableCS_stream/stream_CS480_8x_pa18_pb54",
-    "480", "./test_cfl");
-
-    bart_pics("./test_cfl","./img_cfl",&mut s);
-
-}
+// #[test]
+// fn test(){
+//     // configure BartPicsSettings
+//     let p = "./def_recon";
+//     let mut s = BartPicsSettings::quick();
+//     s.to_file(p);
+//     let mut r_settings = BartPicsSettings::from_file(p);
+//     r_settings.set_bart_binary("/home/wyatt/bart-0.7.00/bart");
+//     r_settings.to_file(p);
+//
+//     mrd_to_cfl("/home/wyatt/testdata/220521T03_m00.mrd",
+//     "0", "/home/wyatt/petableCS_stream/stream_CS480_8x_pa18_pb54",
+//     "480", "./test_cfl");
+//
+//     bart_pics("./test_cfl","./img_cfl",&mut s);
+//
+// }
