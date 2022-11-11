@@ -19,6 +19,8 @@ use std::fs::copy;
 //const SEQUENCE_LIB:&str = "/home/wyatt/projects/test_data/build_test";
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
 const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
+pub const HEADFILE_NAME:&str = "meta";
+pub const HEADFILE_EXT:&str = "txt";
 const BUILD:bool = false;
 
 pub enum Sequence {
@@ -258,7 +260,7 @@ pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bo
     create_dir_all(work_dir).expect("trouble building directory");
     to_build.ppl_export(work_dir,&params.name(),false,build);
     params.mrd_to_kspace_params().to_file(&work_dir.join("mrd_to_kspace"));
-    let h = Headfile::new(&work_dir.join(params.name()).with_extension("headfile"));
+    let h = Headfile::new(&work_dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
     h.append(&params.acq_params().to_hash());
     to_build.param_export(&work_dir);
     match params.is_cs(){
@@ -304,7 +306,7 @@ pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>,
         create_dir_all(&dir).expect("trouble building directory");
         let mut to_build = s.instantiate();
         s.mrd_to_kspace_params().to_file(&dir.join("mrd_to_kspace"));
-        let h = Headfile::new(&dir.join(&label).with_extension("headfile"));
+        let h = Headfile::new(&dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
         h.append(&s.acq_params().to_hash());
         h.append(&s.diffusion_params().to_hash());
         to_build.ppl_export(&dir,&label,false,build);

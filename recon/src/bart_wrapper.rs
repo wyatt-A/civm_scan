@@ -8,7 +8,7 @@ use crate::utils::{self, vec_to_string};
 use crate::cfl;
 //use crate::mrd::{mrd_to_cfl};
 
-#[derive(Debug,Deserialize,Serialize)]
+#[derive(Clone,Debug,Deserialize,Serialize)]
 pub struct BartPicsSettings{
     pub bart_binary:String,
     pub max_iter:u32,
