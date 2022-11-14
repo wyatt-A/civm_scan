@@ -1,6 +1,7 @@
 //use crate::{cfl, resource::*, utils};
 //use crate::volume_index::VolumeIndex;
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use serde::{Deserialize, Serialize};
 use std::fs::{File,create_dir_all};
 use std::io::{Read,Write};
@@ -16,7 +17,9 @@ use seq_lib::pulse_sequence::MrdToKspaceParams;
 use mr_data::mrd::{fse_raw_to_cfl, cs_mrd_to_kspace};
 use headfile::headfile::{ReconHeadfileParams, Headfile};
 use acquire::build::{HEADFILE_NAME,HEADFILE_EXT};
-use crate::cfl;
+use crate::{cfl, utils};
+use glob::glob;
+use clap::Parser;
 
 /*
     headfile=mrs_meta_data(mrd);
@@ -177,189 +180,456 @@ use crate::cfl;
 
 pub fn test_updated() {
 
-
     let local_base_dir = Path::new("/privateShares/wa41");
-    let remote_base_dir = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq");
+    let remote_base_dir = Path::new("/d/dev/221111/ico61/m00");
+
+    // let mut bart_settings = BartPicsSettings::default();
+    // bart_settings.max_iter = 2;
+    // bart_settings.to_file(&work_dir);
 
 
-    let mut bart_settings = BartPicsSettings::default();
-    bart_settings.max_iter = 2;
-
-    let params = VolumeManagerParams {
-        is_scaling_volume: true,
-        run_number: "N60tacos".to_string(),
-        remote_user: "wa41".to_string(),
-        local_user: "wyatt".to_string(),
-        civm_id: "wa41".to_string(),
-        specimen_id: "mr_taco".to_string(),
-        remote_host: "seba".to_string(),
-        local_host: "civmcluster1".to_string(),
-        project_code: "22.tacos.01".to_string(),
-        vol_name: "m00".to_string(),
-        m_number: "m00".to_string(),
-        scanner_vendor: "mrsolutions".to_string(),
-        n_dti_vols:67,
-        bart_settings
+    let vma = VolumeManagerArgs {
+        work_dir:Path::new(local_base_dir).join("test_recon.work/m00").to_owned(),
+        resource_dir: Some(PathBuf::from("/d/dev/221111/ico61/m00")),
+        remote_host: Some(String::from("grumpy")),
+        remote_user: Some(String::from("mrs")),
+        recon_settings_file: None,
+        headfile_params_file: None,
+        //scaling: None
     };
 
+    // write args to file
+    let vm_args_filename = "vm_args";
+    let file_path = vma.work_dir.join(vm_args_filename);
 
-    VolumeManager::launch(local_base_dir,remote_base_dir,&params);
+
+    // volume manager operates on a directory containing a list of required items
+    //VolumeManager::launch(local_base_dir,remote_base_dir,&params);
 
 
+    /*
+        Bare minimum for the volume manager to run:
+        remote directory containing a .mrd and a .mtk file
+        we also should include a .ac file to indicate "acquisition complete" (also include a timestamp)
+
+        if we want a complete head file we also need to look for a:
+        meta.txt
+
+     */
 
 }
 
+#[derive(Debug,clap::Subcommand)]
+pub enum Action {
+    Launch(VolumeManagerArgs),
+    ReLaunch(RelaunchArgs)
+}
 
-#[derive(Debug)]
+
+#[derive(clap::Parser,Debug)]
+pub struct VolumeManagerCmd {
+    #[command(subcommand)]
+    pub action: Action,
+}
+
+#[derive(Debug,clap::Parser)]
+pub struct RelaunchArgs {
+    work_dir: PathBuf
+}
+
+
+
+#[derive(Clone,Debug,Serialize,Deserialize,clap::Parser)]
+pub struct VolumeManagerArgs {
+    work_dir:PathBuf,
+    resource_dir:Option<PathBuf>,
+    remote_user:Option<String>,
+    remote_host:Option<String>,
+    recon_settings_file:Option<PathBuf>,
+    headfile_params_file:Option<PathBuf>,
+    scale_dependent:Option<bool>,
+    scale_setter:Option<bool>,
+    // if it's not the scaling volume,
+    // wait for the existence of scaling file in parent directory
+    // will default to false
+    //scaling:Option<bool>,
+}
+
+
+
+impl VolumeManagerArgs {
+
+    pub fn file_name(work_dir:&Path) -> PathBuf {
+        let vm_args_filename = "vm_args";
+        work_dir.join(vm_args_filename)
+    }
+
+    pub fn from_file(work_dir:&Path) -> Self {
+        let mut f = File::open(Self::file_name(work_dir)).expect("file not found");
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect("cannot read file");
+        serde_json::from_str(&s).expect("cannot deserialize args")
+    }
+
+    pub fn to_file(&self) {
+        let fname = Self::file_name(&self.work_dir);
+        let mut f = File::create(fname).expect("cannot create file");
+        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
+        f.write_all(s.as_bytes()).expect("cannot write to file");
+    }
+}
+
+
+#[derive(Debug,Serialize,Deserialize)]
 struct VolumeManagerResources {
     cs_table:PathBuf,
     raw_mrd:PathBuf,
+    acq_complete:PathBuf,
     kspace_config:PathBuf,
-    headfile:PathBuf,
+    meta:Option<PathBuf>,
+    scaling_info:Option<PathBuf>,
+}
+
+#[derive(Debug,Serialize,Deserialize)]
+pub enum ResourceError {
+    CsTableNotFound,
+    MrdNotFound,
+    MrdNotComplete,
+    KspaceConfigNotFound,
+    Unknown,
+}
+
+#[derive(Serialize,Deserialize)]
+pub enum VolumeManagerState {
+    Idle,
+    NeedsResources(ResourceError),
+    FormattingKspace,
+    Reconstructing,
+    Scaling,
+    WritingOut,
+    Done,
 }
 
 impl VolumeManagerResources {
-    pub fn new(raw_mrd:&Path,cs_table:&Path,kspace_config:&Path,headfile:&Path) -> Self {
-        Self {
-            cs_table:cs_table.to_owned(),
-            raw_mrd:raw_mrd.to_owned(),
-            kspace_config:kspace_config.to_owned(),
-            headfile:headfile.to_owned()
-        }
-    }
-    pub fn from_dir(resource_directory:&Path,prefix:&str) -> Self {
-        let mrd = resource_directory.join(prefix).with_extension("mrd");
-        let cs_table = resource_directory.join("cs_table");
-        let kspace_config = resource_directory.join("mrd_to_kspace").with_extension("mtk");
-        let headfile = resource_directory.join(HEADFILE_NAME).with_extension(HEADFILE_EXT);
-        Self::new(&mrd,&cs_table,&kspace_config,&headfile)
+
+    pub fn find_cs_table(work_dir:&Path) -> Option<PathBuf> {
+        get_first_match(work_dir,"cs_table")
     }
 
-    pub fn exist(&self) -> bool {
-        self.raw_mrd.exists() && self.kspace_config.exists() && self.cs_table.exists() && self.headfile.exists()
+    pub fn from_dir(work_dir:&Path) -> Result<Self,ResourceError> {
+        let work_dir = &Self::resource_dir(work_dir);
+        let cs_table = get_first_match(work_dir,"*cs_table").ok_or(ResourceError::CsTableNotFound)?;
+        let raw_mrd = get_first_match(work_dir,"*.mrd").ok_or(ResourceError::MrdNotFound)?;
+        let acq_complete = get_first_match(work_dir,"*.ac").ok_or(ResourceError::MrdNotComplete)?;
+        let kspace_config = get_first_match(work_dir,".mtk").ok_or(ResourceError::KspaceConfigNotFound)?;
+        let scaling_info = get_first_match(work_dir.parent().unwrap(),"*.scale");
+        let meta = get_first_match(work_dir,"meta.txt");
+        Ok(Self {
+            cs_table,
+            raw_mrd,
+            acq_complete,
+            kspace_config,
+            meta,
+            scaling_info,
+        })
+    }
+
+    pub fn resource_dir(work_dir:&Path) -> PathBuf {
+        work_dir.join("resources")
+    }
+
+    pub fn exist(work_dir:&Path) -> bool {
+        Self::from_dir(work_dir).is_ok()
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct VolumeManagerParams {
-    pub is_scaling_volume:bool,
-    pub run_number:String,
-    pub remote_user:String,
-    pub local_user:String,
-    pub civm_id:String,
-    pub specimen_id:String,
-    pub remote_host:String,
-    pub local_host:String,
-    pub project_code:String,
-    pub vol_name:String,
-    pub m_number:String,
-    pub scanner_vendor:String,
-    pub n_dti_vols:i32,
-    pub bart_settings:BartPicsSettings
-}
 
 
 #[derive(Serialize,Deserialize)]
 pub struct VolumeManager{
-    local_dir:PathBuf,
-    label:String,
-    params:VolumeManagerParams,
+    args:VolumeManagerArgs,
+    resources:Option<VolumeManagerResources>,
+    kspace_data:Option<PathBuf>,
+    image_data:Option<PathBuf>,
+    image_output:Option<PathBuf>,
+    image_scale:Option<f32>,
+    state:VolumeManagerState,
 }
+
+
 
 impl VolumeManager {
 
 
-    pub fn launch(local_base_dir:&Path,remote_base_dir:&Path,params:&VolumeManagerParams) {
+    fn image_vol(&self) -> PathBuf {
+        self.args.work_dir.join("image_vol")
+    }
 
-        let vm_filename = local_base_dir.join(&params.vol_name).with_file_name("volume_manager_state").with_extension("json");
-        let vm = match vm_filename.exists() {
-            true => {
-                println!("resuming volume manager");
-                let mut f = File::open(&vm_filename).expect("cannot open file");
-                let mut json_txt = String::new();
-                f.read_to_string(&mut json_txt).expect("cannot read file");
-                serde_json::from_str(&json_txt).expect("cannot deserialize volume manager")
+    fn kspace_vol_name(&self) -> PathBuf {
+        self.args.work_dir.join("kspace_vol")
+    }
+
+    fn file_name(work_dir:&Path) -> PathBuf {
+        work_dir.join("volume_manager")
+    }
+
+    pub fn to_file(&self) {
+        let mut f = File::create(Self::file_name(&self.args.work_dir)).expect("cannot create file");
+        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
+        f.write_all(s.as_bytes()).expect("cannot write to file");
+    }
+
+    pub fn from_file(work_dir:&Path) -> Option<Self> {
+        let f = File::open(Self::file_name(work_dir));
+        match f {
+            Ok(mut f) => {
+                let mut s = String::new();
+                f.read_to_string(&mut s).expect("cannot read from file");
+                Some(serde_json::from_str(&s).expect("cannot deserialize struct"))
             }
+            Err(_) => None
+        }
+    }
+
+    pub fn re_launch(args:RelaunchArgs) {
+        let file_path = VolumeManagerArgs::file_name(&args.work_dir);
+        match file_path.exists() {
+            true => Self::launch(VolumeManagerArgs::from_file(&args.work_dir)),
             false => {
-                println!("launching new volume manager");
-                Self {
-                    local_dir: local_base_dir.join(&params.vol_name),
-                    label: params.vol_name.clone(),
-                    params: params.clone()
-                }
+                println!("volume manager file not found. You must run the launch command first. No work will be done.");
             }
         };
+    }
 
-        let state_txt = serde_json::to_string_pretty(&vm).expect("cannot serialize volume manager");
-
-        let remote_dir = remote_base_dir.join(&params.vol_name).to_owned();
-
-        let work_dir_name = &format!("{}.work",&params.run_number);
-        let local_dir = local_base_dir.join(work_dir_name).join(&params.vol_name);
-
-        let rparams = ReconHeadfileParams {
-            dti_vols: Some(params.n_dti_vols),
-            project_code: params.project_code.to_string(),
-            civm_id: params.civm_id.to_string(),
-            spec_id: params.specimen_id.to_string(),
-            scanner_vendor: params.scanner_vendor.to_string(),
-            run_number: params.run_number.to_string(),
-            m_number: params.m_number.to_string(),
-            image_code: "t9".to_string(),
-            image_tag: "imx".to_string(),
-            engine_work_dir: local_base_dir.to_owned(),
-        };
-        let vol_name = rparams.m_number.clone();
-        let vmr = VolumeManagerResources::from_dir(&local_dir,&vol_name);
-        let mut puller_cmd = Command::new("puller_simple");
-        puller_cmd.args(
-            vec![
-                "-oer",
-                &params.remote_host,
-                remote_dir.to_str().unwrap(),
-                local_dir.to_str().unwrap(),
-            ]
-        );
-        if !vmr.exist() {
-            println!("fetching data ...");
-            let o = puller_cmd.output().expect("puller_simple failed to launch");
-            match o.status.success() {
-                true => {}
-                false => {
-                    println!("failed to transfer directory. Removing residual files ...");
-                    //todo!(delete any leftover files)
-                    println!("puller_simple command: {:?}", puller_cmd);
-                }
+    fn open(vma:&VolumeManagerArgs) -> Self {
+        match Self::from_file(&vma.work_dir) {
+            Some(vm) => vm,
+            None => VolumeManager {
+                args: vma.clone(),
+                resources: None,
+                kspace_data: None,
+                image_data: None,
+                image_output: None,
+                image_scale: None,
+                state:VolumeManagerState::Idle
             }
         }
-        if !vmr.exist() {
-            panic!("puller simple is having issues");
+    }
+
+
+    fn advance_state(&mut self) {
+        use VolumeManagerState::*;
+        match &self.state {
+            Idle | NeedsResources(_) => {
+                // sync resources here
+                match VolumeManagerResources::from_dir(&self.args.work_dir) {
+                    Ok(resources) => {
+                        self.resources = Some(resources);
+                        self.state = FormattingKspace;
+                    },
+                    Err(e) => {
+                        self.state = NeedsResources(e);
+                        // schedule to run again later
+                    }
+                }
+            }
+            FormattingKspace => {
+                match &self.resources {
+                    Some(res) => {
+                        let mtk = MrdToKspaceParams::from_file(&res.kspace_config);
+                        cs_mrd_to_kspace(&res.raw_mrd,&res.cs_table,&self.kspace_vol_name(),&mtk);
+                        self.kspace_data = Some(self.kspace_vol_name());
+                    }
+                    None => {
+                        self.state = NeedsResources(ResourceError::Unknown);
+                    }
+                }
+            }
+            Reconstructing => {
+                match &self.kspace_data {
+                    Some(kspace) => {
+                        let mut recon_settings = BartPicsSettings::default();
+                        recon_settings.max_iter = 2;
+                        bart_pics(kspace,&self.image_vol(),&mut recon_settings);
+                        self.image_data = Some(self.image_vol());
+                        self.state = Scaling;
+                    }
+                    None => {
+                        self.state = FormattingKspace;
+                    }
+                }
+            }
+            Scaling => {
+                match &self.image_data {
+                    Some(image) => {
+                        match self.args.scale_dependent.unwrap_or(false) {
+                            false => {
+                                // let scale = cfl::find_u16_scale()
+                                // self.image_scale = Some(scale)
+                            }
+                            true => {
+                                // let scale =  look for a scale file and set it.
+                                // if scale isn't found. reschedule for later
+                                // self.image_scale = Some(scale)
+                            }
+                        }
+                        if self.args.scale_setter.unwrap_or(false) {
+                            // write a scale file
+                        }
+                    },
+                    None => {
+                        self.state = Reconstructing;
+                    }
+                }
+            }
+            WritingOut => {
+                match self.image_scale {
+                    Some(scale) => {
+                        // cfl::to_civm_raw_u16(&image,&img_dir,&vname,&raw_prefix,scale);
+                        // write headfile if possible
+                    }
+                    None => self.state = Scaling;
+                }
+            }
+            _=> {}
+        }
+    }
+
+
+    pub fn launch(vma:VolumeManagerArgs) {
+
+        let vm = Self::open(&vma);
+
+        // create work dir
+        if !vma.work_dir.exists() {
+            println!("creating new volume manager working directory at {:?}",vma.work_dir);
+            create_dir_all(&vma.work_dir).expect("failed to create working directory");
+        }
+        vm.to_file();
+
+
+
+        println!("{:?}",vma);
+
+        let vmr = VolumeManagerResources::from_dir(&vma.work_dir);
+
+
+        match &vmr {
+            Ok(res) => {
+                //find state and advance
+            }
+            Err(e) => {
+                println!("resources aren't available");
+                // schedule to run later
+            }
         }
 
+    }
 
-        println!("formatting kspace ...");
-        let mtk = MrdToKspaceParams::from_file(&vmr.kspace_config);
-        let kspace_cfl = vmr.raw_mrd.with_extension("");
-        let image = kspace_cfl.with_file_name("image");
-        cs_mrd_to_kspace(&vmr.raw_mrd,&vmr.cs_table,&kspace_cfl,&mtk);
-        let mut bart_settings = params.bart_settings.clone();
 
-        println!("reconstructing ...");
-        bart_pics(kspace_cfl.to_str().unwrap(),image.to_str().unwrap(),&mut bart_settings);
 
-        println!("scaling image ...");
-        let scale = cfl::find_u16_scale(&image,0.9995);
-        let img_dir = local_dir.join("images");
-        let vname = format!("{}_{}",&params.run_number,vol_name);
-        create_dir_all(&img_dir).expect("cannot create directory");
-        let raw_prefix = format!("{}{}",rparams.image_code,rparams.image_tag);
 
-        println!("writing volume slices ...");
-        cfl::to_civm_raw_u16(&image,&img_dir,&vname,&raw_prefix,scale);
+    // pub fn launch(local_base_dir:&Path,remote_base_dir:&Path,params:&VolumeManagerParams) {
+    //
+    //     let vm_filename = local_base_dir.join(&params.vol_name).with_file_name("volume_manager_state").with_extension("json");
+    //     let vm = match vm_filename.exists() {
+    //         true => {
+    //             println!("resuming volume manager");
+    //             let mut f = File::open(&vm_filename).expect("cannot open file");
+    //             let mut json_txt = String::new();
+    //             f.read_to_string(&mut json_txt).expect("cannot read file");
+    //             serde_json::from_str(&json_txt).expect("cannot deserialize volume manager")
+    //         }
+    //         false => {
+    //             println!("launching new volume manager");
+    //             Self {
+    //                 local_dir: local_base_dir.join(&params.vol_name),
+    //                 label: params.vol_name.clone(),
+    //                 params: params.clone()
+    //             }
+    //         }
+    //     };
+    //
+    //     let state_txt = serde_json::to_string_pretty(&vm).expect("cannot serialize volume manager");
+    //
+    //     let remote_dir = remote_base_dir.join(&params.vol_name).to_owned();
+    //
+    //     let work_dir_name = &format!("{}.work",&params.run_number);
+    //     let local_dir = local_base_dir.join(work_dir_name).join(&params.vol_name);
+    //
+    //     let rparams = ReconHeadfileParams {
+    //         dti_vols: Some(params.n_dti_vols),
+    //         project_code: params.project_code.to_string(),
+    //         civm_id: params.civm_id.to_string(),
+    //         spec_id: params.specimen_id.to_string(),
+    //         scanner_vendor: params.scanner_vendor.to_string(),
+    //         run_number: params.run_number.to_string(),
+    //         m_number: params.m_number.to_string(),
+    //         image_code: "t9".to_string(),
+    //         image_tag: "imx".to_string(),
+    //         engine_work_dir: local_base_dir.to_owned(),
+    //     };
+    //     let vol_name = rparams.m_number.clone();
+    //     let vmr = VolumeManagerResources::from_dir(&local_dir,&vol_name);
+    //     let mut puller_cmd = Command::new("puller_simple");
+    //     puller_cmd.args(
+    //         vec![
+    //             "-oer",
+    //             &params.remote_host,
+    //             remote_dir.to_str().unwrap(),
+    //             local_dir.to_str().unwrap(),
+    //         ]
+    //     );
+    //     if !vmr.exist() {
+    //         println!("fetching data ...");
+    //         let o = puller_cmd.output().expect("puller_simple failed to launch");
+    //         match o.status.success() {
+    //             true => {}
+    //             false => {
+    //                 println!("failed to transfer directory. Removing residual files ...");
+    //                 //todo!(delete any leftover files)
+    //                 println!("puller_simple command: {:?}", puller_cmd);
+    //             }
+    //         }
+    //     }
+    //     if !vmr.exist() {
+    //         panic!("puller simple is having issues");
+    //     }
+    //
+    //
+    //     println!("formatting kspace ...");
+    //     let mtk = MrdToKspaceParams::from_file(&vmr.kspace_config);
+    //     let kspace_cfl = vmr.raw_mrd.with_extension("");
+    //     let image = kspace_cfl.with_file_name("image");
+    //     cs_mrd_to_kspace(&vmr.raw_mrd,&vmr.cs_table,&kspace_cfl,&mtk);
+    //     let mut bart_settings = params.bart_settings.clone();
+    //
+    //     println!("reconstructing ...");
+    //     bart_pics(kspace_cfl.to_str().unwrap(),image.to_str().unwrap(),&mut bart_settings);
+    //
+    //     println!("scaling image ...");
+    //     let scale = cfl::find_u16_scale(&image,0.9995);
+    //     let img_dir = local_dir.join("images");
+    //     let vname = format!("{}_{}",&params.run_number,vol_name);
+    //     create_dir_all(&img_dir).expect("cannot create directory");
+    //     let raw_prefix = format!("{}{}",rparams.image_code,rparams.image_tag);
+    //
+    //     println!("writing volume slices ...");
+    //     cfl::to_civm_raw_u16(&image,&img_dir,&vname,&raw_prefix,scale);
+    //
+    //     println!("updating headfile ...");
+    //     std::fs::copy(&vmr.meta, &vmr.meta.with_file_name("temp")).expect("cannot copy headfile to temp");
+    //     Headfile::open(&vmr.meta.with_file_name("temp")).append(&rparams.to_hash());
+    //     std::fs::rename(&vmr.meta.with_file_name("temp"), img_dir.with_file_name(vmr.meta.file_name().unwrap())).expect("cannot move headfile");
+    // }
+}
 
-        println!("updating headfile ...");
-        std::fs::copy(&vmr.headfile,&vmr.headfile.with_file_name("temp")).expect("cannot copy headfile to temp");
-        Headfile::open(&vmr.headfile.with_file_name("temp")).append(&rparams.to_hash());
-        std::fs::rename(&vmr.headfile.with_file_name("temp"),img_dir.with_file_name(vmr.headfile.file_name().unwrap())).expect("cannot move headfile");
+fn get_first_match(dir:&Path,pattern:&str) -> Option<PathBuf>  {
+    let pat = dir.join(pattern);
+    let pat = pat.to_str().expect("cannot coerce to str");
+    let matches:Vec<PathBuf> = glob(pat).expect("Failed to read glob pattern").flat_map(|m| m).collect();
+    match matches.is_empty() {
+        true => None,
+        false => Some(matches[0].clone())
     }
 }

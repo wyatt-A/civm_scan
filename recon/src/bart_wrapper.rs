@@ -40,12 +40,12 @@ impl BartPicsSettings{
         return s
     }
 
-    pub fn to_file(&self,dest_path:&str){
+    pub fn to_file(&self,dest_path:&Path){
         let s = toml::to_string(&self).expect("trouble serializing data struct");
         utils::write_to_file(dest_path,"toml",&s);
     }
 
-    pub fn write_default(dest_path:&str){
+    pub fn write_default(dest_path:&Path){
         let d = BartPicsSettings::default();
         d.to_file(dest_path);
     }
@@ -98,7 +98,7 @@ impl BartPicsSettings{
         //if !p.exists(){panic!("bart binary not found at {}",binary_path)}
     }
 
-    pub fn set_unit_sens_from_cfl(&mut self,cfl:&str){
+    pub fn set_unit_sens_from_cfl(&mut self,cfl:&Path){
         let cfl_path = Path::new(cfl);
         let p_in = Path::new(cfl).with_extension("").to_owned();
         let mut coil_sens = p_in.clone();
@@ -110,7 +110,7 @@ impl BartPicsSettings{
     }
 }
 
-pub fn bart_pics(kspace_cfl:&str,img_cfl:&str,settings:&mut BartPicsSettings){
+pub fn bart_pics(kspace_cfl:&Path,img_cfl:&Path,settings:&mut BartPicsSettings){
 
     let kspace_cfl_path = Path::new(&kspace_cfl);
     

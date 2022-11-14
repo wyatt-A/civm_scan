@@ -11,9 +11,8 @@ pub fn read_to_string(filepath:&str,extension:&str) -> std::io::Result<String>{
     return Ok(s);
 }
 
-pub fn write_to_file(filepath:&str,extension:&str,string:&str){
-    let p = Path::new(filepath);
-    let p = p.with_extension(extension);
+pub fn write_to_file(filepath:&Path,extension:&str,string:&str){
+    let p = filepath.with_extension(extension);
     let mut f = File::create(p).expect("failed to create file");
     f.write_all(string.as_bytes()).expect("trouble writing to file");
 }
