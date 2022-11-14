@@ -5,6 +5,7 @@ use std::fs::{File};
 use std::io::{Read,Write};
 use byteorder::{ByteOrder,BigEndian,LittleEndian};
 use ndarray::{s,Array3,Array4,Order,Axis};
+use crate::test::ImageScale;
 
 pub fn get_dims(path:&Path) -> Vec<usize>{
     let p = path.to_str().unwrap();
@@ -75,6 +76,11 @@ pub fn to_magnitude(cfl:&Path) -> Vec<f32>{
 pub fn find_u16_scale(cfl:&Path,histo_percent:f64) -> f32{
     let mag = to_magnitude(cfl);
     return u16_scale_from_vec(&mag,histo_percent);
+}
+
+pub fn write_u16_scale(cfl:&Path,histo_percent:f64,output_file:&Path){
+    let scale = find_u16_scale(cfl,histo_percent);
+    ImageScale::new(histo_percent as f32,scale).to_file(output_file);
 }
 
 // typical histo %: 0.999500

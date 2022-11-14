@@ -20,6 +20,7 @@ use acquire::build::{HEADFILE_NAME,HEADFILE_EXT};
 use crate::{cfl, utils};
 use glob::glob;
 use clap::Parser;
+use crate::cfl::write_u16_scale;
 
 /*
     headfile=mrs_meta_data(mrd);
@@ -178,6 +179,10 @@ use clap::Parser;
 //
 // }
 
+
+pub const SCALE_FILENAME:&str = "volume_scale_info";
+pub const DEFAULT_HIST_PERCENT:f32 = 0.9995;
+
 pub fn test_updated() {
 
     let local_base_dir = Path::new("/privateShares/wa41");
@@ -249,6 +254,7 @@ pub struct VolumeManagerArgs {
     headfile_params_file:Option<PathBuf>,
     scale_dependent:Option<bool>,
     scale_setter:Option<bool>,
+    scale_hist_percent:Option<f32>,
     // if it's not the scaling volume,
     // wait for the existence of scaling file in parent directory
     // will default to false
@@ -306,15 +312,16 @@ pub enum VolumeManagerState {
     FormattingKspace,
     Reconstructing,
     Scaling,
-    WritingOut,
+    WritingImageData,
+    WritingHeadfile,
     Done,
 }
 
 impl VolumeManagerResources {
 
-    pub fn find_cs_table(work_dir:&Path) -> Option<PathBuf> {
-        get_first_match(work_dir,"cs_table")
-    }
+    // pub fn find_cs_table(work_dir:&Path) -> Option<PathBuf> {
+    //     get_first_match(work_dir,"cs_table")
+    // }
 
     pub fn from_dir(work_dir:&Path) -> Result<Self,ResourceError> {
         let work_dir = &Self::resource_dir(work_dir);
@@ -322,7 +329,7 @@ impl VolumeManagerResources {
         let raw_mrd = get_first_match(work_dir,"*.mrd").ok_or(ResourceError::MrdNotFound)?;
         let acq_complete = get_first_match(work_dir,"*.ac").ok_or(ResourceError::MrdNotComplete)?;
         let kspace_config = get_first_match(work_dir,".mtk").ok_or(ResourceError::KspaceConfigNotFound)?;
-        let scaling_info = get_first_match(work_dir.parent().unwrap(),"*.scale");
+        let scaling_info = get_first_match(work_dir.parent().expect("directory has no parent"),SCALE_FILENAME);
         let meta = get_first_match(work_dir,"meta.txt");
         Ok(Self {
             cs_table,
@@ -356,6 +363,31 @@ pub struct VolumeManager{
     state:VolumeManagerState,
 }
 
+#[derive(Serialize,Deserialize)]
+pub struct ImageScale {
+    histogram_percent:f32,
+    scale_factor:f32
+}
+
+impl ImageScale {
+    pub fn new(histogram_percent:f32,scale_factor:f32) -> Self {
+        Self {
+            histogram_percent,
+            scale_factor
+        }
+    }
+    pub fn from_file(file_path:&Path) -> Self {
+        let mut f = File::open(file_path).expect("cannot open file");
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect("cannot read from file");
+        serde_json::from_str(&s).expect("cannot deserialize file")
+    }
+    pub fn to_file(&self,file_path:&Path) {
+        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
+        let mut f = File::create(file_path).expect("cannot create file");
+        f.write_all(s.as_bytes()).expect("cannot write to file");
+    }
+}
 
 
 impl VolumeManager {
@@ -439,9 +471,11 @@ impl VolumeManager {
                         let mtk = MrdToKspaceParams::from_file(&res.kspace_config);
                         cs_mrd_to_kspace(&res.raw_mrd,&res.cs_table,&self.kspace_vol_name(),&mtk);
                         self.kspace_data = Some(self.kspace_vol_name());
+                        self.state = Reconstructing;
                     }
                     None => {
-                        self.state = NeedsResources(ResourceError::Unknown);
+                        //self.state = NeedsResources(ResourceError::Unknown);
+                        panic!("raw data is not available to format!")
                     }
                 }
             }
@@ -455,7 +489,8 @@ impl VolumeManager {
                         self.state = Scaling;
                     }
                     None => {
-                        self.state = FormattingKspace;
+                        //self.state = FormattingKspace;
+                        panic!("kspace data is not available to reconstruct!")
                     }
                 }
             }
@@ -464,33 +499,60 @@ impl VolumeManager {
                     Some(image) => {
                         match self.args.scale_dependent.unwrap_or(false) {
                             false => {
-                                // let scale = cfl::find_u16_scale()
-                                // self.image_scale = Some(scale)
+                                let scale = cfl::find_u16_scale(image,self.args.scale_hist_percent.unwrap_or(0.9995) as f64);
+                                self.image_scale = Some(scale);
+                                self.state = WritingImageData;
                             }
                             true => {
-                                // let scale =  look for a scale file and set it.
-                                // if scale isn't found. reschedule for later
-                                // self.image_scale = Some(scale)
+                                match &self.resources.expect("resources not found! How did we get here!?").scaling_info {
+                                    Some(scale_file) => {
+                                        let scale = ImageScale::from_file(scale_file);
+                                        self.image_scale = Some(scale.scale_factor);
+                                        self.state = WritingImageData;
+                                    }
+                                    None => {
+                                        // schedule to run again later
+                                    }
+                                }
                             }
                         }
                         if self.args.scale_setter.unwrap_or(false) {
-                            // write a scale file
+                            let scale_file = self.args.work_dir.parent().expect("path has no parent").join(SCALE_FILENAME);
+                            write_u16_scale(image,self.args.scale_hist_percent.unwrap_or(0.9995) as f64,&scale_file);
+                            let scale = ImageScale::from_file(&scale_file);
+                            self.image_scale = Some(scale.scale_factor);
+                            self.state = WritingImageData;
                         }
                     },
                     None => {
-                        self.state = Reconstructing;
+                        //self.state = Reconstructing;
+                        panic!("image data is not available to scale!")
                     }
                 }
             }
-            WritingOut => {
+            WritingImageData => {
                 match self.image_scale {
                     Some(scale) => {
-                        // cfl::to_civm_raw_u16(&image,&img_dir,&vname,&raw_prefix,scale);
+                        let image_dir = self.args.work_dir.join("images");
+                        let image = self.image_data.expect("where did the image data go!?");
+                        let image_code = "t9".to_string();
+                        let image_tag = "imx".to_string();
+                        let raw_prefix = format!("{}{}",image_code,image_tag);
+                        let vname = self.args.work_dir.file_name().unwrap().to_str().unwrap();
+                        cfl::to_civm_raw_u16(&image,&image_dir,vname,&raw_prefix,scale);
                         // write headfile if possible
                     }
-                    None => self.state = Scaling;
+                    //None => self.state = Scaling;
+                    panic!("image scale is undetermined!");
                 }
             }
+
+            WritingHeadfile => {
+                match self.resources.expect("").meta {
+
+                }
+            }
+
             _=> {}
         }
     }
