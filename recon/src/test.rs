@@ -15,7 +15,7 @@ use std::process::Command;
 use seq_lib::pulse_sequence::MrdToKspaceParams;
 //use crate::config::{ProjectSettings, Recon};
 use mr_data::mrd::{fse_raw_to_cfl, cs_mrd_to_kspace};
-use headfile::headfile::{ReconHeadfileParams, Headfile};
+use headfile::headfile::{ReconHeadfile, Headfile};
 use acquire::build::{HEADFILE_NAME,HEADFILE_EXT};
 use crate::{cfl, utils};
 use glob::glob;
@@ -184,92 +184,68 @@ pub const SCALE_FILENAME:&str = "volume_scale_info";
 pub const DEFAULT_HIST_PERCENT:f32 = 0.9995;
 
 pub fn test_updated() {
+    let work_dir = Path::new("/privateShares/wa41/N60tacos.work/m00");
+    let vmc_file = work_dir.join("vm_config");
 
-    let local_base_dir = Path::new("/privateShares/wa41");
-    let remote_base_dir = Path::new("/d/dev/221111/ico61/m00");
+    let mut vmc  = VolumeManagerConfig::default(work_dir);
+    vmc.remote_host = Some("stejskal".to_string());
+    vmc.remote_user = Some("mrs".to_string());
+    vmc.resource_dir = Some(PathBuf::from("/d/dev/221111/acq/m00"));
+    vmc.to_file(&work_dir.join("vm_config"));
 
-    // let mut bart_settings = BartPicsSettings::default();
-    // bart_settings.max_iter = 2;
-    // bart_settings.to_file(&work_dir);
+    let vma = VolumeManagerArgs::new(work_dir,&vmc_file);
 
+    VolumeManager::launch(vma);
 
-    let vma = VolumeManagerArgs {
-        work_dir:Path::new(local_base_dir).join("test_recon.work/m00").to_owned(),
-        resource_dir: Some(PathBuf::from("/d/dev/221111/ico61/m00")),
-        remote_host: Some(String::from("grumpy")),
-        remote_user: Some(String::from("mrs")),
-        recon_settings_file: None,
-        headfile_params_file: None,
-        //scaling: None
-    };
-
-    // write args to file
-    let vm_args_filename = "vm_args";
-    let file_path = vma.work_dir.join(vm_args_filename);
-
-
-    // volume manager operates on a directory containing a list of required items
-    //VolumeManager::launch(local_base_dir,remote_base_dir,&params);
-
-
-    /*
-        Bare minimum for the volume manager to run:
-        remote directory containing a .mrd and a .mtk file
-        we also should include a .ac file to indicate "acquisition complete" (also include a timestamp)
-
-        if we want a complete head file we also need to look for a:
-        meta.txt
-
-     */
 
 }
 
-#[derive(Debug,clap::Subcommand)]
-pub enum Action {
-    Launch(VolumeManagerArgs),
-    ReLaunch(RelaunchArgs)
-}
+// #[derive(Debug,clap::Subcommand)]
+// pub enum Action {
+//     Launch(VolumeManagerArgs),
+// }
+//
+//
+// #[derive(clap::Parser,Debug)]
+// pub struct VolumeManagerCmd {
+//     #[command(subcommand)]
+//     pub action: Action,
+// }
+//
+// #[derive(Debug,clap::Parser)]
+// pub struct RelaunchArgs {
+//     work_dir: PathBuf
+// }
 
 
-#[derive(clap::Parser,Debug)]
-pub struct VolumeManagerCmd {
-    #[command(subcommand)]
-    pub action: Action,
-}
-
-#[derive(Debug,clap::Parser)]
-pub struct RelaunchArgs {
-    work_dir: PathBuf
-}
-
-
-
-#[derive(Clone,Debug,Serialize,Deserialize,clap::Parser)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct VolumeManagerArgs {
     work_dir:PathBuf,
+    config:PathBuf
+}
+
+impl VolumeManagerArgs {
+    pub fn new(work_dir:&Path,config_file:&Path) -> Self {
+        Self {
+            work_dir:work_dir.to_owned(),
+            config:config_file.to_owned()
+        }
+    }
+}
+
+#[derive(Clone,Debug,Serialize,Deserialize)]
+pub struct VolumeManagerConfig {
     resource_dir:Option<PathBuf>,
     remote_user:Option<String>,
     remote_host:Option<String>,
-    recon_settings_file:Option<PathBuf>,
-    headfile_params_file:Option<PathBuf>,
+    recon_headfile:Option<ReconHeadfile>,
+    recon_settings:Option<BartPicsSettings>,
     scale_dependent:Option<bool>,
     scale_setter:Option<bool>,
     scale_hist_percent:Option<f32>,
-    // if it's not the scaling volume,
-    // wait for the existence of scaling file in parent directory
-    // will default to false
-    //scaling:Option<bool>,
 }
 
-
-
-impl VolumeManagerArgs {
-
-    pub fn file_name(work_dir:&Path) -> PathBuf {
-        let vm_args_filename = "vm_args";
-        work_dir.join(vm_args_filename)
-    }
-
+impl VolumeManagerConfig {
     pub fn from_file(work_dir:&Path) -> Self {
         let mut f = File::open(Self::file_name(work_dir)).expect("file not found");
         let mut s = String::new();
@@ -277,16 +253,54 @@ impl VolumeManagerArgs {
         serde_json::from_str(&s).expect("cannot deserialize args")
     }
 
-    pub fn to_file(&self) {
-        let fname = Self::file_name(&self.work_dir);
+    pub fn to_file(&self,work_dir:&Path) {
+        let fname = Self::file_name(work_dir);
         let mut f = File::create(fname).expect("cannot create file");
         let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
         f.write_all(s.as_bytes()).expect("cannot write to file");
     }
+
+    pub fn default(work_dir:&Path) -> Self {
+        Self {
+            resource_dir: None,
+            remote_user: None,
+            remote_host: None,
+            recon_headfile: Some(ReconHeadfile::default()),
+            recon_settings: Some(BartPicsSettings::default()),
+            scale_dependent: None,
+            scale_setter: None,
+            scale_hist_percent: None
+        }
+    }
+
+    pub fn file_name(work_dir:&Path) -> PathBuf {
+        work_dir.join("volume_manager_config")
+    }
+}
+
+impl VolumeManagerArgs {
+    pub fn file_name(work_dir:&Path) -> PathBuf {
+        let vm_args_filename = "vm_args";
+        work_dir.join(vm_args_filename)
+    }
+
+    pub fn to_file(&self) {
+        let filename = Self::file_name(&self.work_dir);
+        let s = serde_json::to_string_pretty(&self).unwrap();
+        let mut f = File::create(filename).unwrap();
+        f.write_all(s.as_bytes()).unwrap();
+    }
+
+    pub fn from_file(config_file:&Path) -> Self {
+        let mut f = File::open(config_file).unwrap();
+        let mut s = String::new();
+        f.read_to_string(&mut s).unwrap();
+        serde_json::from_str(&s).unwrap()
+    }
 }
 
 
-#[derive(Debug,Serialize,Deserialize)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 struct VolumeManagerResources {
     cs_table:PathBuf,
     raw_mrd:PathBuf,
@@ -296,7 +310,7 @@ struct VolumeManagerResources {
     scaling_info:Option<PathBuf>,
 }
 
-#[derive(Debug,Serialize,Deserialize)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 pub enum ResourceError {
     CsTableNotFound,
     MrdNotFound,
@@ -305,7 +319,7 @@ pub enum ResourceError {
     Unknown,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum VolumeManagerState {
     Idle,
     NeedsResources(ResourceError),
@@ -316,6 +330,7 @@ pub enum VolumeManagerState {
     WritingHeadfile,
     Done,
 }
+
 
 impl VolumeManagerResources {
 
@@ -355,6 +370,7 @@ impl VolumeManagerResources {
 #[derive(Serialize,Deserialize)]
 pub struct VolumeManager{
     args:VolumeManagerArgs,
+    config:VolumeManagerConfig,
     resources:Option<VolumeManagerResources>,
     kspace_data:Option<PathBuf>,
     image_data:Option<PathBuf>,
@@ -423,21 +439,12 @@ impl VolumeManager {
         }
     }
 
-    pub fn re_launch(args:RelaunchArgs) {
-        let file_path = VolumeManagerArgs::file_name(&args.work_dir);
-        match file_path.exists() {
-            true => Self::launch(VolumeManagerArgs::from_file(&args.work_dir)),
-            false => {
-                println!("volume manager file not found. You must run the launch command first. No work will be done.");
-            }
-        };
-    }
-
     fn open(vma:&VolumeManagerArgs) -> Self {
         match Self::from_file(&vma.work_dir) {
             Some(vm) => vm,
             None => VolumeManager {
                 args: vma.clone(),
+                config: VolumeManagerConfig {},
                 resources: None,
                 kspace_data: None,
                 image_data: None,
@@ -546,19 +553,14 @@ impl VolumeManager {
                     panic!("image scale is undetermined!");
                 }
             }
-
-            WritingHeadfile => {
-                match self.resources.expect("").meta {
-
-                }
-            }
-
             _=> {}
         }
     }
 
 
     pub fn launch(vma:VolumeManagerArgs) {
+
+        let config = VolumeManagerConfig::from_file(&vma.config);
 
         let vm = Self::open(&vma);
 
@@ -684,14 +686,4 @@ impl VolumeManager {
     //     Headfile::open(&vmr.meta.with_file_name("temp")).append(&rparams.to_hash());
     //     std::fs::rename(&vmr.meta.with_file_name("temp"), img_dir.with_file_name(vmr.meta.file_name().unwrap())).expect("cannot move headfile");
     // }
-}
-
-fn get_first_match(dir:&Path,pattern:&str) -> Option<PathBuf>  {
-    let pat = dir.join(pattern);
-    let pat = pat.to_str().expect("cannot coerce to str");
-    let matches:Vec<PathBuf> = glob(pat).expect("Failed to read glob pattern").flat_map(|m| m).collect();
-    match matches.is_empty() {
-        true => None,
-        false => Some(matches[0].clone())
-    }
 }

@@ -6,17 +6,27 @@
 //use recon::test::{main_test_cluster};
 use clap::Parser;
 use std::path::Path;
-use recon::test::{Action, test_updated, VolumeManager, VolumeManagerCmd};
-use recon::test::VolumeManagerArgs;
+use recon::vol_manager::VolumeManagerArgs;
+use recon::vol_manager::test_updated;
 
-fn main(){
-    let args = VolumeManagerCmd::parse();
-    match args.action {
-        Action::Launch(args) => {
-            VolumeManager::launch(args)
-        }
-        Action::ReLaunch(args) => {
-            VolumeManager::re_launch(args)
-        }
-    }
+
+/*
+    recon volume-manager launch "path/to/args/file"
+ */
+
+
+// fn main(){
+//     let args = VolumeManagerCmd::parse();
+//     match args.action {
+//         Action::Launch(args) => {
+//             VolumeManager::launch(args)
+//         }
+//         Action::ReLaunch(args) => {
+//             VolumeManager::re_launch(args)
+//         }
+//     }
+// }
+
+fn main() {
+    test_updated()
 }

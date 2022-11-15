@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path,PathBuf};
+use serde::{Deserialize, Serialize};
 
 pub struct Headfile{
     file:PathBuf
@@ -153,7 +154,9 @@ pub struct DWHeadfileParams {
                 headfile.engine_work_directory = pwd;
                 */
 
-pub struct ReconHeadfileParams {
+
+#[derive(Clone,Serialize,Deserialize,Debug)]
+pub struct ReconHeadfile {
     pub dti_vols:Option<i32>,
     pub project_code:String,
     pub civm_id:String,
@@ -166,7 +169,23 @@ pub struct ReconHeadfileParams {
     pub engine_work_dir:PathBuf,
 }
 
-impl ReconHeadfileParams {
+impl ReconHeadfile {
+
+    pub fn default() -> Self {
+        Self {
+            dti_vols: Some(1),
+            project_code: "00.project.00".to_string(),
+            civm_id: "wa41".to_string(),
+            spec_id: "mr_tacos".to_string(),
+            scanner_vendor: "mrsolutions".to_string(),
+            run_number: "N60tacos".to_string(),
+            m_number: "m00".to_string(),
+            image_code: "t9".to_string(),
+            image_tag: "imx".to_string(),
+            engine_work_dir: PathBuf::from(std::env::var("BIGGUS_DISKUS").expect("biggus diskus not set!"))
+        }
+    }
+
     pub fn to_hash(&self) -> HashMap<String,String> {
         let mut h = HashMap::<String,String>::new();
         h.insert(String::from("dti_vols"),self.dti_vols.unwrap_or(0).to_string());
@@ -179,6 +198,20 @@ impl ReconHeadfileParams {
         h.insert(String::from("civm_image_source_tag"),self.image_tag.clone());
         h.insert(String::from("engine_work_directory"),self.engine_work_dir.to_str().unwrap_or("").to_string());
         h
+    }
+
+    pub fn to_file(&self,file_path:&Path) {
+        let default = Self::default();
+        let s = serde_json::to_string_pretty(&default).expect("cannot serialize struct");
+        let mut f = File::create(file_path).expect("cannot create file");
+        f.write_all(s.as_bytes()).expect("cannot write to file");
+    }
+
+    fn from_file(file_path:&Path) -> Self {
+        let mut f = File::open(file_path).expect("cannot open file");
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect("cannot read from file");
+        serde_json::from_str(&s).expect("cannot deserialize file")
     }
 }
 

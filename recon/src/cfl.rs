@@ -5,7 +5,34 @@ use std::fs::{File};
 use std::io::{Read,Write};
 use byteorder::{ByteOrder,BigEndian,LittleEndian};
 use ndarray::{s,Array3,Array4,Order,Axis};
-use crate::test::ImageScale;
+use serde::{Deserialize, Serialize};
+use serde_json;
+
+#[derive(Serialize,Deserialize)]
+pub struct ImageScale {
+    histogram_percent:f32,
+    pub(crate) scale_factor:f32
+}
+
+impl ImageScale {
+    pub fn new(histogram_percent:f32,scale_factor:f32) -> Self {
+        Self {
+            histogram_percent,
+            scale_factor
+        }
+    }
+    pub fn from_file(file_path:&Path) -> Self {
+        let mut f = File::open(file_path).expect("cannot open file");
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect("cannot read from file");
+        serde_json::from_str(&s).expect("cannot deserialize file")
+    }
+    pub fn to_file(&self,file_path:&Path) {
+        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
+        let mut f = File::create(file_path).expect("cannot create file");
+        f.write_all(s.as_bytes()).expect("cannot write to file");
+    }
+}
 
 pub fn get_dims(path:&Path) -> Vec<usize>{
     let p = path.to_str().unwrap();
