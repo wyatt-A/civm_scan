@@ -31,7 +31,7 @@ pub fn test_updated() {
     let work_dir = Path::new("/privateShares/wa41/N60tacos.work/m01");
     let vmc_file = work_dir.join("vm_config");
 
-    let mut vmc  = VolumeManagerConfig::default(work_dir);
+    let mut vmc  = VolumeManagerConfig::default();
     vmc.remote_host = Some("stejskal".to_string());
     vmc.remote_user = Some("mrs".to_string());
     vmc.resource_dir = Some(PathBuf::from("/d/dev/221111/acq/m01"));
@@ -111,24 +111,24 @@ pub enum VolumeManagerState {
 }
 
 impl VolumeManagerConfig {
-    pub fn from_file(work_dir:&Path) -> Self {
-        let mut f = File::open(Self::file_name(work_dir)).expect(&format!("unable to open {:?}",Self::file_name(work_dir)));
+    pub fn from_file(file_name:&Path) -> Self {
+        let mut f = File::open(file_name).expect(&format!("unable to open {:?}",Self::file_name(work_dir)));
         let mut s = String::new();
         f.read_to_string(&mut s).expect("cannot read file");
         serde_json::from_str(&s).expect("cannot deserialize args")
     }
 
-    pub fn to_file(&self,work_dir:&Path) {
-        let fname = Self::file_name(work_dir);
-        if !work_dir.exists() {
-            create_dir_all(&work_dir).expect(&format!("cannot create {:?}",work_dir));
+    pub fn to_file(&self,file_name:&Path) {
+        let parent = file_name.parent().unwrap();
+        if !parent.exists() {
+            create_dir_all(&parent).expect(&format!("cannot create {:?}",parent));
         }
-        let mut f = File::create(&fname).expect(&format!("unable to create file: {:?}",fname));
+        let mut f = File::create(&file_name).expect(&format!("unable to create file: {:?}", file_name));
         let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
         f.write_all(s.as_bytes()).expect("cannot write to file");
     }
 
-    pub fn default(work_dir:&Path) -> Self {
+    pub fn default() -> Self {
         Self {
             resource_dir: None,
             remote_user: None,
@@ -259,22 +259,17 @@ impl VolumeManager {
     fn image_vol(&self) -> PathBuf {
         self.args.work_dir.join("image_vol")
     }
-
     fn kspace_vol_name(&self) -> PathBuf {
         self.args.work_dir.join("kspace_vol")
     }
-
     fn file_name(work_dir: &Path) -> PathBuf {
         work_dir.join("volume_manager")
     }
-
     pub fn to_file(&self) {
         let mut f = File::create(Self::file_name(&self.args.work_dir)).expect("cannot create file");
         let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
         f.write_all(s.as_bytes()).expect("cannot write to file");
     }
-
-
     pub fn new(vma:&VolumeManagerArgs) -> Self {
         let config = VolumeManagerConfig::from_file(&vma.work_dir);
         let vm = Self {
@@ -290,7 +285,6 @@ impl VolumeManager {
         vm.to_file();
         vm
     }
-
     pub fn from_file(work_dir: &Path) -> Option<Self> {
         let f = File::open(Self::file_name(work_dir));
         match f {
@@ -302,8 +296,6 @@ impl VolumeManager {
             Err(_) => None
         }
     }
-
-
     pub fn open(args:&VolumeManagerArgs) -> Self {
         match Self::from_file(&args.work_dir) {
             Some(vm) => {
@@ -316,12 +308,10 @@ impl VolumeManager {
             }
         }
     }
-
-    fn launch(args:&Path) {
+    pub fn launch(args:&Path) {
 
         let vma = VolumeManagerArgs::from_file(args);
         let mut vm = Self::open(&vma);
-
         println!("vol_man = {:?}",vm);
 
         // attempt to advance state and return a success/failure code
@@ -336,7 +326,18 @@ impl VolumeManager {
             match status {
                 Succeeded => continue,
                 TryingAgainLater => {
-                    // do relaunch system call
+                    let this_exe = std::env::current_exe().expect("couldn't determine the current executable");
+                    let mut cmd = Command::new(this_exe);
+                    cmd.args(
+                        vec![
+                            "volume-manager",
+                            "launch",
+                            args.to_str().unwrap()
+                        ]
+                    );
+                    let mut b = BatchScript::new("volume_manager");
+                    b.commands.push(format!("{:?}",cmd));
+                    let jid = b.submit_later(&vm.args.work_dir,2*60);
                     break
                 }
                 // don't reschedule
@@ -385,8 +386,7 @@ impl VolumeManager {
                 println!("reconstructing kspace ...");
                 match &self.kspace_data {
                     Some(kspace) => {
-                        let mut recon_settings = BartPicsSettings::default();
-                        recon_settings.max_iter = 2;
+                        let mut recon_settings = self.config.recon_settings.unwrap_or(BartPicsSettings::default());
                         bart_pics(kspace, &self.image_vol(), &mut recon_settings);
                         self.image_data = Some(self.image_vol());
                         self.state = Scaling;

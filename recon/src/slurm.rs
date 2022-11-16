@@ -20,6 +20,7 @@ pub struct SBatchOpts{
     no_requeue:bool,
     pub output:String,
     pub partition:String,
+    pub start_delay_sec:Option<u32>
 }
 
 pub struct BatchScript{
@@ -36,7 +37,8 @@ impl SBatchOpts{
             reservation:String::from(""),
             no_requeue: true,
             output:String::from(""),
-            partition:String::from("")
+            partition:String::from(""),
+            start_delay_sec:None
         };
     }
     pub fn print(&self) -> String {
@@ -46,6 +48,7 @@ impl SBatchOpts{
         if self.no_requeue{ opts.push("#SBATCH --no-requeue".to_string())}
         if !self.output.is_empty(){ opts.push(format!("#SBATCH --output={}",&self.output))}
         if !self.partition.is_empty(){ opts.push(format!("#SBATCH --partition={}",&self.partition))}
+        if self.start_delay_sec.is_some() { opts.push(format!("#SBATCH --begin=now+{}",self.start_delay_sec.unwrap()))}
         return opts.join("\n");
     }
 }
@@ -75,15 +78,28 @@ impl BatchScript{
         return elems.join("\n");
     }
 
-    pub fn write(&self,location:&str) -> PathBuf{
-        let mut fname = Path::new(location).to_owned();
+    pub fn write(&self,location:&Path) -> PathBuf{
+        let mut fname = location.to_owned();
         fname = fname.join(&self.options.job_name).with_extension("bash");
         let mut f = File::create(&fname).expect("cannot create file");
         f.write_all(self.print().as_bytes()).expect("trouble writing to file");
         return fname;
     }
 
-    pub fn submit(&mut self,write_location:&str) -> u32{
+    pub fn submit_later(&mut self, write_location:&Path,seconds_later:u32) -> u32{
+        self.options.start_delay_sec = Some(seconds_later);
+        let path = self.write(write_location);
+        let mut cmd = Command::new("sbatch");
+        cmd.arg(path);
+        let o = cmd.output().expect("failed to run command");
+        let response = String::from_utf8_lossy(&o.stdout);
+        let jid = BatchScript::response_to_job_id(&response);
+        //println!("job id: {}",jid);
+        self.job_id = Some(jid);
+        return jid;
+    }
+
+    pub fn submit_now(&mut self, write_location:&Path) -> u32{
         let path = self.write(write_location);
         let mut cmd = Command::new("sbatch");
         cmd.arg(path);
@@ -196,7 +212,7 @@ fn test(){
     j.commands.push(cmd);
     j.options.output = "/home/wa41/test_log".to_string();
     println!("{}",j.print());
-    j.submit("/home/wa41");
+    j.submit_now("/home/wa41");
     for _ in 0..20{
         j.check_state();
         std::thread::sleep(std::time::Duration::from_millis(100));
