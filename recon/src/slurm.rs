@@ -54,10 +54,10 @@ impl SBatchOpts{
 }
 
 impl BatchScript{
-    pub fn new(job_name:&str) -> BatchScript {
+    pub fn new(job_name:&str,commands:&Vec<Command>) -> BatchScript {
         let preamble = "#!/usr/bin/env bash".to_string();
         let opts = SBatchOpts::new(job_name);
-        let command = Vec::<String>::new();
+        let command:Vec<String> = commands.iter().map(|cmd| format!("{:?}",cmd)).collect();
         return BatchScript {
             preamble:preamble,
             options:opts,

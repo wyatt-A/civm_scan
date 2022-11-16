@@ -69,14 +69,14 @@ pub struct VolumeManager{
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct VolumeManagerConfig {
-    resource_dir:Option<PathBuf>,
-    remote_user:Option<String>,
-    remote_host:Option<String>,
-    recon_headfile:Option<ReconHeadfile>,
-    recon_settings:Option<BartPicsSettings>,
-    is_scale_dependent:Option<bool>,
-    is_scale_setter:Option<bool>,
-    scale_hist_percent:Option<f32>,
+    pub resource_dir:Option<PathBuf>,
+    pub remote_user:Option<String>,
+    pub remote_host:Option<String>,
+    pub recon_headfile:Option<ReconHeadfile>,
+    pub recon_settings:Option<BartPicsSettings>,
+    pub is_scale_dependent:Option<bool>,
+    pub is_scale_setter:Option<bool>,
+    pub scale_hist_percent:Option<f32>,
 }
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -112,7 +112,7 @@ pub enum VolumeManagerState {
 
 impl VolumeManagerConfig {
     pub fn from_file(file_name:&Path) -> Self {
-        let mut f = File::open(file_name).expect(&format!("unable to open {:?}",Self::file_name(work_dir)));
+        let mut f = File::open(file_name).expect(&format!("unable to open {:?}",file_name));
         let mut s = String::new();
         f.read_to_string(&mut s).expect("cannot read file");
         serde_json::from_str(&s).expect("cannot deserialize args")
@@ -265,13 +265,15 @@ impl VolumeManager {
     fn file_name(work_dir: &Path) -> PathBuf {
         work_dir.join("volume_manager")
     }
-    pub fn to_file(&self) {
-        let mut f = File::create(Self::file_name(&self.args.work_dir)).expect("cannot create file");
+    pub fn to_file(&self) -> PathBuf {
+        let filename = Self::file_name(&self.args.work_dir);
+        let mut f = File::create(&filename).expect("cannot create file");
         let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
         f.write_all(s.as_bytes()).expect("cannot write to file");
+        filename
     }
     pub fn new(vma:&VolumeManagerArgs) -> Self {
-        let config = VolumeManagerConfig::from_file(&vma.work_dir);
+        let config = VolumeManagerConfig::from_file(&vma.config);
         let vm = Self {
             args: vma.to_owned(),
             config: config,
@@ -308,6 +310,40 @@ impl VolumeManager {
             }
         }
     }
+
+    pub fn launch_with_slurm_later(&self,seconds_later:u32) -> u32 {
+        let d = self.args.work_dir.file_name().unwrap().to_str().unwrap();
+        BatchScript::new(d,&vec![self.launch_cmd()]).submit_later(&self.args.work_dir,seconds_later)
+    }
+
+    pub fn launch_with_slurm_now(&self) -> u32 {
+        let d = self.args.work_dir.file_name().unwrap().to_str().unwrap();
+        BatchScript::new(d,&vec![self.launch_cmd()]).submit_now(&self.args.work_dir)
+    }
+
+    fn launch_cmd(&self) -> Command {
+        let this_exe = std::env::current_exe().expect("couldn't determine the current executable");
+        let mut cmd = Command::new(this_exe);
+        cmd.args(
+            vec![
+                "volume-manager",
+                "launch",
+                self.args.work_dir.to_str().unwrap()
+            ]
+        );
+        cmd
+    }
+
+    pub fn is_sequential_mode() -> bool {
+        // check to see if we are running sequentially or in parallel on the cluster
+        match std::env::var("CS_RECON_SEQUENTIAL").unwrap_or(String::from("no")).as_str() {
+            "yes" | "y" | "true" | "1" => {
+                true
+            },
+            _=> false
+        }
+    }
+
     pub fn launch(args:&Path) {
 
         let vma = VolumeManagerArgs::from_file(args);
@@ -326,23 +362,17 @@ impl VolumeManager {
             match status {
                 Succeeded => continue,
                 TryingAgainLater => {
-                    let this_exe = std::env::current_exe().expect("couldn't determine the current executable");
-                    let mut cmd = Command::new(this_exe);
-                    cmd.args(
-                        vec![
-                            "volume-manager",
-                            "launch",
-                            args.to_str().unwrap()
-                        ]
-                    );
-                    let mut b = BatchScript::new("volume_manager");
-                    b.commands.push(format!("{:?}",cmd));
-                    let jid = b.submit_later(&vm.args.work_dir,2*60);
+                    vm.launch_with_slurm_later(60*2);
                     break
                 }
-                // don't reschedule
-                // maybe write to a log or send an email
-                TerminalFailure | AllWorkDone => break
+                TerminalFailure => {
+                    println!("volume manager cannot continue. Will not reschedule.");
+                    break
+                },
+                AllWorkDone => {
+                    println!("all work is complete.");
+                    break
+                }
             }
         }
     }
@@ -362,7 +392,10 @@ impl VolumeManager {
                     },
                     Err(e) => {
                         self.state = NeedsResources(e);
-                        StateAdvance::TryingAgainLater
+                        match VolumeManager::is_sequential_mode() {
+                            false => StateAdvance::TryingAgainLater,
+                            true => StateAdvance::TerminalFailure
+                        }
                     }
                 }
             }
@@ -386,7 +419,7 @@ impl VolumeManager {
                 println!("reconstructing kspace ...");
                 match &self.kspace_data {
                     Some(kspace) => {
-                        let mut recon_settings = self.config.recon_settings.unwrap_or(BartPicsSettings::default());
+                        let mut recon_settings = self.config.recon_settings.clone().unwrap_or(BartPicsSettings::default());
                         bart_pics(kspace, &self.image_vol(), &mut recon_settings);
                         self.image_data = Some(self.image_vol());
                         self.state = Scaling;
@@ -440,8 +473,11 @@ impl VolumeManager {
                                     }
                                     None => {
                                         // schedule to run again later
-                                        println!("scale file not yet found!. Trying again later.");
-                                        StateAdvance::TryingAgainLater
+                                        println!("scale file not yet found!");
+                                        match VolumeManager::is_sequential_mode() {
+                                            false => StateAdvance::TryingAgainLater,
+                                            true => StateAdvance::TerminalFailure
+                                        }
                                     }
                                 }
                             }

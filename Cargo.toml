@@ -10,7 +10,8 @@ members = [
     "mr_data",
     "cs_table",
     "acquire",
-    "headfile"
+    "headfile",
+    "utils"
 ]
 
 # this determines which package is the entry point for cargo run (if multiple binaries exist)

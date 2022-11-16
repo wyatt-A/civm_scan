@@ -1494,6 +1494,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "utils",
  "whoami",
 ]
 
@@ -1881,6 +1882,10 @@ dependencies = [
  "idna",
  "percent-encoding",
 ]
+
+[[package]]
+name = "utils"
+version = "0.1.0"
 
 [[package]]
 name = "vec_map"
