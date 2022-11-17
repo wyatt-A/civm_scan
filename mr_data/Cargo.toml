@@ -9,5 +9,10 @@ edition = "2021"
 acquire = {path = "../acquire"}
 seq_lib = {path = "../seq_lib"}
 cs_table = {path = "../cs_table"}
+utils = {path = "../utils"}
 byteorder = "1.4.3"
 ndarray = "0.15.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.85"
+ndrustfft = "0.3.0"
+num-complex = "0.4.2"

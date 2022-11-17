@@ -4,8 +4,8 @@ use std::path::{Path,PathBuf};
 use std::fs::File;
 use std::process::{Command, CommandArgs};
 use toml;
-use crate::utils::{self, vec_to_string};
-use crate::cfl;
+use utils::{read_to_string, vec_to_string};
+use mr_data::cfl;
 //use crate::mrd::{mrd_to_cfl};
 
 #[derive(Clone,Debug,Deserialize,Serialize)]
@@ -51,7 +51,7 @@ impl BartPicsSettings{
     }
 
     pub fn from_file(src_path:&str) -> BartPicsSettings{
-        let s = utils::read_to_string(src_path,"toml").expect("cannot open file");
+        let s = read_to_string(src_path,"toml").expect("cannot open file");
         return toml::from_str(&s).expect("cannot deserialize file");
     }
 

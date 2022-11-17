@@ -16,11 +16,10 @@ use seq_lib::pulse_sequence::MrdToKspaceParams;
 use mr_data::mrd::{fse_raw_to_cfl, cs_mrd_to_kspace};
 use headfile::headfile::{ReconHeadfile, Headfile};
 use acquire::build::{HEADFILE_NAME,HEADFILE_EXT};
-use crate::{cfl, utils};
 use glob::glob;
 use clap::Parser;
 use serde_json::to_string;
-use crate::cfl::{ImageScale, write_u16_scale};
+use mr_data::cfl::{self,ImageScale, write_u16_scale};
 
 pub const SCALE_FILENAME:&str = "volume_scale_info";
 pub const DEFAULT_HIST_PERCENT:f32 = 0.9995;
@@ -104,6 +103,7 @@ pub enum VolumeManagerState {
     NeedsResources(ResourceError),
     FormattingKspace,
     Reconstructing,
+    Filtering,
     Scaling,
     WritingImageData,
     WritingHeadfile,
@@ -334,7 +334,7 @@ impl VolumeManager {
         cmd
     }
 
-    pub fn is_sequential_mode() -> bool {
+    pub fn no_cluster_scheduling() -> bool {
         // check to see if we are running sequentially or in parallel on the cluster
         match std::env::var("CS_RECON_SEQUENTIAL").unwrap_or(String::from("no")).as_str() {
             "yes" | "y" | "true" | "1" => {
@@ -392,7 +392,7 @@ impl VolumeManager {
                     },
                     Err(e) => {
                         self.state = NeedsResources(e);
-                        match VolumeManager::is_sequential_mode() {
+                        match VolumeManager::no_cluster_scheduling() {
                             false => StateAdvance::TryingAgainLater,
                             true => StateAdvance::TerminalFailure
                         }
@@ -415,6 +415,7 @@ impl VolumeManager {
                     }
                 }
             }
+            //todo!(think about how to use the cluster's temp directory that lives in memory. "Needs special cleanup care")
             Reconstructing => {
                 println!("reconstructing kspace ...");
                 match &self.kspace_data {
@@ -432,6 +433,11 @@ impl VolumeManager {
                     }
                 }
             }
+
+            Filtering => {
+                StateAdvance::TerminalFailure
+            }
+
             Scaling => {
                 println!("determining image scale ...");
                 /*
@@ -474,7 +480,7 @@ impl VolumeManager {
                                     None => {
                                         // schedule to run again later
                                         println!("scale file not yet found!");
-                                        match VolumeManager::is_sequential_mode() {
+                                        match VolumeManager::no_cluster_scheduling() {
                                             false => StateAdvance::TryingAgainLater,
                                             true => StateAdvance::TerminalFailure
                                         }

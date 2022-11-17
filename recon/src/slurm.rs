@@ -18,6 +18,7 @@ pub struct SBatchOpts{
     reservation:String,
     pub(crate) job_name:String,
     no_requeue:bool,
+    pub memory:Option<String>,
     pub output:String,
     pub partition:String,
     pub start_delay_sec:Option<u32>
@@ -35,6 +36,7 @@ impl SBatchOpts{
         return SBatchOpts{
             job_name:job_name.to_string(),
             reservation:String::from(""),
+            memory:Some(String::from("80G")),
             no_requeue: true,
             output:String::from(""),
             partition:String::from(""),
@@ -49,6 +51,7 @@ impl SBatchOpts{
         if !self.output.is_empty(){ opts.push(format!("#SBATCH --output={}",&self.output))}
         if !self.partition.is_empty(){ opts.push(format!("#SBATCH --partition={}",&self.partition))}
         if self.start_delay_sec.is_some() { opts.push(format!("#SBATCH --begin=now+{}",self.start_delay_sec.unwrap()))}
+        opts.push(format!("#SBATCH --mem={}",self.memory.clone().expect("memory request must be specified")));
         return opts.join("\n");
     }
 }

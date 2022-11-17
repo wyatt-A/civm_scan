@@ -153,7 +153,7 @@ fn main() {
 
                 let vm = VolumeManager::new(&vma);
 
-                match VolumeManager::is_sequential_mode() {
+                match VolumeManager::no_cluster_scheduling() {
                     true => VolumeManager::launch(&args_file),
                     false => {
                         let jid = vm.launch_with_slurm_now();

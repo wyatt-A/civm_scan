@@ -5,7 +5,6 @@
 //pub mod resource;
 pub mod slurm;
 mod utils;
-pub mod cfl;
 pub mod bart_wrapper;
 //pub mod volume_manager;
 //pub mod test;

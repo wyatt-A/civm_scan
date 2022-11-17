@@ -10,6 +10,7 @@ use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate, Ix};
 use ndarray::{Array, ArrayView, array, Axis};
 use ndarray::iter::Axes;
 use ndarray::Order::RowMajor;
+use crate::cfl;
 
 
 const OFFSET_TO_DATA:usize = 512;
@@ -78,7 +79,7 @@ pub fn cs_mrd_to_kspace(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKsp
 pub fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out:&Path,params:&MrdToKspaceParams) {
     let formatted = format_fse_raw(mrd,params.n_read,params.n_views,params.dummy_excitations);
     let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
-    write_cfl_vol(&vol,cfl_out);
+    cfl::write_cfl_vol(&vol,cfl_out);
 }
 
 fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&MrdToKspaceParams) {
@@ -92,7 +93,7 @@ fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params
         let cfl = cfl_out_base_name.with_file_name(qualified_name);
         let formatted = format_multi_echo_raw(mrd,params.n_read,params.n_views,params.dummy_excitations,i);
         let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
-        write_cfl_vol(&vol,&cfl);
+        cfl::write_cfl_vol(&vol,&cfl);
     }
 }
 
@@ -137,19 +138,7 @@ fn zero_fill(array:&Array<f32, Dim<[Ix; 3]>>,
     zf_arr
 }
 
-fn write_cfl_vol(complex_volume:&Array<f32, Dim<[Ix; 4]>>,filename:&Path) {
-    let shape = complex_volume.shape();
-    let numel = shape[0]*shape[1]*shape[2]*shape[3];
-    let hdr_str = format!("# Dimensions\n{} {} {} 1 1",shape[2],shape[1],shape[0]);
-    let flat = complex_volume.to_shape((numel,Order::RowMajor)).expect("cannot flatten with specified number of elements").to_vec();
-    let n_bytes = flat.len()*4;
-    let mut byte_buff:Vec<u8> = vec![0;n_bytes];
-    LittleEndian::write_f32_into(&flat,&mut byte_buff);
-    let mut cfl = File::create(filename.with_extension("cfl")).expect("cannot create file");
-    cfl.write_all(&byte_buff).expect("problem writing to file");
-    let mut hdr = File::create(filename.with_extension("hdr")).expect("cannot create file");
-    hdr.write_all(hdr_str.as_bytes()).expect("a problem occurred writing to cfl header");
-}
+
 
 
 pub struct MRData {

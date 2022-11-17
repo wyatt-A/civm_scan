@@ -1,0 +1,296 @@
+use std::{collections::HashMap, hash};
+use std::path::{Path,PathBuf};
+use std::fs::{create_dir_all, File};
+use std::io::{Read,Write};
+use std::process::Command;
+use byteorder::{ByteOrder,BigEndian,LittleEndian};
+use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate, Ix};
+use ndarray::{Array, ArrayView, array, Axis};
+use ndarray::iter::Axes;
+use ndarray::Order::RowMajor;
+use serde::{Deserialize, Serialize};
+use ndrustfft::{ndfft,ndifft,FftHandler};
+use serde_json;
+use utils;
+use num_complex::Complex;
+
+
+#[derive(Serialize,Deserialize)]
+pub struct ImageScale {
+    histogram_percent:f32,
+    pub scale_factor:f32
+}
+
+impl ImageScale {
+    pub fn new(histogram_percent:f32,scale_factor:f32) -> Self {
+        Self {
+            histogram_percent,
+            scale_factor
+        }
+    }
+    pub fn from_file(file_path:&Path) -> Self {
+        let mut f = File::open(file_path).expect("cannot open file");
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect("cannot read from file");
+        serde_json::from_str(&s).expect("cannot deserialize file")
+    }
+    pub fn to_file(&self,file_path:&Path) {
+        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
+        let mut f = File::create(file_path).expect("cannot create file");
+        f.write_all(s.as_bytes()).expect("cannot write to file");
+    }
+}
+
+pub fn get_dims(path:&Path) -> Vec<usize>{
+    let h = load_cfl_header(path);
+    let d = h.get("# Dimensions").expect("Couldn't find # dimesions").to_owned();
+    let dim_str:Vec<&str> = d.split_whitespace().collect();
+    let dims:Vec<usize> = dim_str.iter().flat_map(|str| str.to_string().parse()).collect();
+    let non_singleton:Vec<usize> = dims.into_iter().filter(|dimension| *dimension != 1).collect();
+    return non_singleton;
+}
+
+pub fn load_cfl_header(cfl_base:&Path) -> HashMap<String,String>{
+    let (hdr,_) = cfl_base_decode(cfl_base);
+    let mut f = File::open(&hdr).expect(&format!("cannot open file {:?}",hdr));
+    let mut s = String::new();
+    f.read_to_string(&mut s).expect("cannot read from file");
+    //let s = utils::read_to_string(path,"hdr").expect("cannot open file");
+    let mut h = HashMap::<String,String>::new();
+    let lines:Vec<&str> = s.lines().collect();
+    lines.iter().enumerate().for_each( |(i,line)|
+    {
+        if line.starts_with("#"){
+            let key = line.to_owned().to_string();
+            h.insert(key,lines[i+1].to_string());
+        }
+    });
+    return h;
+}
+
+pub fn to_civm_raw_u16(cfl_base:&Path,output_dir:&Path,volume_label:&str,raw_prefix:&str,scale:f32){
+    let (hdr,_) = cfl_base_decode(cfl_base);
+    if !output_dir.exists(){
+        create_dir_all(output_dir).expect("cannot crate output image directory");
+    }
+    let dims = get_dims(&hdr);
+    if dims.len() !=3 {panic!("we don't know how to write data {}-D data!",dims.len())}
+    let mag = Array3::from_shape_vec((dims[2],dims[1],dims[0]),to_magnitude(cfl_base)).expect("raw floats cannot fit into shape");
+    let numel_per_img = dims[1]*dims[0];
+    let mut byte_buff:Vec<u8> = vec![0;2*numel_per_img];
+    println!("writing to civm_raw ...");
+    for i in 0..dims[1] {
+        let slice = mag.slice(s![..,i,..]);
+        let flat = slice.to_shape((numel_per_img,Order::RowMajor)).expect("unexpected data size");
+        let v = flat.to_vec();
+        let uints:Vec<u16> = v.iter().map(|float| (*float*scale) as u16).collect();
+        let fname = output_dir.join(&format!("{}{}.{:03}.raw",volume_label,raw_prefix,i+1));
+        let mut f = File::create(fname).expect("trouble creating file");
+        BigEndian::write_u16_into(&uints,&mut byte_buff);
+        f.write_all(&mut byte_buff).expect("touble writing to file");
+    }
+}
+
+pub fn load(cfl:&Path) -> Vec<f32>{
+    let mut f = File::open(cfl).expect("cannot open file");
+    let mut buf = Vec::<u8>::new();
+    f.read_to_end(&mut buf).expect("trouble reading file");
+    let mut fbuf:Vec<f32> = vec![0.0;buf.len()/4];
+    LittleEndian::read_f32_into(&buf,&mut fbuf);
+    return fbuf;
+}
+
+pub fn to_magnitude(cfl:&Path) -> Vec<f32>{
+    let (hdr,cfl) = cfl_base_decode(cfl);
+    let dims = get_dims(&hdr);
+    let mut complex = Array4::from_shape_vec((dims[2],dims[1],dims[0],2),load(&cfl)).expect("cannot fit data vector in ndarray");
+    let square = |x:&mut f32| *x = (*x).powi(2);
+    // magnitude is calculated from complex values
+    // "square root of the sum of the squares"
+    complex.slice_mut(s![..,..,..,0]).map_inplace(square);
+    complex.slice_mut(s![..,..,..,1]).map_inplace(square);
+    let mut mag = complex.sum_axis(Axis(3));
+    mag.mapv_inplace(f32::sqrt);
+    let f = mag.to_shape((dims[2]*dims[1]*dims[0],Order::RowMajor)).expect("cannot flatten array");
+    return f.to_vec();
+}
+
+pub fn find_u16_scale(cfl:&Path,histo_percent:f64) -> f32{
+    let mag = to_magnitude(cfl);
+    return u16_scale_from_vec(&mag,histo_percent);
+}
+
+pub fn write_u16_scale(cfl:&Path,histo_percent:f64,output_file:&Path){
+    let scale = find_u16_scale(cfl,histo_percent);
+    ImageScale::new(histo_percent as f32,scale).to_file(output_file);
+}
+
+// typical histo %: 0.999500
+pub fn u16_scale_from_vec(magnitude_img:&Vec<f32>,histo_percent:f64) -> f32{
+    let mut mag = magnitude_img.clone();
+    println!("sorting image ...");
+    mag.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    // find scale factor as a float
+    let n_voxels = mag.len();
+    let n_to_saturate = (n_voxels as f64 * (1.0-histo_percent)).round() as usize;
+    return 65535.0/mag[n_voxels - n_to_saturate + 1];
+}
+pub fn write_cfl_vol(complex_volume:&Array<f32, Dim<[Ix; 4]>>,cfl_base:&Path) {
+    let shape = complex_volume.shape();
+    let numel = shape[0]*shape[1]*shape[2]*shape[3];
+    let hdr_str = format!("# Dimensions\n{} {} {} 1 1",shape[2],shape[1],shape[0]);
+    let flat = complex_volume.to_shape((numel,Order::RowMajor)).expect("cannot flatten with specified number of elements").to_vec();
+    write(&flat,(shape[2],shape[1],shape[0]),cfl_base);
+}
+
+fn write(flat:&Vec<f32>,dims:(usize,usize,usize),cfl_base:&Path) {
+    let (hdr,cfl) = cfl_base_decode(cfl_base);
+    let n_bytes = flat.len()*4;
+    let mut byte_buff:Vec<u8> = vec![0;n_bytes];
+    LittleEndian::write_f32_into(&flat,&mut byte_buff);
+    let mut cfl = File::create(cfl).expect("cannot create file");
+    cfl.write_all(&byte_buff).expect("problem writing to file");
+    let mut hdr = File::create(hdr).expect("cannot create file");
+    let hdr_str = format!("# Dimensions\n{} {} {} 1 1",dims.0,dims.1,dims.2);
+    hdr.write_all(hdr_str.as_bytes()).expect("a problem occurred writing to cfl header");
+}
+
+fn to_complex_volume(cfl_base:&Path) -> Array3<Complex<f32>> {
+    let (hdr,vol) = cfl_base_decode(cfl_base);
+    let v = load(&vol);
+    let dims = get_dims(&hdr);
+    if dims.len() != 3 {
+        panic!("cfl data must have 3 non-singleton dimensions");
+    }
+    let dims = (dims[0],dims[1],dims[2]);
+    vec_to_complex_vol(&v,dims)
+}
+
+pub fn from_complex_volume(vol:&Array3<Complex<f32>>,cfl_base:&Path) {
+    let flat = complex_vol_to_vec(vol);
+    let shape = vol.shape();
+    let dims = (shape[2],shape[1],shape[0]);
+    write(&flat,dims,cfl_base);
+}
+
+fn vec_to_complex_vol(flat:&Vec<f32>,dims:(usize,usize,usize)) -> Array3<Complex<f32>> {
+    let complex_arr:Vec::<Complex<f32>> = (0..flat.len()/2).map(|i| Complex::new(flat[2*i],flat[2*i+1])).collect();
+    Array3::<Complex<f32>>::from_shape_vec((dims.2,dims.1,dims.0),complex_arr).expect(&format!("cannot coerce cfl raw data to shape {:?}",dims))
+}
+
+fn complex_vol_to_vec(vol:&Array3<Complex<f32>>) -> Vec<f32> {
+    let dims = vol.shape();
+    let numel = dims[0]*dims[1]*dims[2];
+    let flat:Vec<Complex<f32>> = vol.to_shape((numel,Order::RowMajor)).expect("cannot flatten array").to_vec();
+    let mut cfl_flat:Vec<f32> = vec![0.0;numel*2];
+    flat.iter().enumerate().for_each(|(i,c_val)|{
+        cfl_flat[2*i] = c_val.re;
+        cfl_flat[2*i+1] = c_val.im;
+    });
+    cfl_flat
+}
+
+fn fft3(vol:&Array3<Complex<f32>>) -> Array3<Complex<f32>> {
+    let shape = vol.shape();
+    let mut r = Array3::<Complex<f32>>::zeros((shape[0],shape[1],shape[2]));
+
+    let mut handler:FftHandler<f32> = FftHandler::new(shape[2]);
+    ndfft(vol, &mut r, &mut handler, 2);
+
+    let mut handler2:FftHandler<f32> = FftHandler::new(shape[1]);
+    ndfft(vol, &mut r, &mut handler2, 1);
+
+    let mut handler3:FftHandler<f32> = FftHandler::new(shape[0]);
+    ndfft(vol, &mut r, &mut handler3, 0);
+
+
+    // for dim in 0..1 {
+    //     let mut handler:FftHandler<f32> = FftHandler::new(shape[dim]);
+    //     ndfft(vol, &mut r, &mut handler, dim);
+    // }
+    r
+}
+
+fn cfl_base_decode(cfl_base:&Path) -> (PathBuf,PathBuf) {
+    (cfl_base.with_extension("hdr"),cfl_base.with_extension("cfl"))
+}
+
+pub fn fermi_filter(cfl_in:&Path,cfl_out:&Path,w1:f32,w2:f32) {
+
+    let (hdr,cfl) = cfl_base_decode(cfl_in);
+
+    let dims = get_dims(&hdr);
+    if dims.len() != 3 {
+        panic!("only 3-d volumes are supported");
+    }
+
+    // calculate intermediate filter parameters
+    let max_dim = dims.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).expect("dimension vector is empty").clone() as f32;
+    let fermi_t = max_dim*w1/2.0;
+    let fermi_u = max_dim*w2/2.0;
+
+    // the norm_factor ensures that the filter coefficients do not exceed 1.
+    // this approach requires less computation and memory than the previous approach
+    let norm_factor = 1.0+(-fermi_u/fermi_t).exp();
+
+    let dx = dims[0];
+    let dy = dims[1];
+    let dz = dims[2];
+
+    let x_n = (dx as f32/max_dim).powi(2);
+    let y_n = (dy as f32/max_dim).powi(2);
+    let z_n = (dz as f32/max_dim).powi(2);
+
+    println!("loading cfl volume ...");
+    let mut kspace = Array4::from_shape_vec((dims[2],dims[1],dims[0],2),load(&cfl)).expect(&format!("cannot coerce vector to dims {:?}",dims));
+    println!("filtering ...");
+    for x_i in 0..dims[0] {
+        for y_i in 0..dims[1] {
+            for z_i in 0..dims[2] {
+                // find filter coefficients
+                let x_c_sq = ((x_i as f32) - (dx/2) as f32).powi(2);
+                let y_c_sq = ((y_i as f32) - (dy/2) as f32).powi(2);
+                let z_c_sq = ((z_i as f32) - (dz/2) as f32).powi(2);
+                let k_radius = (x_c_sq/x_n + y_c_sq/y_n + z_c_sq/z_n).sqrt();
+                let filt_param = (k_radius - fermi_u)/fermi_t;
+                let coeff = 1.0/(1.0 + filt_param.exp());
+                // in-place operation on each complex value;
+                let mut sample = kspace.slice_mut(s![z_i,y_i,x_i,..]);
+                sample *= coeff*norm_factor;
+            }
+        }
+    }
+    println!("writing filtered output...");
+    write_cfl_vol(&kspace,cfl_out);
+}
+
+#[test]
+fn test_filter() {
+    let cfl_base = Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m01/kspace_vol");
+    let out = cfl_base.with_file_name("image_vol_bart_kspace");
+
+
+    let kspace_cfl = Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m01/kspace_vol");
+    let image_space_cfl = Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m01/image_vol_fft");
+
+
+    let cv = to_complex_volume(kspace_cfl);
+    let ft = fft3(&cv);
+    from_complex_volume(&ft,image_space_cfl);
+
+
+    //Array3::<Complex<f32>>::from_shape_vec();
+
+    // let mut cmd = Command::new("/Users/Wyatt/build/bart-0.7.00/bart");
+    // cmd.args(&vec![
+    //     "fft",
+    //     cfl.to_str().unwrap(),
+    //     out.to_str().unwrap()
+    // ]);
+    // let o = cmd.output().unwrap();
+    // println!("{}",String::from_utf8_lossy(&o.stdout));
+
+    // fermi_filter(cfl,&out,0.15,0.75);
+    // let scale = find_u16_scale(&out,0.9995);
+    // to_civm_raw_u16(&out,&cfl.with_file_name("filtered"),"g","p",scale);
+}
