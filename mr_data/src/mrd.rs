@@ -6,10 +6,11 @@ use seq_lib::pulse_sequence::{AcqDims, MrdFormat, MrdToKspaceParams};
 use acquire::build::acq_dims;
 use cs_table::cs_table::CSTable;
 use byteorder::{LittleEndian,ByteOrder};
-use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate, Ix};
+use ndarray::{s, Array3, Array4, Array6, Order, Dim, ArrayD, IxDyn, concatenate, Ix, Array2, Ix6};
 use ndarray::{Array, ArrayView, array, Axis};
 use ndarray::iter::Axes;
 use ndarray::Order::RowMajor;
+use num_complex::Complex;
 use crate::cfl;
 
 
@@ -27,43 +28,14 @@ const N_EXPERIMENT_BYTES:Range<usize> = 156..160;
 
 #[test]
 fn test(){
+    let mrd = Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m00/resources/m00.mrd");
 
-    // FSE kspace formatting
+    let cs_table = Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m00/resources/cs_table");
 
-    let ksp_fse = MrdToKspaceParams {
-        mrd_format: MrdFormat::FseCSVol,
-        n_read:788,
-        n_phase1:480,
-        n_phase2:480,
-        n_views:28800,
-        view_acceleration:2,
-        dummy_excitations:20,
-        n_objects:1
-    };
-    let mrd_path = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq/m01/m01.mrd");
-    let table = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq/m01/cs_table");
-    let out_base = Path::new("/Users/Wyatt/IdeaProjects/test_data/acq/m01/mgre_ksp");
-    fse_raw_to_cfl(mrd_path,table,out_base,&ksp_fse);
+    let p = MrdToKspaceParams::from_file(Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m00/resources/mrd_to_kspace.mtk"));
 
-
-    // Single echo/multi echo formatting
-
-/*
-    let ksp = RawToKspaceParams {
-        n_read:788,
-        n_phase1:480,
-        n_phase2:480,
-        n_views:28800,
-        view_acceleration:1,
-        dummy_excitations:0,
-        n_vols:4
-    };
-
-    let data_path = Path::new("/Users/Wyatt/IdeaProjects/test_data/mgre/mgre.mrd");
-    let table = Path::new("/Users/Wyatt/IdeaProjects/test_data/se/stream_CS480_8x_pa18_pb54");
-    let out_base = Path::new("/Users/Wyatt/IdeaProjects/test_data/mgre/mgre_ksp");
-    multi_echo_raw_to_cfl(data_path,table,out_base,&ksp)
-*/
+    let vol = fse_raw_to_vol(mrd,cs_table,&p);
+    cfl::to_nifti(&vol,&mrd.with_file_name("m00_ksapce.nii"));
 }
 
 
@@ -76,10 +48,14 @@ pub fn cs_mrd_to_kspace(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKsp
 }
 
 
-pub fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out:&Path,params:&MrdToKspaceParams) {
+pub fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKspaceParams) {
+    let vol = fse_raw_to_vol(mrd,cs_table,params);
+    cfl::write_cfl_vol(&vol,cfl_base);
+}
+
+pub fn fse_raw_to_vol(mrd:&Path,cs_table:&Path,params:&MrdToKspaceParams) -> Array3<Complex<f32>> {
     let formatted = format_fse_raw(mrd,params.n_read,params.n_views,params.dummy_excitations);
-    let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
-    cfl::write_cfl_vol(&vol,cfl_out);
+    zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration)
 }
 
 fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&MrdToKspaceParams) {
@@ -97,8 +73,7 @@ fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params
     }
 }
 
-
-fn format_fse_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize) -> Array<f32, Dim<[Ix; 3]>> {
+fn format_fse_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize) -> Array2::<Complex<f32>> {
     let mrd = MRData::new(mrd);
     let mut mrd_dims = mrd.char_dim_array().to_vec();
     mrd_dims.reverse();
@@ -109,31 +84,47 @@ fn format_fse_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize
     echo2 += &echo3;
     let combined_echos = concatenate(Axis(1), &[echo1, echo2.view()]).expect("unable to concatenate arrays").permuted_axes([0,3,2,1,4,5]);
     let trimmed = combined_echos.slice(s![..,n_dummy_excitations..,..,..,..,..]).to_owned();
-    trimmed.to_shape(((n_views,n_read,2), Order::RowMajor)).expect("cannot reshape array").to_owned()
+    let trimmed = trimmed.to_shape(((n_views,n_read,2), Order::RowMajor)).expect("cannot reshape array").to_owned();
+
+    let mut cf = Array2::<Complex<f32>>::zeros((n_views,n_read));
+    trimmed.outer_iter().enumerate().for_each(|(i,read)|{
+        read.outer_iter().enumerate().for_each(|(j,sample)|{
+            cf[[i,j]] = Complex::new(sample[0],sample[1])
+        })
+    });
+    cf
 }
 
 
-fn format_multi_echo_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize,vol_index:usize) -> Array<f32, Dim<[Ix; 3]>> {
+fn format_multi_echo_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize,vol_index:usize) -> Array2::<Complex<f32>> {
     let mrd = MRData::new(mrd);
     let mut mrd_dims = mrd.char_dim_array().to_vec();
     mrd_dims.reverse();
     let mrd_array = ArrayD::<f32>::from_shape_vec(IxDyn(&mrd_dims), mrd.float_stream()).expect("unexpected number of samples");
     let echo = mrd_array.slice(s![..,vol_index,..,..,..,..,..]).to_owned().permuted_axes([0,3,2,1,4,5]);
     let trimmed = echo.slice(s![..,n_dummy_excitations..,..,..,..,..]).to_owned();
-    trimmed.to_shape(((n_views,n_read,2), Order::RowMajor)).expect("cannot reshape array").to_owned()
+    let trimmed = trimmed.to_shape(((n_views,n_read,2), Order::RowMajor)).expect("cannot reshape array").to_owned();
+    let mut cf = Array2::<Complex<f32>>::zeros((n_views,n_read));
+    trimmed.outer_iter().enumerate().for_each(|(i,read)|{
+        read.outer_iter().enumerate().for_each(|(j,sample)|{
+            cf[[i,j]] = Complex::new(sample[0],sample[1])
+        })
+    });
+    cf
 }
 
 
-fn zero_fill(array:&Array<f32, Dim<[Ix; 3]>>,
+fn zero_fill(array:&Array2::<Complex<f32>>,
              cs_table:&Path,
              dims:(usize,usize,usize),
              dummy_excitations:usize,
-             view_acceleration:usize) ->  Array<f32, Dim<[Ix; 4]>>{
+             view_acceleration:usize) ->  Array3::<Complex<f32>>{
     let cs_table = CSTable::open(cs_table,dims.1 as i16,dims.2 as i16);
     let mut zf_arr = Array4::<f32>::zeros([dims.2,dims.1,dims.0,2]);
+    let mut zf_arr = Array3::<Complex<f32>>::zeros([dims.2,dims.1,dims.0]);
     for (i,index) in cs_table.indices(dummy_excitations*view_acceleration).iter().enumerate() {
-        let mut zf_slice = zf_arr.slice_mut(s![index.0 as usize,index.1 as usize,..,..]);
-        zf_slice += &array.slice(s![i,..,..]);
+        let mut zf_slice = zf_arr.slice_mut(s![index.0 as usize,index.1 as usize,..]);
+        zf_slice += &array.slice(s![i,..]);
     }
     zf_arr
 }
@@ -302,3 +293,8 @@ fn read_to_string(file_path:&Path) -> String {
     f.read_to_string(&mut s).expect("cannot read from file");
     s
 }
+
+
+
+
+

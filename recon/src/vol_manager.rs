@@ -19,7 +19,7 @@ use acquire::build::{HEADFILE_NAME,HEADFILE_EXT};
 use glob::glob;
 use clap::Parser;
 use serde_json::to_string;
-use mr_data::cfl::{self,ImageScale, write_u16_scale};
+use mr_data::cfl::{self, ImageScale, write_u16_scale};
 
 pub const SCALE_FILENAME:&str = "volume_scale_info";
 pub const DEFAULT_HIST_PERCENT:f32 = 0.9995;
@@ -423,7 +423,7 @@ impl VolumeManager {
                         let mut recon_settings = self.config.recon_settings.clone().unwrap_or(BartPicsSettings::default());
                         bart_pics(kspace, &self.image_vol(), &mut recon_settings);
                         self.image_data = Some(self.image_vol());
-                        self.state = Scaling;
+                        self.state = Filtering;
                         StateAdvance::Succeeded
                     }
                     None => {
@@ -433,11 +433,12 @@ impl VolumeManager {
                     }
                 }
             }
-
             Filtering => {
-                StateAdvance::TerminalFailure
+                let image = self.image_data.clone().expect("image cfl not set");
+                cfl::fermi_filter_image(&image,&image,0.15,0.75);
+                self.state = Scaling;
+                StateAdvance::Succeeded
             }
-
             Scaling => {
                 println!("determining image scale ...");
                 /*

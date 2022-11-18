@@ -151,7 +151,7 @@ pub fn write_cfl_vol(complex_volume:&Array3<Complex<f32>>,cfl_base:&Path) {
     write_cfl_header(complex_volume,cfl_base);
 }
 
-fn write_data(flat:&Vec<f32>, cfl_base:&Path) {
+pub fn write_data(flat:&Vec<f32>, cfl_base:&Path) {
     let (_,cfl) = cfl_base_decode(cfl_base);
     let n_bytes = flat.len()*4;
     let mut byte_buff:Vec<u8> = vec![0;n_bytes];
@@ -182,7 +182,14 @@ pub fn from_complex_volume(vol:&Array3<Complex<f32>>,cfl_base:&Path) {
     let flat = complex_vol_to_vec(vol);
     let shape = vol.shape();
     let dims = (shape[2],shape[1],shape[0]);
-    write_data(&flat, dims, cfl_base);
+    write_data(&flat, cfl_base);
+    write_cfl_header(vol,cfl_base);
+}
+
+pub fn to_nifti(vol:&Array3<Complex<f32>>,nifti_base:&Path) {
+    let mag_vol = complex_vol_to_magnitude(vol);
+    let nii = WriterOptions::new(nifti_base);
+    nii.write_nifti(&mag_vol).expect("trouble writing to nifti");
 }
 
 fn vec_to_complex_vol(flat:&Vec<f32>,dims:(usize,usize,usize)) -> Array3<Complex<f32>> {
@@ -202,21 +209,7 @@ fn complex_vol_to_vec(vol:&Array3<Complex<f32>>) -> Vec<f32> {
     cfl_flat
 }
 
-fn fft3(vol:&Array3<Complex<f32>>) /*-> Array3<Complex<f32>> */{
-    let shape = vol.shape();
-    let mut vol = vol.clone();
-
-    let mut planner = FftPlanner::<f32>::new();
-    let fft = planner.plan_fft_forward(shape[2]);
-
-    vol.axis_iter_mut(Axis(0)).for_each(|mut slice|{
-        slice.axis_iter_mut(Axis(1)).for_each(|mut read|{
-            fft.process(read.as_slice_mut().unwrap());
-        })
-    })
-}
-
-fn fft3_axis(vol:Array3<Complex<f32>>, axis:usize) -> Array3<Complex<f32>> {
+pub fn fft3_axis(vol:Array3<Complex<f32>>, axis:usize) -> Array3<Complex<f32>> {
     let process_order = match axis {
         0 => ([2,1,0],[2,1,0]),
         1 => ([2,0,1],[1,2,0]),
@@ -243,12 +236,18 @@ fn fft3_axis(vol:Array3<Complex<f32>>, axis:usize) -> Array3<Complex<f32>> {
             line.assign(&Array::from_vec(temp));
         })
     });
-
     // permute axes back to be consistent with input
     let vol = vol.permuted_axes(process_order.1);
     return vol;
 }
 
+pub fn fermi_filter_image(cfl_base_in:&Path,cfl_base_out:&Path,w1:f32,w2:f32) {
+    let img_vol = to_complex_volume(cfl_base_in);
+    let mut k = fft3_axis(fft3_axis(fft3_axis(img_vol,0),1),2);
+    _fermi_filter(&mut k,w1,w2);
+    let img_filt = fft3_axis(fft3_axis(fft3_axis(k,0),1),2);
+    write_cfl_vol(&img_filt,cfl_base_out);
+}
 
 fn cfl_base_decode(cfl_base:&Path) -> (PathBuf,PathBuf) {
     (cfl_base.with_extension("hdr"),cfl_base.with_extension("cfl"))
@@ -288,11 +287,6 @@ fn _fermi_filter(vol:&mut Array3<Complex<f32>>,w1:f32,w2:f32) -> &mut Array3<Com
     vol
 }
 
-pub fn fermi_filt_cfl(cfl_in:&Path,cfl_out:&Path,w1:f32,w2:f32) {
-    let mut vol = to_complex_volume(cfl_in);
-    _fermi_filter(&mut vol,w1,w2);
-    write_cfl_vol(&vol,cfl_out);
-}
 
 #[test]
 fn test_filter() {
