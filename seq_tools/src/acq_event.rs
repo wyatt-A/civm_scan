@@ -3,7 +3,7 @@ use crate::command_string::CommandString;
 use crate::rf_state::{RfState, RfStateType};
 use crate::{ppl_function, utils};
 use crate::pulse_function::{Function,FunctionParams};
-use crate::ppl::ScrollBar;
+use crate::ppl::Adjustment;
 use crate::grad_cal;
 use crate::pulse::Trapezoid;
 use crate::gradient_event::GradEvent;
@@ -139,7 +139,7 @@ impl ExecutionBlock for AcqEvent {
         );
         BlockExecution::new(cmd,post_delay_clock)
     }
-    fn block_header_adjustments(&self) -> Option<Vec<ScrollBar>> {
+    fn block_header_adjustments(&self) -> Option<Vec<Adjustment>> {
         None
     }
     fn block_constant_initialization(&self) -> Option<CommandString> {

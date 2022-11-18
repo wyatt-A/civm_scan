@@ -12,7 +12,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use crate::command_string::{CommandString, Command};
-use crate::ppl::{AVERAGES_LOOP_COUNTER_VAR, ScrollBar, VIEW_LOOP_COUNTER_VAR};
+use crate::ppl::{AVERAGES_LOOP_COUNTER_VAR, Adjustment, VIEW_LOOP_COUNTER_VAR};
 
 pub const LONG_TEMPVAL_VAR_NAME:&str = "tempval_long";
 pub const LUT_TEMPVAL_VAR_NAME_1:&str = "lut_tempval_1";
@@ -445,25 +445,25 @@ impl Matrix {
             false => None
         }
     }
-    pub fn header_declaration(&self) -> Option<Vec<ScrollBar>> {
-        let mut scrollbars = Vec::<ScrollBar>::new();
+    pub fn header_declaration(&self) -> Option<Vec<Adjustment>> {
+        let mut scrollbars = Vec::<Adjustment>::new();
         let vars = self.var_names_adj();
 
         match &self.adjustable.0 {
             true => {
-                scrollbars.push(ScrollBar::new_grad_adj(&self.label,&vars.0,1000));
+                scrollbars.push(Adjustment::new_grad_adj(&self.label, &vars.0, 20000));
             }
             false => {}
         }
         match &self.adjustable.1 {
             true => {
-                scrollbars.push(ScrollBar::new_grad_adj(&self.label,&vars.1,1000));
+                scrollbars.push(Adjustment::new_grad_adj(&self.label, &vars.1, 20000));
             }
             false => {}
         }
         match &self.adjustable.2 {
             true => {
-                scrollbars.push(ScrollBar::new_grad_adj(&self.label,&vars.2,1000));
+                scrollbars.push(Adjustment::new_grad_adj(&self.label, &vars.2, 20000));
             }
             false => {}
         }

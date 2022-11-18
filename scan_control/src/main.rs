@@ -1,11 +1,13 @@
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{thread,time};
+use std::time::SystemTime;
 use regex::Regex;
 use clap::{Parser,Arg,Subcommand};
 use glob::glob;
+use chrono::{DateTime,Local};
 
 const DIR:&str = "C:/workstation/civm_scan/vb_script";
 const STATUS_VBS:&str = "status.vbs";
@@ -41,19 +43,25 @@ pub enum Action {
     /// finds all pprs nested in the parent directory and runs them
     RunDirectory(RunDirectoryArgs),
     /// abort the scan
-    Abort
+    Abort,
+    /// Run a ppr in setup mode
+    SetupPPR(RunDirectoryArgs),
+    /// Acquire data for PPR
+    AcquirePPR(RunDirectoryArgs),
 }
 
 #[derive(clap::Args,Debug)]
 pub struct PathArgs {
-    path:String,
+    path:PathBuf,
 }
 
 #[derive(clap::Args,Debug)]
 pub struct RunDirectoryArgs {
-    path:String,
+    path:PathBuf,
     #[clap(short, long)]
-    cs_table:Option<String>
+    cs_table:Option<String>,
+    #[clap(short, long)]
+    depth_to_search:Option<u8>
 }
 
 
@@ -137,29 +145,88 @@ fn main(){
         Action::RunDirectory(args) => {
             run_directory(args)
         }
+        Action::SetupPPR(args) => {
+            setup_ppr(args);
+        }
+        Action::AcquirePPR(args) => {
+            acquire_ppr(args)
+        }
     }
+}
 
+
+fn setup_ppr(args:RunDirectoryArgs) {
+    let ppr = args.path.to_owned();
+    set_ppr(&ppr);
+    match &args.cs_table {
+        Some(table_pat) => {
+            let pat = ppr.with_file_name(format!("*{}*",table_pat));
+            let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
+            if paths.len() < 1 {
+                println!("no cs table found that matches pattern! table will not be uploaded");
+            }
+            else{
+                upload_table(&paths[0]);
+                println!("cs table uploaded");
+            }
+        }
+        None => {}
+    };
+    run_setup();
+}
+
+
+
+fn acquire_ppr(args:RunDirectoryArgs) {
+    let ppr = args.path.to_owned();
+    let mrd = ppr.with_extension("mrd");
+    set_ppr(&ppr);
+    match &args.cs_table {
+        Some(table_pat) => {
+            let pat = ppr.with_file_name(format!("*{}*",table_pat));
+            let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
+            if paths.len() < 1 {
+                println!("no cs table found that matches pattern! table will not be uploaded");
+            }
+            else{
+                upload_table(&paths[0]);
+                println!("cs table uploaded");
+            }
+        }
+        None => {}
+    };
+    set_mrd(&mrd);
+    run_acquisition();
 }
 
 
 fn run_directory(args:RunDirectoryArgs){
     let base_dir = Path::new(&args.path);
-    let depth = 1;
+
+    let depth = args.depth_to_search.unwrap_or(1);
+
     let pattern = (0..depth).map(|_| r"*\").collect::<String>();
     let pattern = format!("{}*.ppr",pattern);
 
     let pat = base_dir.join(pattern);
     let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
     let pairs:Vec<(PathBuf,PathBuf)> = paths.iter().map(|ppr| (ppr.clone(),ppr.with_extension("mrd"))).collect();
-    pairs.iter().for_each(|pair| {
-        loop {
-            match scan_status() {
-                Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => {
-                    thread::sleep(time::Duration::from_secs(1));
-                }
-                _=> break
-            }
+
+    //todo!(check for already running)
+    //todo!(move loop after run_acquisition to block next run)
+    //todo!(write a "done" file when mrd acq is complete ".ac file")
+
+    // check to make sure we are not already running something before we start
+    match scan_status() {
+        Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => {
+            println!("cannot launch new scan jobs while scan is currently running. Use abort to kill the current scan and try again");
+            return
         }
+        _=> println!("attempting to run {} ppr(s)",pairs.len())
+    }
+
+    // loop thru all pprs and run them in acq mode
+    pairs.iter().enumerate().for_each(|(index,pair)| {
         match &args.cs_table {
             Some(table_pat) => {
                 let pat = pair.0.with_file_name(format!("*{}*",table_pat));
@@ -174,57 +241,32 @@ fn run_directory(args:RunDirectoryArgs){
             }
             None => {}
         };
+        println!("running acquisition {} of {} ...",index+1,pairs.len());
         set_ppr(&pair.0);
         set_mrd(&pair.1);
         run_acquisition();
+        thread::sleep(time::Duration::from_secs(2));
+        loop { // run_acquisition() doesn't block so we have to do it manually with a loop
+            match scan_status() {
+                // block until scanning is done
+                Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => {
+                    thread::sleep(time::Duration::from_secs(2));
+                }
+                // when acq is complete, write to an ac (acq complete) file and record the date and time
+                Status::AcquisitionComplete => {
+                    let datetime: DateTime<Local> = SystemTime::now().into();
+                    let s = format!("completion_date={}", datetime.format("%Y%m%d:%T"));
+                    let mut f = File::create(pair.0.with_extension("ac")).expect("unable to create file");
+                    f.write_all(s.as_bytes()).expect("cannot write to file");
+                    break
+                }
+                _=> break
+            }
+        }
     });
+    println!("acquisition complete");
 }
 
-
-// fn main() {
-//
-//     let args = Args::parse();
-//     match args.sub_command.as_str() {
-//         "status" => {
-//             let stat = scan_status();
-//             println!("{:?}",stat);
-//             //todo!(make enum of all status' to report what's happening in english)
-//         }
-//         "set_ppr" => {
-//             let args = ArgsSetPPR::parse();
-//             let ppr_file = Path::new(&args.ppr_file);
-//             let stat = set_ppr(&ppr_file);
-//             match stat {
-//                 false => println!("failed to set ppr"),
-//                 true => {}
-//             }
-//         }
-//         "set_mrd" => {
-//             let args = ArgsSetMRD::parse();
-//             let mrd_file = Path::new(&args.mrd_file);
-//             let stat = set_mrd(&mrd_file);
-//             match stat {
-//                 false => println!("failed to set mrd"),
-//                 true => {}
-//             }
-//         }
-//         "run_setup" => {
-//             run_setup()
-//         }
-//         "run" => {
-//             run_acquisition()
-//         }
-//         "abort" => {
-//             abort()
-//         }
-//         "upload" => {
-//             let args:ArgsUpload = ArgsUpload::parse();
-//             let table_file = Path::new(&args.table_file);
-//             upload_table(table_file);
-//         }
-//         _=> println!("command not recognized")
-//     }
-// }
 
 //196095
 fn upload_table(path_to_table:&Path){
@@ -323,6 +365,7 @@ pub enum Status {
     Running,
     SetupInProgress,
     AcquisitionInProgress,
+    AcquisitionComplete,
     Aborted,
     Idle,
     Unknown
@@ -335,6 +378,7 @@ impl Status {
             5 => Aborted,
             2 => SetupInProgress,
             3 => AcquisitionInProgress,
+            4 => AcquisitionComplete,
             0 => Idle,
             _=> Unknown
         }

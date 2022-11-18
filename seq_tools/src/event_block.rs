@@ -5,7 +5,7 @@ use crate::ppl_function::MIN_DELAY_CLOCKS;
 use serde::{Serialize};
 use serde_json;
 use crate::command_string::CommandString;
-use crate::ppl::{FlatLoopStructure, ScrollBar};
+use crate::ppl::{FlatLoopStructure, Adjustment};
 use crate::utils;
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -223,8 +223,8 @@ impl EventQueue {
     pub fn flat_loop_structure(&mut self,repetitions:u32,averages:u16,rep_time:f32,acceleration:u16) -> FlatLoopStructure {
         FlatLoopStructure::new(repetitions,averages,rep_time,self,acceleration)
     }
-    pub fn ppl_user_adjustments(&self) -> Option<Vec<ScrollBar>> {
-        let mut scrollbars = Vec::<ScrollBar>::new();
+    pub fn ppl_user_adjustments(&self) -> Option<Vec<Adjustment>> {
+        let mut scrollbars = Vec::<Adjustment>::new();
         self.unique().iter().for_each(|event| {
             let adj = event.borrow().execution.block_header_adjustments();
             match adj {

@@ -213,6 +213,7 @@ impl Build for FseDti {
             rep_time: self.params.rep_time,
             base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset),
             orientation: Orientation::CivmStandard,
+            //orientation: Orientation::Ortho2,
             grad_clock: GradClock::CPS20,
             phase_unit: PhaseUnit::Min,
             view_acceleration: self.params.view_acceleration,
@@ -264,7 +265,8 @@ pub struct FseDti {
 #[derive(Clone)]
 pub struct FseDtiEvents {
         excitation: RfEvent<Hardpulse>,
-        diffusion: GradEvent<HalfSin>,
+        diffusion1: GradEvent<HalfSin>,
+        diffusion2: GradEvent<HalfSin>,
         refocus1: RfEvent<CompositeHardpulse>,
         refocus2: RfEvent<CompositeHardpulse>,
         phase_encode1: GradEvent<Trapezoid>,
@@ -288,7 +290,8 @@ struct Waveforms {
     }
 
 struct GradMatrices {
-        diffusion: Matrix,
+        diffusion1: Matrix,
+        diffusion2: Matrix,
         phase_encode1: Matrix,
         phase_encode2: Matrix,
         readout: Matrix,
@@ -410,15 +413,30 @@ impl FseDti {
 
             /* DIFFUSION */
 
-            let diffusion = match params.setup_mode {
+            // diffusion gradient corrections: this ensures that echo position doesn't change on the
+            // read channel to cause ringing artifacts in diffusion weighted images.
+            // This is depended on the physical gradient amplifiers, and as a result, the orientation
+            // of the base matrix (defined in the ppl)
+
+
+
+            let (diffusion1,diffusion2) = match params.setup_mode {
                 true =>{
                     println!("SETUP MODE ON");
-                    let diff_dacs = b_val_to_dac(DiffusionPulseShape::HalfSin,20.0,params.diff_pulse_duration,params.diff_pulse_separation,(1.0,0.0,0.0));
-                    Matrix::new_static("diffusion_mat", DacValues::new(Some(diff_dacs.0), None, None), (true, false, false), params.grad_off, &mat_count)
+                    let diff_dacs = b_val_to_dac(DiffusionPulseShape::HalfSin,0.0,params.diff_pulse_duration,params.diff_pulse_separation,(1.0,0.0,0.0));
+                    (Matrix::new_static("diffusion_mat1", DacValues::new(Some(diff_dacs.0), None, None), (true, true, true), params.grad_off, &mat_count),
+                    Matrix::new_static("diffusion_mat2", DacValues::new(Some(diff_dacs.0), None, None), (true, true, true), params.grad_off, &mat_count))
                 },
                 false =>{
                     let diff_dacs = b_val_to_dac(DiffusionPulseShape::HalfSin,params.b_value,params.diff_pulse_duration,params.diff_pulse_separation,params.b_vec);
-                    Matrix::new_static("diffusion_mat", DacValues::new(Some(diff_dacs.0), Some(diff_dacs.1), Some(diff_dacs.2)), (false, false, false), params.grad_off, &mat_count)
+
+                    // the magnitude of the second diffusion pulse needs to be reduced to avoid a shift in echo location
+                    let r_corrected = (diff_dacs.0 as f32 * 0.99905).round() as i16;
+                    let p_corrected = (diff_dacs.1 as f32 * 0.99780).round() as i16;
+                    let s_corrected = (diff_dacs.2 as f32 * 0.99975).round() as i16;
+
+                    (Matrix::new_static("diffusion_mat1", DacValues::new(Some(diff_dacs.0), Some(diff_dacs.1), Some(diff_dacs.2)), (false, false, false), params.grad_off, &mat_count),
+                    Matrix::new_static("diffusion_mat2", DacValues::new(Some(r_corrected), Some(p_corrected), Some(s_corrected)), (false, false, false), params.grad_off, &mat_count))
                 }
             };
 
@@ -427,7 +445,8 @@ impl FseDti {
 
 
             GradMatrices {
-                diffusion,
+                diffusion1,
+                diffusion2,
                 phase_encode1,
                 rewind1,
                 rewind2,
@@ -519,11 +538,18 @@ impl FseDti {
                 "readout"
             );
 
-            let diffusion = GradEvent::new(
+            let diffusion1 = GradEvent::new(
                 (Some(w.diffusion), Some(w.diffusion), Some(w.diffusion)),
-                &m.diffusion,
+                &m.diffusion1,
                 GradEventType::Blocking,
-                "diffusion"
+                "diffusion1"
+            );
+
+            let diffusion2 = GradEvent::new(
+                (Some(w.diffusion), Some(w.diffusion), Some(w.diffusion)),
+                &m.diffusion2,
+                GradEventType::Blocking,
+                "diffusion2"
             );
 
             let acquire = AcqEvent::new(
@@ -543,7 +569,8 @@ impl FseDti {
 
             FseDtiEvents {
                 excitation,
-                diffusion,
+                diffusion1,
+                diffusion2,
                 refocus1,
                 refocus2,
                 refocus3,
@@ -589,11 +616,11 @@ impl FseDti {
 
             let spoiler = Event::new(self.events.spoiler.as_reference(), After(acquire3.clone(), 0));
 
-            let diffusion2 = Event::new(self.events.diffusion.as_reference(), Before(phase_encode1.clone(), 0));
+            let diffusion2 = Event::new(self.events.diffusion2.as_reference(), Before(phase_encode1.clone(), 0));
             let c2 = diffusion2.borrow().center();
             let sep = sec_to_clock(self.params.diff_pulse_separation);
             let c1 = c2 - sep;
-            let diffusion1 = Event::new(self.events.diffusion.as_reference(), ExactFromOrigin(c1));
+            let diffusion1 = Event::new(self.events.diffusion1.as_reference(), ExactFromOrigin(c1));
             EventQueue::new(
                 &vec![
                     excitation,

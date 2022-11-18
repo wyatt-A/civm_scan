@@ -14,14 +14,16 @@ use regex::Regex;
 use seq_lib::fse_dti::FseDtiParams;
 use crate::args::{ApplySetupArgs, NewArgs, NewConfigArgs, NewDiffusionExperimentArgs};
 use std::fs::copy;
+use seq_lib::se_dti::SeDtiParams;
 
-//const SEQUENCE_LIB:&str = r"C:\\workstation\\civm_scan\\sequence_library";
+const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
 //const SEQUENCE_LIB:&str = "/home/wyatt/projects/test_data/build_test";
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
-const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
+//const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
 pub const HEADFILE_NAME:&str = "meta";
 pub const HEADFILE_EXT:&str = "txt";
-const BUILD:bool = false;
+
+const BUILD:bool = true;
 
 pub enum Sequence {
     FseDti,
@@ -58,6 +60,8 @@ impl Sequence {
     }
 }
 
+
+
 pub fn acq_dims(cfg_file:&Path) -> AcqDims {
     load_params(cfg_file).acq_dims()
 }
@@ -68,6 +72,9 @@ fn load_params(cfg_file:&Path) -> Box<dyn SequenceParameters> {
         Sequence::FseDti => {
             Box::new(FseDtiParams::load(&cfg_file))
         },
+        Sequence::SeDti => {
+            Box::new(SeDtiParams::load(&cfg_file))
+        },
         _=> panic!("not yet implemented")
     }
 }
@@ -77,6 +84,9 @@ fn load_dw_params(cfg_file:&Path) -> Box<dyn DWSequenceParameters> {
     match find_seq_name_from_config(&cfg_str) {
         Sequence::FseDti => {
             Box::new(FseDtiParams::load(&cfg_file))
+        },
+        Sequence::SeDti => {
+            Box::new(SeDtiParams::load(&cfg_file))
         },
         _=> panic!("not yet implemented")
     }
@@ -91,6 +101,9 @@ pub fn new_simulation(args:&NewArgs) {
 pub fn new(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
     let params = load_params(&cfg_file);
+    if !args.destination.exists() {
+        create_dir_all(&args.destination).expect(&format!("unable to create directory: {:?}",args.destination));
+    }
     build(params,&args.destination,BUILD);
 }
 
@@ -110,6 +123,9 @@ pub fn new_config(args:&NewConfigArgs){
     match seq {
         Sequence::FseDti => {
             FseDtiParams::write_default(&path_out);
+        },
+        Sequence::SeDti => {
+            SeDtiParams::write_default(&path_out);
         }
         _=> panic!("not yet implemented")
     }
@@ -123,6 +139,10 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
         return
     }
     let params = load_dw_params(&cfg_file);
+
+    if !args.destination.exists() {
+        create_dir_all(&args.destination).expect(&format!("unable to create directory: {:?}",args.destination));
+    }
     build_diffusion_experiment(params, &args.destination, b_table, BUILD);
 }
 
@@ -130,14 +150,14 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
 pub fn apply_setup(args:&ApplySetupArgs) {
     if args.children.is_file() {
         sync_pprs(&args.setup_ppr,&vec![args.children.clone()]);
-        if args.recursive.is_some(){
-            let r = args.recursive.unwrap();
+        if args.depth.is_some(){
+            let r = args.depth.unwrap();
             let entries = find_files(&args.children, ".ppr", r);
             sync_pprs(&args.setup_ppr,&entries);
         }
     }
     else {
-        let r = args.recursive.unwrap_or(0);
+        let r = args.depth.unwrap_or(0);
         let entries = find_files(&args.children, ".ppr", r);
         sync_pprs(&args.setup_ppr,&entries);
         println!("updating {} ppr files",entries.len());
@@ -175,7 +195,6 @@ pub fn sync_pprs(ppr_template:&Path,to_sync:&Vec<PathBuf>) {
         to_modify = update_ppr(&to_modify,&map);
         write_ppr(file,&to_modify);
     });
-
 }
 
 pub fn read_ppr(ppr_file:&Path) -> String {
@@ -191,22 +210,31 @@ pub fn write_ppr(ppr_file:&Path,ppr_string:&str) {
     f.write_all(&bytes).expect("trouble writing to file");
 }
 
-pub fn ppr_var_map(ppr_string:&str) -> Option<HashMap<String,i16>> {
-    let reg = Regex::new(r":VAR (.*?), ([-0-9]+)").expect("invalid regex");
-    let mut map = HashMap::<String,i16>::new();
+pub fn ppr_var_map(ppr_string:&str) -> Option<HashMap<String,String>> {
+    let var_reg = Regex::new(r":VAR (.*?), ([-0-9]+)").expect("invalid regex");
+
+    let freq_reg = Regex::new(r":OBSERVE_FREQUENCY").expect("invalid regex");
+
+    let mut map = HashMap::<String,String>::new();
     let mut str = ppr_string.to_owned();
     let lines:Vec<String> = str.lines().map(|s| s.to_string()).collect();
     lines.iter().for_each(|line| {
-        let captures = reg.captures(line);
+        let captures = var_reg.captures(line);
         match captures {
             Some(capture) => {
                 let cap1 = capture.get(1).expect("ppr variable not found");
                 let cap2 = capture.get(2).expect("ppr value not found");
                 let var_name = cap1.as_str().to_string();
-                let value:i16 = cap2.as_str().parse().expect("cannot parse to int16");
+                let value = cap2.as_str().to_string();
                 map.insert(var_name,value);
             },
             None => {}
+        }
+        match freq_reg.is_match(line) {
+            true => {
+                map.insert(String::from("OBSERVE_FREQUENCY"),line.clone());
+            }
+            _=> {}
         }
     });
     match map.is_empty() {
@@ -215,17 +243,28 @@ pub fn ppr_var_map(ppr_string:&str) -> Option<HashMap<String,i16>> {
     }
 }
 
-pub fn update_ppr(ppr_string:&str,var_map:&HashMap<String,i16>) -> String {
+pub fn update_ppr(ppr_string:&str,var_map:&HashMap<String,String>) -> String {
     let mut str = ppr_string.to_owned();
     var_map.iter().for_each(|(key,value)| {
         let mut lines:Vec<String> = str.lines().map(|s| s.to_string()).collect();
         lines.iter_mut().for_each(|line| {
-            let u = update_ppr_line(line,key,*value);
-            match u {
+            let u_var = update_ppr_var_line(line, key, &value);
+            match u_var {
                 Some((new_string,_)) => {
                     *line = new_string;
                 }
                 None => {}
+            }
+            match key.as_str() {
+                "OBSERVE_FREQUENCY" => {
+                    match update_ppr_freq_line(line,value.as_str()) {
+                        Some(new_line) => {
+                            *line = new_line;
+                        }
+                        None => {}
+                    }
+                }
+                _=> {}
             }
         });
         str = lines.join("\n")
@@ -233,18 +272,29 @@ pub fn update_ppr(ppr_string:&str,var_map:&HashMap<String,i16>) -> String {
     str
 }
 
-fn update_ppr_line(line:&str,var_name:&str,new_value:i16) -> Option<(String,i16)> {
+fn update_ppr_var_line(line:&str, var_name:&str, new_value:&str) -> Option<(String,String)> {
     let reg = Regex::new(&format!(":VAR {}, ([-0-9]+)",var_name)).expect("invalid regex");
     let captures = reg.captures(line);
     match captures {
         Some(capture) => {
             let cap = capture.get(1).expect("ppr value not found");
-            let old_value = cap.as_str().parse().expect("cannot parse to int16");
+            let old_value = cap.as_str().to_string();
             Some((format!(":VAR {}, {}",var_name,new_value),old_value))
         },
         None => None
     }
 }
+
+fn update_ppr_freq_line(line:&str, new_line:&str) -> Option<String> {
+    let freq_reg = Regex::new(r":OBSERVE_FREQUENCY").expect("invalid regex");
+    match freq_reg.is_match(line) {
+        true => {
+            Some(new_line.to_string())
+        }
+        _=> None
+    }
+}
+
 
 pub fn build_simulation(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
     let params = clone_box(&*sequence_params);
@@ -255,7 +305,15 @@ pub fn build_simulation(sequence_params:Box<dyn SequenceParameters>,work_dir:&Pa
 }
 
 pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
-    let params = clone_box(&*sequence_params);
+    let mut params = clone_box(&*sequence_params);
+    match params.is_cs(){
+        true =>{
+            params.set_cs_table();
+            let table = &params.cs_table().unwrap();
+            copy(table,work_dir.join("cs_table")).expect("unable to copy cs table to destination");
+        }
+        _=> {}
+    }
     let mut to_build = params.instantiate();
     create_dir_all(work_dir).expect("trouble building directory");
     to_build.ppl_export(work_dir,&params.name(),false,build);
@@ -263,13 +321,6 @@ pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bo
     let h = Headfile::new(&work_dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
     h.append(&params.acq_params().to_hash());
     to_build.param_export(&work_dir);
-    match params.is_cs(){
-        true =>{
-            let table = &params.cs_table().unwrap();
-            copy(table,work_dir.join("cs_table")).expect("unable to copy cs table to destination");
-        }
-        _=> {}
-    }
 }
 
 pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {

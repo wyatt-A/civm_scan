@@ -15,7 +15,7 @@ pub enum Action {
     NewDiffusionExperiment(NewDiffusionExperimentArgs),
     NewSetup(NewArgs),
     ApplySetup(ApplySetupArgs),
-    ListSequences
+    ListSequences,
 }
 
 #[derive(clap::Args,Debug)]
@@ -42,5 +42,5 @@ pub struct ApplySetupArgs {
     pub setup_ppr:PathBuf,
     pub children:PathBuf,
     #[clap(short, long)]
-    pub recursive:Option<u16>
+    pub depth:Option<u16>
 }

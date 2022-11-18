@@ -15,7 +15,7 @@ use std::path::Path;
 use std::process::Command;
 use std::rc::Rc;
 use crate::event_block::{Event, EventPlacementType, GradEventType, EventQueue};
-use crate::ppl::{FlatLoopStructure, CalcBlock, Header, DspRoutine, BaseFrequency, ScrollBar, PPL, Orientation, GradClock, VIEW_LOOP_COUNTER_VAR, PhaseUnit};
+use crate::ppl::{FlatLoopStructure, CalcBlock, Header, DspRoutine, BaseFrequency, Adjustment, PPL, Orientation, GradClock, VIEW_LOOP_COUNTER_VAR, PhaseUnit};
 use crate::ppl_function::acquire;
 use crate::seqframe::SeqFrame;
 
@@ -87,7 +87,7 @@ pub trait ExecutionBlock {
     // code the executes sequence events on the hardware
     fn block_execution(&self,post_delay:i32) -> BlockExecution;
     // Optional header fields for special variables
-    fn block_header_adjustments(&self) -> Option<Vec<ScrollBar>>;
+    fn block_header_adjustments(&self) -> Option<Vec<Adjustment>>;
     // constant declarations (have to be done ahead of variable inits)
     fn block_constant_initialization(&self) -> Option<CommandString>;
     // variable initializations for execution block

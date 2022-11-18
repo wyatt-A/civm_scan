@@ -9,7 +9,7 @@ use crate::execution::{ExecutionBlock, WaveformData, PlotTrace, BlockExecution, 
 use crate::ppl_function;
 use crate::pulse_function::render_function_vector;
 use crate::utils::us_to_clock;
-use crate::ppl::ScrollBar;
+use crate::ppl::Adjustment;
 use crate::seqframe::{RF_SEQ_FILE_LABEL, SeqFrame};
 
 //const TIME_BLOCK:i32 = 150; // clock cycles (100ns)
@@ -101,7 +101,7 @@ impl<RF: 'static> ExecutionBlock for RfEvent<RF> where RF:RfFrame + Clone{
     fn block_constant_initialization(&self) -> Option<CommandString> {
         None
     }
-    fn block_header_adjustments(&self) -> Option<Vec<ScrollBar>> {
+    fn block_header_adjustments(&self) -> Option<Vec<Adjustment>> {
         self.rf_state.header_declaration()
     }
     fn as_reference(&self) -> Box<dyn ExecutionBlock> {

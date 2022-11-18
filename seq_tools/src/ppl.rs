@@ -74,6 +74,8 @@ pub enum DspRoutine {
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Orientation {
     CivmStandard,
+    Ortho1,
+    Ortho2,
     Simulation
 }
 
@@ -107,6 +109,8 @@ impl Orientation {
         match self {
             Orientation::CivmStandard => (-900,0,0),
             Orientation::Simulation => (0,0,0),
+            Orientation::Ortho1 => (0,-900,0),
+            Orientation::Ortho2 => (0,0,-900),
         }
 
     }
@@ -192,7 +196,7 @@ pub struct Header {
     pub echos:u16,
     pub echo_divisor:u16,
     pub averages:u16,
-    pub user_adjustments:Option<Vec<ScrollBar>>
+    pub user_adjustments:Option<Vec<Adjustment>>
 }
 
 
@@ -448,7 +452,15 @@ impl Setup {
     }
 }
 
-pub struct ScrollBar{
+
+
+pub enum AdjustmentInterface {
+    Scrollbar,
+    Text,
+}
+
+pub struct Adjustment {
+    interface:AdjustmentInterface,
     title:String,
     title_hint:String,
     target_var:String,
@@ -458,7 +470,7 @@ pub struct ScrollBar{
     default:i16,
 }
 
-impl ScrollBar {
+impl Adjustment {
     pub fn new_rf_pow_adj(label:&str,target_var:&str,default_val:i16) -> Self {
         Self {
             title:format!("{} dac percent",label),
@@ -467,7 +479,8 @@ impl ScrollBar {
             min:0,
             max:RF_MAX_DAC,
             scale:RF_MAX_DAC as f32/100.0,
-            default:default_val
+            default:default_val,
+            interface:AdjustmentInterface::Scrollbar
         }
     }
     pub fn new_rf_phase_adj(label:&str,target_var:&str,default_val:i16) -> Self {
@@ -478,7 +491,8 @@ impl ScrollBar {
             min:-800,
             max:800,
             scale:1.0,
-            default:default_val
+            default:default_val,
+            interface:AdjustmentInterface::Scrollbar
         }
     }
     pub fn new_grad_adj(label:&str,target_var:&str,half_range:i16) -> Self {
@@ -489,12 +503,22 @@ impl ScrollBar {
             min:-half_range,
             max:half_range,
             scale:1.0,
-            default:0
+            default:0,
+            interface:AdjustmentInterface::Text
         }
     }
     fn print(&self) -> String {
-        format!("SCROLLBAR \"{}\",\"{}\",\"%.2f\",{},{},{},{},{};",
-                self.title,self.title_hint,self.min,self.max,self.default,self.scale,self.target_var,)
+        match self.interface {
+            AdjustmentInterface::Text => {
+                format!("EDITTEXT \"{}\",\"{}\",\"%.2f\",{},{},{},{},{};",
+                        self.title,self.title_hint,self.min,self.max,self.default,self.scale,self.target_var,)
+            },
+            AdjustmentInterface::Scrollbar => {
+                format!("SCROLLBAR \"{}\",\"{}\",\"%.2f\",{},{},{},{},{};",
+                        self.title,self.title_hint,self.min,self.max,self.default,self.scale,self.target_var,)
+            }
+        }
+
     }
     fn print_ppr(&self) -> String {
         format!(":VAR {}, {}",self.target_var,self.default)

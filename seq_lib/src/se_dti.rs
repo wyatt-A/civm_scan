@@ -122,8 +122,8 @@ impl DWHeadfile for SeDtiParams {
 impl Initialize for SeDtiParams {
     fn default() -> Self {
         SeDtiParams {
-            name: "fse_dti".to_string(),
-            cs_table: Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned(),
+            name: "se_dti".to_string(),
+            cs_table: Path::new(r"C:\workstation\data\petableCS_stream\stream_CS480_8x_pa18_pb54").to_owned(),
             b_value: 3000.0,
             b_vec: (1.0, 0.0, 0.0),
             fov: (19.7, 12.0, 12.0),
@@ -133,7 +133,7 @@ impl Initialize for SeDtiParams {
             rf_90_duration: 140E-6,
             rf_180_duration: 280E-6,
             diff_pulse_duration: 3.5E-3,
-            diff_pulse_separation: 4E-3,
+            diff_pulse_separation: 5E-3,
             spoil_duration: 600E-6,
             ramp_time: 140E-6,
             read_extension: 0.0,
@@ -258,7 +258,8 @@ pub struct SeDti {
 #[derive(Clone)]
 pub struct SeDtiEvents {
     excitation: RfEvent<Hardpulse>,
-    diffusion: GradEvent<HalfSin>,
+    diffusion1: GradEvent<HalfSin>,
+    diffusion2: GradEvent<HalfSin>,
     refocus1: RfEvent<CompositeHardpulse>,
     phase_encode1: GradEvent<Trapezoid>,
     readout: GradEvent<Trapezoid>,
@@ -276,7 +277,8 @@ struct Waveforms {
 }
 
 struct GradMatrices {
-    diffusion: Matrix,
+    diffusion1: Matrix,
+    diffusion2: Matrix,
     phase_encode1: Matrix,
     readout: Matrix,
     spoiler: Matrix,
@@ -355,25 +357,32 @@ impl SeDti {
         );
 
         /* DIFFUSION */
-
-        let diffusion = match params.setup_mode {
+        let (diffusion1,diffusion2) = match params.setup_mode {
             true =>{
                 println!("SETUP MODE ON");
-                let diff_dacs = b_val_to_dac(DiffusionPulseShape::HalfSin,20.0,params.diff_pulse_duration,params.diff_pulse_separation,(1.0,0.0,0.0));
-                Matrix::new_static("diffusion_mat", DacValues::new(Some(diff_dacs.0), None, None), (true, false, false), params.grad_off, &mat_count)
+                let diff_dacs = b_val_to_dac(DiffusionPulseShape::HalfSin,0.0,params.diff_pulse_duration,params.diff_pulse_separation,(1.0,0.0,0.0));
+                (Matrix::new_static("diffusion_mat1", DacValues::new(Some(diff_dacs.0), None, None), (true, true, true), params.grad_off, &mat_count),
+                 Matrix::new_static("diffusion_mat2", DacValues::new(Some(diff_dacs.0), None, None), (true, true, true), params.grad_off, &mat_count))
             },
             false =>{
                 let diff_dacs = b_val_to_dac(DiffusionPulseShape::HalfSin,params.b_value,params.diff_pulse_duration,params.diff_pulse_separation,params.b_vec);
-                Matrix::new_static("diffusion_mat", DacValues::new(Some(diff_dacs.0), Some(diff_dacs.1), Some(diff_dacs.2)), (false, false, false), params.grad_off, &mat_count)
+
+                // the magnitude of the second diffusion pulse needs to be reduced to avoid a shift in echo location
+                let r_corrected = (diff_dacs.0 as f32 * 0.99905).round() as i16;
+                let p_corrected = (diff_dacs.1 as f32 * 0.99780).round() as i16;
+                let s_corrected = (diff_dacs.2 as f32 * 0.99975).round() as i16;
+
+                (Matrix::new_static("diffusion_mat1", DacValues::new(Some(diff_dacs.0), Some(diff_dacs.1), Some(diff_dacs.2)), (false, false, false), params.grad_off, &mat_count),
+                 Matrix::new_static("diffusion_mat2", DacValues::new(Some(r_corrected), Some(p_corrected), Some(s_corrected)), (false, false, false), params.grad_off, &mat_count))
             }
         };
 
         /* SPOILER */
         let spoiler = Matrix::new_static("spoiler_mat", DacValues::new(Some(read_grad_dac), Some(read_grad_dac), Some(read_grad_dac)), non_adjustable, params.grad_off, &mat_count);
 
-
         GradMatrices {
-            diffusion,
+            diffusion1,
+            diffusion2,
             phase_encode1,
             readout,
             spoiler
@@ -415,11 +424,18 @@ impl SeDti {
             "readout"
         );
 
-        let diffusion = GradEvent::new(
+        let diffusion1 = GradEvent::new(
             (Some(w.diffusion), Some(w.diffusion), Some(w.diffusion)),
-            &m.diffusion,
+            &m.diffusion1,
             GradEventType::Blocking,
-            "diffusion"
+            "diffusion1"
+        );
+
+        let diffusion2 = GradEvent::new(
+            (Some(w.diffusion), Some(w.diffusion), Some(w.diffusion)),
+            &m.diffusion2,
+            GradEventType::Blocking,
+            "diffusion2"
         );
 
         let acquire = AcqEvent::new(
@@ -439,7 +455,8 @@ impl SeDti {
 
         SeDtiEvents {
             excitation,
-            diffusion,
+            diffusion1,
+            diffusion2,
             refocus1,
             phase_encode1,
             readout,
@@ -462,11 +479,12 @@ impl SeDti {
 
         let spoiler = Event::new(self.events.spoiler.as_reference(), After(acquire1.clone(), 0));
 
-        let diffusion2 = Event::new(self.events.diffusion.as_reference(), Before(phase_encode1.clone(), 0));
+        let diffusion2 = Event::new(self.events.diffusion2.as_reference(), Before(phase_encode1.clone(), 0));
         let c2 = diffusion2.borrow().center();
         let sep = sec_to_clock(self.params.diff_pulse_separation);
         let c1 = c2 - sep;
-        let diffusion1 = Event::new(self.events.diffusion.as_reference(), ExactFromOrigin(c1));
+        let diffusion1 = Event::new(self.events.diffusion1.as_reference(), ExactFromOrigin(c1));
+
         EventQueue::new(
             &vec![
                 excitation,

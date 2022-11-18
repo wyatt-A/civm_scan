@@ -1,6 +1,6 @@
 use crate::gradient_matrix::{LUT_INDEX_VAR_NAME, LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, LONG_TEMPVAL_VAR_NAME, DriverVar};
 use crate::command_string::{CommandString,Command};
-use crate::ppl::{ScrollBar, VIEW_LOOP_COUNTER_VAR};
+use crate::ppl::{Adjustment, VIEW_LOOP_COUNTER_VAR};
 
 #[derive(Clone,Debug)]
 pub struct RfState {
@@ -72,18 +72,18 @@ impl RfState {
             phase:phase_type,
         }
     }
-    pub fn header_declaration(&self) -> Option<Vec<ScrollBar>> {
-        let mut scrollbars = Vec::<ScrollBar>::new();
+    pub fn header_declaration(&self) -> Option<Vec<Adjustment>> {
+        let mut scrollbars = Vec::<Adjustment>::new();
         match &self.power {
             Some(RfStateType::Adjustable(init_dac,_)) => {
-                let scrollbar = ScrollBar::new_rf_pow_adj(&self.label,&self.adjust_power_var(),*init_dac);
+                let scrollbar = Adjustment::new_rf_pow_adj(&self.label, &self.adjust_power_var(), *init_dac);
                 scrollbars.push(scrollbar);
             }
             _=> {}
         };
         match &self.phase {
             RfStateType::Adjustable(init_dac,_) => {
-                let scrollbar = ScrollBar::new_rf_phase_adj(&self.label,&self.adjust_phase_var(),*init_dac);
+                let scrollbar = Adjustment::new_rf_phase_adj(&self.label, &self.adjust_phase_var(), *init_dac);
                 scrollbars.push(scrollbar);
             }
             _=> {}

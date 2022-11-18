@@ -12,7 +12,7 @@ use crate::ppl_function;
 use crate::utils;
 use crate::resource::Resource;
 use crate::gradient_matrix::MatrixDriverType::PhaseEncode;
-use crate::ppl::ScrollBar;
+use crate::ppl::Adjustment;
 use crate::seqframe::{GRAD_SEQ_FILE_LABEL, SeqFrame};
 
 const TIME_BLOCK_1:i32 = 300;
@@ -226,7 +226,7 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
         );
         BlockExecution::new(cmd,post_delay_clocks)
     }
-    fn block_header_adjustments(&self) -> Option<Vec<ScrollBar>> {
+    fn block_header_adjustments(&self) -> Option<Vec<Adjustment>> {
         self.matrix.header_declaration()
     }
     fn block_constant_initialization(&self) -> Option<CommandString> {
