@@ -157,7 +157,7 @@ pub struct DWHeadfileParams {
 
 #[derive(Clone,Serialize,Deserialize,Debug)]
 pub struct ReconHeadfile {
-    pub dti_vols:Option<i32>,
+    pub dti_vols:Option<usize>,
     pub project_code:String,
     pub civm_id:String,
     pub spec_id:String,

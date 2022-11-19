@@ -2,17 +2,18 @@
     cs_recon main is the entry point for the civm reconstruction pipeline that is using BART under
     the hood.
 */
-use std::fs::create_dir_all;
+use std::fs::{create_dir, create_dir_all};
 use std::io::{stdin, stdout, Write};
 //use recon::volume_manager::{launch_volume_manager,re_launch_volume_manager};
 //use recon::test::{main_test_cluster};
 use clap::Parser;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use recon::slurm;
+use recon::{recon_config, slurm};
+use recon::recon_config::{Config, ConfigFile, ProjectSettings, VolumeManagerConfig};
 use recon::slurm::{BatchScript, get_job_state};
-use recon::vol_manager::{VolumeManager, VolumeManagerArgs, VolumeManagerConfig};
-use recon::vol_manager::test_updated;
+use recon::vol_manager::{VolumeManager,};
+
 use utils::m_number_formatter;
 
 #[derive(clap::Parser,Debug)]
@@ -38,7 +39,7 @@ pub struct VolumeManagerCmd {
 pub enum VolumeMangerAction {
     Launch(VolumeMangerLaunchArgs),
     NewConfig(NewConfigArgs),
-    TemplateConfig(TemplateConfigArgs),
+    NewProjectTemplate(TemplateConfigArgs),
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -57,7 +58,7 @@ pub struct DtiRecon {
     /// civm id (cof,wa41 ...)
     civm_id:String,
     /// base configuration used to define recon parameters
-    base_config:PathBuf,
+    project_settings:PathBuf,
     /// run number for the collection of DTI volumes
     run_number:String,
     /// base path for the collection of DTI volumes
@@ -90,79 +91,55 @@ fn main() {
                 VolumeMangerAction::Launch(launch_cmd) => {
                     VolumeManager::launch(&launch_cmd.config_file)
                 }
-                VolumeMangerAction::TemplateConfig(args) => {
-                    VolumeManagerConfig::default().to_file(&args.output_config);
+                VolumeMangerAction::NewProjectTemplate(args) => {
+                    ProjectSettings::default().to_file(&args.output_config)
                 }
                 _=> println!("not yet implemented!")
             }
         }
         ReconAction::DtiRecon(args) => {
 
-            // load up config file
-            let template_config = VolumeManagerConfig::from_file(&args.base_config);
-            let recon_meta = template_config.recon_headfile.clone().expect("recon headfile must be defined in config for this reconstruction");
-            let n_vols = recon_meta.dti_vols.expect("number of dti_vols must be defined in config for this reconstruction");
+            let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
+            let engine_work_dir = Path::new(&bg);
+            let mut vm_configs = recon_config::VolumeManagerConfig::new_dti_config(&args.project_settings,&args.civm_id,&args.run_number,&args.specimen_id,&args.raw_data_base_dir);
 
-            // create dirs for volumes managers to live in
-            let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS is not set!");
-            let base_path = Path::new(&bg);
-            let runno_dir = base_path.join(&args.run_number).with_extension("work");
-            let m_numbers = m_number_formatter(n_vols as usize);
+            vm_configs.iter_mut().for_each(|conf| {
+                conf.vm_settings.engine_work_dir = engine_work_dir.to_owned();
+            });
 
-            let mut this_config = template_config.clone();
-            let mut this_recon_meta = recon_meta.clone();
-            // configure meta/headfile info
-            this_recon_meta.run_number = args.run_number.clone();
-            this_recon_meta.civm_id = args.civm_id.clone();
-            this_recon_meta.spec_id = args.specimen_id.clone();
-            this_config.recon_headfile = Some(this_recon_meta.clone());
+            let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
+            if !work_dir.exists() {
+                create_dir(&work_dir).expect(&format!("unable to create working directory {:?}",work_dir));
+            }
 
-            println!("before we launch the reconstruction lets review the settings ...");
-
-            let s = serde_json::to_string_pretty(&this_config).expect("cannot serialize struct");
-            println!("{}",s);
-            println!("hit enter to accept, or ^C to try again");
-            let _=stdout().flush();
-            let mut user_in = String::new();
-            stdin().read_line(&mut user_in).expect("Did not enter a correct string");
-
-            println!("configuring volume managers ...");
-            m_numbers.iter().enumerate().for_each(|(index,mnum)| {
-                let d = format!("{}_{}",&args.run_number,mnum);
-                let local_dir = runno_dir.join(&d);
-
-                if !local_dir.exists() {
-                    create_dir_all(&local_dir).expect("cannot create directory");
-                }
-
-                // general volume manager config
-                this_config.resource_dir = Some(args.raw_data_base_dir.join(mnum));
-                // configure if this volume manager is setting the image scale for the others
-                if args.scaling_volume.unwrap_or(0) as usize == index {
-                    this_config.is_scale_dependent = Some(false);
-                    this_config.is_scale_setter = Some(true);
-                    this_config.scale_hist_percent = Some(this_config.recon_settings.clone().expect("bart pics settings not defined!").image_scale_histo_percent as f32);
-                }
-                else {
-                    this_config.is_scale_dependent = Some(true);
-                }
-                let vmc = local_dir.join("volume_manager_config");
-                this_config.to_file(&vmc);
-                let vma = VolumeManagerArgs::new(&local_dir,&vmc);
-                let args_file = vma.to_file();
-
-                let vm = VolumeManager::new(&vma);
-
+            let jids:Vec<Option<u32>> = vm_configs.iter().map(|conf| {
+                let config_path = work_dir.join(conf.name());
+                create_dir_all(&config_path).expect(&format!("unable to create {:?}",config_path));
+                let conf_file = config_path.join(conf.name());
+                conf.to_file(&conf_file);
+                conf_file
+            }).map(|config|{
                 match VolumeManager::no_cluster_scheduling() {
-                    true => VolumeManager::launch(&args_file),
+                    true => {
+                        VolumeManager::launch(&config);
+                        //VolumeManager::lauch_with_srun(&config);
+                        None
+                    },
                     false => {
-                        let jid = vm.launch_with_slurm_now();
-                        let job_state = get_job_state(jid,60);
-                        println!("{} submitted... {:?}",d,job_state);
+                        Some(VolumeManager::launch_with_slurm_now(&config))
                     }
                 }
+            }).collect();
+
+            jids.iter().enumerate().for_each(|(i,j)|{
+                match j {
+                    Some(j) => {
+                        let job_state = get_job_state(*j,60);
+                        println!("{} job submitted... {:?}",vm_configs[i].name(),job_state);
+                    }
+                    None => {}
+                }
             });
-            println!("done");
         }
     }
 }

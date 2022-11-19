@@ -7,7 +7,7 @@ use std::io::{Read,Write};
 use std::path::{Path, PathBuf};
 use whoami;
 use serde_json;
-use crate::bart_wrapper::{bart_pics, BartPicsSettings};
+use crate::bart_wrapper::{bart_pics};
 //use crate::volume_manager::{VmState,VolumeManager,launch_volume_manager,launch_volume_manager_job,re_launch_volume_manager_job};
 use crate::slurm::{self,BatchScript, JobState};
 use std::process::{Command, exit};
@@ -20,62 +20,23 @@ use glob::glob;
 use clap::Parser;
 use serde_json::to_string;
 use mr_data::cfl::{self, ImageScale, write_u16_scale};
+use crate::recon_config::{ConfigFile, VolumeManagerConfig};
 
 pub const SCALE_FILENAME:&str = "volume_scale_info";
 pub const DEFAULT_HIST_PERCENT:f32 = 0.9995;
 pub const DEFAULT_IMAGE_CODE:&str = "t9";
 pub const DEFAULT_IMAGE_TAG:&str = "imx";
 
-pub fn test_updated() {
-    let work_dir = Path::new("/privateShares/wa41/N60tacos.work/m01");
-    let vmc_file = work_dir.join("vm_config");
-
-    let mut vmc  = VolumeManagerConfig::default();
-    vmc.remote_host = Some("stejskal".to_string());
-    vmc.remote_user = Some("mrs".to_string());
-    vmc.resource_dir = Some(PathBuf::from("/d/dev/221111/acq/m01"));
-    vmc.is_scale_dependent = Some(true);
-    vmc.is_scale_setter = Some(false);
-    vmc.to_file(&work_dir);
-
-    let vma = VolumeManagerArgs::new(work_dir,&vmc_file);
-    let vma_file = vma.to_file();
-
-    
-    VolumeManager::launch(&vma_file);
-    
-}
-
-#[derive(Clone,Debug,Serialize,Deserialize)]
-pub struct VolumeManagerArgs {
-    work_dir:PathBuf,
-    config:PathBuf
-}
 
 #[derive(Debug,Serialize,Deserialize)]
 pub struct VolumeManager{
-    args:VolumeManagerArgs,
-    config:VolumeManagerConfig,
-    resources:Option<VolumeManagerResources>,
+    config:PathBuf,
+    state:VolumeManagerState,
     kspace_data:Option<PathBuf>,
     image_data:Option<PathBuf>,
     image_output:Option<PathBuf>,
     image_scale:Option<f32>,
-    state:VolumeManagerState,
-}
-
-
-
-#[derive(Clone,Debug,Serialize,Deserialize)]
-pub struct VolumeManagerConfig {
-    pub resource_dir:Option<PathBuf>,
-    pub remote_user:Option<String>,
-    pub remote_host:Option<String>,
-    pub recon_headfile:Option<ReconHeadfile>,
-    pub recon_settings:Option<BartPicsSettings>,
-    pub is_scale_dependent:Option<bool>,
-    pub is_scale_setter:Option<bool>,
-    pub scale_hist_percent:Option<f32>,
+    resources:Option<VolumeManagerResources>,
 }
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -85,7 +46,6 @@ struct VolumeManagerResources {
     acq_complete:PathBuf,
     kspace_config:PathBuf,
     meta:Option<PathBuf>,
-    scaling_info:Option<PathBuf>,
 }
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -94,6 +54,7 @@ pub enum ResourceError {
     MrdNotFound,
     MrdNotComplete,
     KspaceConfigNotFound,
+    FetchError,
     Unknown,
 }
 
@@ -110,69 +71,39 @@ pub enum VolumeManagerState {
     Done,
 }
 
-impl VolumeManagerConfig {
-    pub fn from_file(file_name:&Path) -> Self {
-        let mut f = File::open(file_name).expect(&format!("unable to open {:?}",file_name));
-        let mut s = String::new();
-        f.read_to_string(&mut s).expect("cannot read file");
-        serde_json::from_str(&s).expect("cannot deserialize args")
-    }
 
-    pub fn to_file(&self,file_name:&Path) {
-        let parent = file_name.parent().unwrap();
-        if !parent.exists() {
-            create_dir_all(&parent).expect(&format!("cannot create {:?}",parent));
-        }
-        let mut f = File::create(&file_name).expect(&format!("unable to create file: {:?}", file_name));
-        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
-        f.write_all(s.as_bytes()).expect("cannot write to file");
-    }
-
-    pub fn default() -> Self {
-        Self {
-            resource_dir: None,
-            remote_user: None,
-            remote_host: None,
-            recon_headfile: Some(ReconHeadfile::default()),
-            recon_settings: Some(BartPicsSettings::default()),
-            is_scale_dependent: None,
-            is_scale_setter: None,
-            scale_hist_percent: None
+impl VolumeManager {
+    pub fn open(config:&Path) -> Self {
+        let state_file = config.with_file_name(Self::file_ext());
+        match state_file.exists() {
+            true => {
+                let t = utils::read_to_string(config,&Self::file_ext());
+                toml::from_str(&t).expect("volume manager state file is corrupt. What happened?")
+            }
+            false => {
+                Self::new(config)
+            }
         }
     }
-
-    pub fn file_name(work_dir:&Path) -> PathBuf {
-        work_dir.join("volume_manager_config")
+    pub fn config(&self) -> VolumeManagerConfig {
+        VolumeManagerConfig::from_file(&self.config)
     }
-}
-
-impl VolumeManagerArgs {
-    pub fn file_name(work_dir:&Path) -> PathBuf {
-        let vm_args_filename = "vm_args";
-        work_dir.join(vm_args_filename)
+    fn to_file(&self) {
+        let t = toml::to_string(&self).unwrap();
+        utils::write_to_file(&self.config,&Self::file_ext(),&t);
     }
-
-    pub fn to_file(&self) -> PathBuf {
-        let filename = Self::file_name(&self.work_dir);
-        let s = serde_json::to_string_pretty(&self).unwrap();
-        let mut f = File::create(&filename).unwrap();
-        f.write_all(s.as_bytes()).unwrap();
-        filename.to_owned()
+    fn file_ext() -> String {
+        String::from("vol_man")
     }
-
-    pub fn from_file(config_file:&Path) -> Self {
-        let mut f = File::open(config_file).unwrap();
-        let mut s = String::new();
-        f.read_to_string(&mut s).unwrap();
-        serde_json::from_str(&s).unwrap()
-    }
-}
-
-impl VolumeManagerArgs {
-    pub fn new(work_dir:&Path,config_file:&Path) -> Self {
+    fn new(config:&Path) -> Self {
         Self {
-            work_dir:work_dir.to_owned(),
-            config:config_file.to_owned()
+            config: config.to_owned(),
+            state: VolumeManagerState::Idle,
+            resources: None,
+            kspace_data: None,
+            image_data: None,
+            image_output: None,
+            image_scale: None
         }
     }
 }
@@ -180,68 +111,82 @@ impl VolumeManagerArgs {
 
 impl VolumeManagerResources {
 
-    // pub fn find_cs_table(work_dir:&Path) -> Option<PathBuf> {
-    //     get_first_match(work_dir,"cs_table")
-    // }
-
-    pub fn from_dir(work_dir:&Path) -> Result<Self,ResourceError> {
-        let work_dir = &Self::resource_dir(work_dir);
-        let cs_table = get_first_match(work_dir,"*cs_table").ok_or(ResourceError::CsTableNotFound)?;
-        let raw_mrd = get_first_match(work_dir,"*.mrd").ok_or(ResourceError::MrdNotFound)?;
-        let acq_complete = get_first_match(work_dir,"*.ac").ok_or(ResourceError::MrdNotComplete)?;
-        let kspace_config = get_first_match(work_dir,"*.mtk").ok_or(ResourceError::KspaceConfigNotFound)?;
-        let scaling_info = get_first_match(work_dir.parent().expect("directory has no parent"),SCALE_FILENAME);
-        let meta = get_first_match(work_dir,"meta.txt");
-        Ok(Self {
-            cs_table,
-            raw_mrd,
-            acq_complete,
-            kspace_config,
-            meta,
-            scaling_info,
-        })
-    }
-    pub fn resource_dir(work_dir:&Path) -> PathBuf {
-        let dir = work_dir.join("resources");
-        if !dir.exists() {
-            create_dir_all(&dir).expect("cannot create local resource directory");
-        }
-        dir.to_owned()
-    }
-    pub fn exist(work_dir:&Path) -> bool {
-        Self::from_dir(work_dir).is_ok()
-    }
-
-    pub fn fetch(work_dir:&Path,vmc:&VolumeManagerConfig) {
-
-        let vmc = vmc.clone();
-
-        let local = Self::resource_dir(work_dir);
-        let local = local.to_str().unwrap();
-
-        match &vmc.remote_host {
-            Some(host) => {
-                let user = vmc.remote_user.unwrap();
-                let resource_dir = vmc.resource_dir.unwrap();
-                let resource_dir = resource_dir.to_str().unwrap();
-
-                let mut cmd = Command::new("scp");
-                cmd.args(vec![
-                    format!("{}@{}:{}/*",user,host,resource_dir).as_str(),
-                    local,
-                ]);
-                let o = cmd.output().expect("failed to launch scp");
-                if !o.status.success() {
-                    println!("scp failed... we should clean up");
-                    println!("we tried to run:{:?}",cmd);
-                    println!("{}",String::from_utf8(o.stdout.clone()).unwrap());
-                }
-                else {
-                    println!("directory successfully transferred");
-                }
+    pub fn open(config:&Path) -> Result<Self,ResourceError> {
+        match Self::fetch(config) {
+            Some(res_dir) => {
+                let cs_table = get_first_match(&res_dir, "*cs_table").ok_or(ResourceError::CsTableNotFound)?;
+                let raw_mrd = get_first_match(&res_dir, "*.mrd").ok_or(ResourceError::MrdNotFound)?;
+                let acq_complete = get_first_match(&res_dir, "*.ac").ok_or(ResourceError::MrdNotComplete)?;
+                let kspace_config = get_first_match(&res_dir, "*.mtk").ok_or(ResourceError::KspaceConfigNotFound)?;
+                let meta = get_first_match(&res_dir, "meta.txt");
+                Ok(Self {
+                    cs_table,
+                    raw_mrd,
+                    acq_complete,
+                    kspace_config,
+                    meta,
+                })
             }
-            None => {
-                println!("remote hist not specified. Not fetching data");
+            None => Err(ResourceError::FetchError)
+        }
+    }
+    fn resource_dir(config:&Path) -> PathBuf {
+        let local_dir = config.with_file_name("resource");
+        if !local_dir.exists() {
+            println!("creating local dir: {:?}",local_dir);
+            create_dir_all(&local_dir).expect("cannot create local resource directory");
+        }else {
+            println!("{:?} already exists",local_dir);
+        }
+        local_dir.to_owned()
+    }
+
+    fn fetch(config:&Path) -> Option<PathBuf> {
+
+        /*
+            get settings from config (remote user,host, and data directory)
+            if local resource dir doesn't exist, create one
+            use scp to transfer remote files to resource dir
+            if scp fails, the resource dir is removed
+            return the resource directory if success, None if failed
+         */
+
+        let settings = VolumeManagerConfig::from_file(config);
+        let user = &settings.project_settings.scanner_settings.remote_user;
+        let host = &settings.project_settings.scanner_settings.remote_host;
+        let dir = &settings.vm_settings.resource_dir.join("*");
+
+        let dir_str = dir.clone().into_os_string();
+        let dir_str = dir_str.to_str().unwrap();
+
+
+        let remote_system = format!("{}@{}",user,host);
+        // maybe test remote system connection here
+
+        let local_dir = Self::resource_dir(config);
+        let local_dir_str = local_dir.clone().into_os_string();
+        let local_dir_str = local_dir_str.to_str().unwrap();
+
+        let mut scp_command = Command::new("scp");
+        scp_command.args(vec![
+            &format!("{}:{}",remote_system,dir_str),
+            &format!("{}/",local_dir_str)
+        ]);
+
+        println!("attempting to run {:?}",scp_command);
+
+        let o = scp_command.output().expect(&format!("failed to launch {:?}",scp_command));
+
+        match o.status.success() {
+            true => {
+                println!("scp successful");
+                Some(local_dir)
+            },
+            false => {
+                println!("scp failed with error:\n {}",String::from_utf8(o.stderr.clone()).unwrap_or(String::from("unknown")));
+                println!("removing resource directory ...");
+                //std::fs::remove_dir_all(&local_dir).expect("unable to clean up resource directory");
+                None
             }
         }
     }
@@ -256,87 +201,85 @@ enum StateAdvance {
 }
 
 impl VolumeManager {
-    fn image_vol(&self) -> PathBuf {
-        self.args.work_dir.join("image_vol")
-    }
-    fn kspace_vol_name(&self) -> PathBuf {
-        self.args.work_dir.join("kspace_vol")
-    }
-    fn file_name(work_dir: &Path) -> PathBuf {
-        work_dir.join("volume_manager")
-    }
-    pub fn to_file(&self) -> PathBuf {
-        let filename = Self::file_name(&self.args.work_dir);
-        let mut f = File::create(&filename).expect("cannot create file");
-        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
-        f.write_all(s.as_bytes()).expect("cannot write to file");
-        filename
-    }
-    pub fn new(vma:&VolumeManagerArgs) -> Self {
-        let config = VolumeManagerConfig::from_file(&vma.config);
-        let vm = Self {
-            args: vma.to_owned(),
-            config: config,
-            resources: None,
-            kspace_data: None,
-            image_data: None,
-            image_output: None,
-            image_scale: None,
-            state: VolumeManagerState::Idle
-        };
-        vm.to_file();
-        vm
-    }
-    pub fn from_file(work_dir: &Path) -> Option<Self> {
-        let f = File::open(Self::file_name(work_dir));
-        match f {
-            Ok(mut f) => {
-                let mut s = String::new();
-                f.read_to_string(&mut s).expect("cannot read from file");
-                Some(serde_json::from_str(&s).expect("cannot deserialize struct"))
-            }
-            Err(_) => None
-        }
-    }
-    pub fn open(args:&VolumeManagerArgs) -> Self {
-        match Self::from_file(&args.work_dir) {
-            Some(vm) => {
-                println!("loading previous volume manager");
-                vm
-            }
-            None => {
-                println!("initializing new volume manager");
-                Self::new(args)
-            }
-        }
+
+    pub fn m_number(&self) -> String {
+        let settings = self.config();
+        settings.m_number()
     }
 
-    pub fn launch_with_slurm_later(&self,seconds_later:u32) -> u32 {
-        let d = self.args.work_dir.file_name().unwrap().to_str().unwrap();
-        BatchScript::new(d,&vec![self.launch_cmd()]).submit_later(&self.args.work_dir,seconds_later)
+    pub fn work_dir(&self) -> &Path {
+        self.config.parent().expect(&format!("volume manager config has no parent {:?}",self.config))
     }
 
-    pub fn launch_with_slurm_now(&self) -> u32 {
-        let d = self.args.work_dir.file_name().unwrap().to_str().unwrap();
-        BatchScript::new(d,&vec![self.launch_cmd()]).submit_now(&self.args.work_dir)
+    pub fn scale_file(&self) -> PathBuf {
+        self.work_dir().parent().expect("volume manager work dir has no parent").join(SCALE_FILENAME)
     }
 
-    fn launch_cmd(&self) -> Command {
+    pub fn name(&self) -> String {
+        let settings = self.config();
+        settings.name()
+    }
+
+    fn kspace_file(&self) -> PathBuf {
+        self.work_dir().join(format!("{}_kspace",self.name()))
+    }
+
+    fn image_space_file(&self) -> PathBuf {
+        self.work_dir().join(format!("{}_imspace",self.name()))
+    }
+
+    fn image_dir(&self) -> PathBuf {
+        self.work_dir().join(format!("{}images",self.name()))
+    }
+
+    pub fn launch_with_slurm_later(config:&Path,seconds_later:u32) -> u32 {
+        let vm = VolumeManager::open(config);
+        BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]).submit_later(vm.work_dir(),seconds_later)
+    }
+
+    pub fn launch_with_slurm_now(config:&Path) -> u32 {
+        let vm = VolumeManager::open(config);
+        BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]).submit_now(vm.work_dir())
+    }
+
+    fn launch_cmd(config:&Path) -> Command {
         let this_exe = std::env::current_exe().expect("couldn't determine the current executable");
         let mut cmd = Command::new(this_exe);
         cmd.args(
             vec![
                 "volume-manager",
                 "launch",
-                self.args.work_dir.to_str().unwrap()
+                config.to_str().unwrap()
             ]
         );
         cmd
     }
 
+    pub fn lauch_with_srun(config:&Path) {
+
+        let this_exe = std::env::current_exe().expect("couldn't determine the current executable");
+        let this_exe = this_exe.into_os_string();
+        let this_exe = this_exe.to_str().unwrap();
+
+        let mut cmd = Command::new("srun");
+        cmd.args(
+            vec![
+                this_exe,
+                "--mem=30G",
+                "volume-manager",
+                "launch",
+                config.to_str().unwrap()
+            ]
+        );
+        println!("running {:?}",cmd);
+
+        let o = cmd.output().expect("failed to launch srun");
+        println!("{}",String::from_utf8(o.stdout).unwrap());
+    }
+
     pub fn no_cluster_scheduling() -> bool {
         // check to see if we are running sequentially or in parallel on the cluster
-        match std::env::var("CS_RECON_SEQUENTIAL").unwrap_or(String::from("no")).as_str() {
+        match std::env::var("SLURM_DISABLE").unwrap_or(String::from("no")).as_str() {
             "yes" | "y" | "true" | "1" => {
                 true
             },
@@ -344,11 +287,9 @@ impl VolumeManager {
         }
     }
 
-    pub fn launch(args:&Path) {
+    pub fn launch(config:&Path) {
 
-        let vma = VolumeManagerArgs::from_file(args);
-        let mut vm = Self::open(&vma);
-        println!("vol_man = {:?}",vm);
+        let mut vm = VolumeManager::open(config);
 
         // attempt to advance state and return a success/failure code
         // advancement either succeeds, fails, or needs to try again later
@@ -362,7 +303,7 @@ impl VolumeManager {
             match status {
                 Succeeded => continue,
                 TryingAgainLater => {
-                    vm.launch_with_slurm_later(60*2);
+                    VolumeManager::launch_with_slurm_later(config,60*2);
                     break
                 }
                 TerminalFailure => {
@@ -378,13 +319,15 @@ impl VolumeManager {
     }
 
     fn advance_state(&mut self) -> StateAdvance {
+
+        let settings = self.config();
+
         use VolumeManagerState::*;
         match &self.state {
             Idle | NeedsResources(_) => {
                 println!("gathering and checking resources ...");
                 // sync resources here
-                VolumeManagerResources::fetch(&self.args.work_dir,&self.config);
-                match VolumeManagerResources::from_dir(&self.args.work_dir) {
+                match VolumeManagerResources::open(&self.config) {
                     Ok(resources) => {
                         self.resources = Some(resources);
                         self.state = FormattingKspace;
@@ -404,8 +347,8 @@ impl VolumeManager {
                 match &self.resources {
                     Some(res) => {
                         let mtk = MrdToKspaceParams::from_file(&res.kspace_config);
-                        cs_mrd_to_kspace(&res.raw_mrd, &res.cs_table, &self.kspace_vol_name(), &mtk);
-                        self.kspace_data = Some(self.kspace_vol_name());
+                        cs_mrd_to_kspace(&res.raw_mrd, &res.cs_table, &self.kspace_file(), &mtk);
+                        self.kspace_data = Some(self.kspace_file());
                         self.state = Reconstructing;
                         StateAdvance::Succeeded
                     }
@@ -420,9 +363,9 @@ impl VolumeManager {
                 println!("reconstructing kspace ...");
                 match &self.kspace_data {
                     Some(kspace) => {
-                        let mut recon_settings = self.config.recon_settings.clone().unwrap_or(BartPicsSettings::default());
-                        bart_pics(kspace, &self.image_vol(), &mut recon_settings);
-                        self.image_data = Some(self.image_vol());
+                        let image_space = self.image_space_file();
+                        bart_pics(kspace,&image_space,&settings.project_settings.recon_settings);
+                        self.image_data = Some(image_space);
                         self.state = Filtering;
                         StateAdvance::Succeeded
                     }
@@ -434,10 +377,19 @@ impl VolumeManager {
                 }
             }
             Filtering => {
-                let image = self.image_data.clone().expect("image cfl not set");
-                cfl::fermi_filter_image(&image,&image,0.15,0.75);
-                self.state = Scaling;
-                StateAdvance::Succeeded
+                match &self.image_data {
+                    Some(image) => {
+                        let w1 = settings.project_settings.recon_settings.fermi_filter_w1;
+                        let w2 = settings.project_settings.recon_settings.fermi_filter_w2;
+                        cfl::fermi_filter_image(&image,&image,w1,w2);
+                        self.state = Scaling;
+                        StateAdvance::Succeeded
+                    }
+                    None => {
+                        println!("image data is not set. Cannot continue!");
+                        StateAdvance::TerminalFailure
+                    }
+                }
             }
             Scaling => {
                 println!("determining image scale ...");
@@ -445,11 +397,11 @@ impl VolumeManager {
                 If this volume is determining the scale of the other volumes, it will find the proper
                 scale and write it to a file in the parent directory
                  */
-                match self.config.is_scale_setter.unwrap_or(false) {
+                let scale_histo = settings.project_settings.recon_settings.image_scale_hist_percent as f64;
+                match settings.vm_settings.is_scale_setter {
                     true => {
-                        let scale_file = self.args.work_dir.parent().expect("path has no parent").join(SCALE_FILENAME);
-                        write_u16_scale(&self.image_data.clone().unwrap(), self.config.scale_hist_percent.unwrap_or(0.9995) as f64, &scale_file);
-                        let scale = ImageScale::from_file(&scale_file);
+                        write_u16_scale(&self.image_data.clone().unwrap(),scale_histo, &self.scale_file());
+                        let scale = ImageScale::from_file(&self.scale_file());
                         self.image_scale = Some(scale.scale_factor);
                         self.state = WritingImageData;
                         return StateAdvance::Succeeded
@@ -462,25 +414,24 @@ impl VolumeManager {
                  */
                 match &self.image_data {
                     Some(image) => {
-                        match self.config.is_scale_dependent.unwrap_or(false) {
+                        match settings.vm_settings.is_scale_dependent {
                             false => {
-                                let scale = cfl::find_u16_scale(image, self.config.scale_hist_percent.unwrap_or(0.9995) as f64);
+                                let scale = cfl::find_u16_scale(image,scale_histo);
                                 self.image_scale = Some(scale);
                                 self.state = WritingImageData;
                                 StateAdvance::Succeeded
                             }
                             true => {
-                                let scale_file = get_first_match(&self.args.work_dir.parent().unwrap(),SCALE_FILENAME);
-                                match &scale_file {
-                                    Some(scale_file) => {
-                                        let scale = ImageScale::from_file(scale_file);
+                                match &self.scale_file().exists() {
+                                    true => {
+                                        let scale = ImageScale::from_file(&self.scale_file());
                                         self.image_scale = Some(scale.scale_factor);
                                         self.state = WritingImageData;
                                         StateAdvance::Succeeded
                                     }
-                                    None => {
+                                    false => {
                                         // schedule to run again later
-                                        println!("scale file not yet found!");
+                                        println!("scale file not found yet. Expecting it to be {:?}",self.scale_file());
                                         match VolumeManager::no_cluster_scheduling() {
                                             false => StateAdvance::TryingAgainLater,
                                             true => StateAdvance::TerminalFailure
@@ -498,25 +449,29 @@ impl VolumeManager {
             }
             WritingImageData => {
                 println!("writing image data ...");
+                let image_dir = self.image_dir();
+                let name = self.name();
                 match self.image_scale {
                     Some(scale) => {
-                        let image_dir = self.args.work_dir.join("images");
-                        if !image_dir.exists() {
-                            create_dir_all(&image_dir).expect(&format!("cannot create dir: {:?}",image_dir));
+                        match image_dir.exists() {
+                            false => create_dir_all(&image_dir).expect(&format!("cannot create dir: {:?}",image_dir)),
+                            true => {
+                                std::fs::remove_dir_all(&self.image_dir()).expect(&format!("cannot clean up image directory {:?}",image_dir));
+                                create_dir_all(&self.image_dir()).expect(&format!("cannot create dir: {:?}",image_dir));
+                            }
                         }
-                        self.image_output = Some(image_dir.clone());
-                        let image = self.image_data.clone().expect("where did the image data go!?");
-                        let image_code = match &self.config.recon_headfile.clone() {
-                            Some(rh) => rh.image_code.clone(),
-                            None => DEFAULT_IMAGE_CODE.to_string()
-                        };
-                        let image_tag = match &self.config.recon_headfile.clone() {
-                            Some(rh) => rh.image_tag.clone(),
-                            None => DEFAULT_IMAGE_TAG.to_string()
-                        };
-                        let raw_prefix = format!("{}{}", image_code, image_tag);
-                        let vname = self.args.work_dir.file_name().unwrap().to_str().unwrap();
-                        cfl::to_civm_raw_u16(&image, &image_dir, vname, &raw_prefix, scale);
+                        match &self.image_data {
+                            Some(image) => {
+                                let code = &settings.project_settings.scanner_settings.image_code;
+                                let tag = &settings.project_settings.scanner_settings.image_tag;
+                                let raw_prefix = format!("{}{}",code,tag);
+                                let axis_inversion = (true,true,true); // flip all axes
+                                cfl::to_civm_raw_u16(&image, &image_dir, &name, &raw_prefix, scale, axis_inversion);
+                            }
+                            None => {
+                                panic!("where did the image data go!?")
+                            }
+                        }
                         self.state = WritingHeadfile;
                         StateAdvance::Succeeded
                     }
@@ -528,21 +483,31 @@ impl VolumeManager {
             }
             WritingHeadfile => {
                 println!("writing headfile ...");
+                let image_dir = self.image_dir();
+                let recon_headfile = ReconHeadfile {
+                    dti_vols: settings.project_settings.dti_vols.clone(),
+                    project_code: settings.project_settings.project_code.clone(),
+                    civm_id: settings.run_settings.civm_id.clone(),
+                    spec_id: settings.run_settings.spec_id.clone(),
+                    scanner_vendor: settings.project_settings.scanner_settings.scanner_vendor.clone(),
+                    run_number: settings.run_settings.run_number.clone(),
+                    m_number: self.m_number(),
+                    image_code: settings.project_settings.scanner_settings.image_code.clone(),
+                    image_tag: settings.project_settings.scanner_settings.image_tag.clone(),
+                    engine_work_dir: settings.vm_settings.engine_work_dir.clone()
+                };
+
+                let headfile_name = image_dir.join(self.name()).with_extension("headfile");
                 match &self.resources.clone().unwrap().meta {
                     Some(meta) => {
                         std::fs::copy(&meta, &meta.with_file_name("temp")).expect("cannot copy headfile to temp");
-                        match &self.config.recon_headfile {
-                            Some(recon_headfile) => {
-                                println!("writing to {:?}",meta.with_file_name("temp"));
-                                Headfile::open(&meta.with_file_name("temp")).append(&recon_headfile.to_hash());
-                            }
-                            None => println!("recon headfile not specified. Head file will be incomplete")
-                        }
-                        let img_dir = self.image_output.clone().expect("image directory not defined!");
-                        let vname = self.args.work_dir.file_name().unwrap().to_str().unwrap();
-                        std::fs::rename(&meta.with_file_name("temp"),img_dir.join(vname).with_extension("headfile")).expect("cannot move headfile");
+                        Headfile::open(&meta.with_file_name("temp")).append(&recon_headfile.to_hash());
+                        std::fs::rename(&meta.with_file_name("temp"),&headfile_name).expect("cannot move headfile");
                     }
-                    None => println!("meta data not found. No headfile will be written")
+                    None => {
+                        let h = Headfile::new(&headfile_name);
+                        h.append(&recon_headfile.to_hash());
+                    }
                 }
                 self.state = Done;
                 StateAdvance::Succeeded

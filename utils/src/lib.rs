@@ -7,13 +7,19 @@ pub fn m_number_formatter(n_elements:usize) -> Vec<String>{
     let formatter = |index:usize| format!("m{:0width$ }",index,width=w);
     (0..n_elements).map(|index| formatter(index)).collect()
 }
-pub fn read_to_string(filepath:&str,extension:&str) -> std::io::Result<String>{
-    let p = Path::new(filepath);
-    let p = p.with_extension(extension);
-    let mut f = File::open(p)?;
+
+pub fn m_number(index:usize,n_total:usize) -> String {
+    let w = ((n_total-1) as f32).log10().floor() as usize + 1;
+    let formatter = |index:usize| format!("m{:0width$ }",index,width=w);
+    formatter(index)
+}
+
+pub fn read_to_string(filepath:&Path,extension:&str) -> String {
+    let p = filepath.with_extension(extension);
+    let mut f = File::open(&p).expect(&format!("cannot open file {:?}",p));
     let mut s = String::new();
     f.read_to_string(&mut s).expect("trouble reading file");
-    return Ok(s);
+    s
 }
 
 pub fn write_to_file(filepath:&Path,extension:&str,string:&str){

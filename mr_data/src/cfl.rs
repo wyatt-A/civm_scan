@@ -78,14 +78,27 @@ pub fn write_cfl_header(vol:&Array3<Complex<f32>>,cfl_base:&Path) {
     hdr.write_all(hdr_str.as_bytes()).expect("a problem occurred writing to cfl header");
 }
 
-pub fn to_civm_raw_u16(cfl_base:&Path,output_dir:&Path,volume_label:&str,raw_prefix:&str,scale:f32){
+pub fn to_civm_raw_u16(cfl_base:&Path, output_dir:&Path, volume_label:&str, raw_prefix:&str, scale:f32, axis_inversion: (bool, bool, bool)){
     let (hdr,_) = cfl_base_decode(cfl_base);
     if !output_dir.exists(){
         create_dir_all(output_dir).expect("cannot crate output image directory");
     }
     let dims = get_dims(&hdr);
     if dims.len() !=3 {panic!("we don't know how to write data {}-D data!",dims.len())}
-    let mag = Array3::from_shape_vec((dims[2],dims[1],dims[0]),to_magnitude(cfl_base)).expect("raw floats cannot fit into shape");
+    let mut mag = Array3::from_shape_vec((dims[2],dims[1],dims[0]),to_magnitude(cfl_base)).expect("raw floats cannot fit into shape");
+
+    if axis_inversion.0 {
+        mag.invert_axis(Axis(0));
+    }
+
+    if axis_inversion.1 {
+        mag.invert_axis(Axis(1));
+    }
+
+    if axis_inversion.2 {
+        mag.invert_axis(Axis(2));
+    }
+
     let numel_per_img = dims[1]*dims[0];
     let mut byte_buff:Vec<u8> = vec![0;2*numel_per_img];
     println!("writing to civm_raw ...");
@@ -209,7 +222,7 @@ fn complex_vol_to_vec(vol:&Array3<Complex<f32>>) -> Vec<f32> {
     cfl_flat
 }
 
-pub fn fft3_axis(vol:Array3<Complex<f32>>, axis:usize) -> Array3<Complex<f32>> {
+pub fn fft3_axis(vol:Array3<Complex<f32>>, axis:usize,fftshift:bool) -> Array3<Complex<f32>> {
     let process_order = match axis {
         0 => ([2,1,0],[2,1,0]),
         1 => ([2,0,1],[1,2,0]),
@@ -231,7 +244,9 @@ pub fn fft3_axis(vol:Array3<Complex<f32>>, axis:usize) -> Array3<Complex<f32>> {
             fft.process(&mut temp);
             // normalize the result
             temp.iter_mut().for_each(|e| *e /= (n as f32).sqrt());
-            temp.rotate_right(n/2);
+            if fftshift {
+                temp.rotate_right(n/2);
+            }
             // assign temp back to line
             line.assign(&Array::from_vec(temp));
         })
@@ -243,9 +258,9 @@ pub fn fft3_axis(vol:Array3<Complex<f32>>, axis:usize) -> Array3<Complex<f32>> {
 
 pub fn fermi_filter_image(cfl_base_in:&Path,cfl_base_out:&Path,w1:f32,w2:f32) {
     let img_vol = to_complex_volume(cfl_base_in);
-    let mut k = fft3_axis(fft3_axis(fft3_axis(img_vol,0),1),2);
+    let mut k = fft3_axis(fft3_axis(fft3_axis(img_vol,0,true),1,true),2,true);
     _fermi_filter(&mut k,w1,w2);
-    let img_filt = fft3_axis(fft3_axis(fft3_axis(k,0),1),2);
+    let img_filt = fft3_axis(fft3_axis(fft3_axis(k,0,false),1,false),2,false);
     write_cfl_vol(&img_filt,cfl_base_out);
 }
 
@@ -254,13 +269,13 @@ fn cfl_base_decode(cfl_base:&Path) -> (PathBuf,PathBuf) {
 }
 
 fn _fermi_filter(vol:&mut Array3<Complex<f32>>,w1:f32,w2:f32) -> &mut Array3<Complex<f32>> {
-
     let dims = vol.shape();
     let max_dim = dims.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).expect("dimension vector is empty").clone() as f32;
     let fermi_t = max_dim*w1/2.0;
     let fermi_u = max_dim*w2/2.0;
     // the norm_factor ensures that the filter coefficients do not exceed 1.
     // this approach requires less computation and memory than the previous approach
+    //todo!(maybe figure out how to do this multi-threaded)
     let norm_factor = 1.0+(-fermi_u/fermi_t).exp();
 
     let dx = dims[0];
