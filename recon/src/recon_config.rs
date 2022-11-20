@@ -284,6 +284,7 @@ pub trait RemoteSystem {
         println!("enter password for user {} on {}",self.user(),self.hostname());
         let mut cmd = Command::new("ssh-copy-id");
         cmd.arg(format!("{}@{}",self.user(),self.hostname()));
+        println!("attempting to run {:?}",cmd);
         if ! cmd.output().expect("failed to launch ssh-copy-id").status.success() {
             panic!("you must resolve ssh issues. Maybe you are on a windows system? Sorry if you are");
         }
