@@ -68,6 +68,8 @@ pub enum VolumeManagerState {
     Scaling,
     WritingImageData,
     WritingHeadfile,
+    CleaningUp,
+    SendingToArchiveEngine,
     Done,
 }
 
@@ -303,7 +305,7 @@ impl VolumeManager {
             match status {
                 Succeeded => continue,
                 TryingAgainLater => {
-                    VolumeManager::launch_with_slurm_later(config,60*2);
+                    VolumeManager::launch_with_slurm_later(config,120);
                     break
                 }
                 TerminalFailure => {
@@ -326,7 +328,6 @@ impl VolumeManager {
         match &self.state {
             Idle | NeedsResources(_) => {
                 println!("gathering and checking resources ...");
-                // sync resources here
                 match VolumeManagerResources::open(&self.config) {
                     Ok(resources) => {
                         self.resources = Some(resources);
@@ -512,9 +513,30 @@ impl VolumeManager {
                 self.state = Done;
                 StateAdvance::Succeeded
             }
+
+
+            // SendingToArchiveEngine => {
+            //     println!("Sending images to {}",settings.project_settings.archive_engine_settings.remote_host);
+            //
+            //     let cmd = format!("mkidr")
+            //
+            //
+            //     let cmd = Command::new("scp")
+            //
+            //
+            // }
+            //
+            //
+            // CleaningUp => {
+            //     println!("cleaning up")
+            // }
+
             Done => {
                 println!("all work is complete.");
                 StateAdvance::AllWorkDone
+            }
+            _=> {
+                panic!("not yet implemented")
             }
         }
     }

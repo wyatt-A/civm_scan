@@ -1,3 +1,5 @@
+extern crate core;
+
 //pub mod mrd;
 //pub mod pe_table;
 //pub mod config_;

@@ -10,7 +10,7 @@ use clap::Parser;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use recon::{recon_config, slurm};
-use recon::recon_config::{Config, ConfigFile, ProjectSettings, VolumeManagerConfig};
+use recon::recon_config::{Config, ConfigFile, ProjectSettings, RemoteSystem, VolumeManagerConfig};
 use recon::slurm::{BatchScript, get_job_state};
 use recon::vol_manager::{VolumeManager,};
 
@@ -98,7 +98,15 @@ fn main() {
             }
         }
         ReconAction::DtiRecon(args) => {
-
+            // test connection to remote systems...
+            let p = ProjectSettings::from_file(&args.project_settings);
+            if !p.archive_engine_settings.test_connection() {
+                p.archive_engine_settings.copy_ssh_key();
+            }
+            if !p.scanner_settings.test_connection() {
+                p.scanner_settings.copy_ssh_key();
+            }
+            return;
             let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
             let engine_work_dir = Path::new(&bg);
             let mut vm_configs = recon_config::VolumeManagerConfig::new_dti_config(&args.project_settings,&args.civm_id,&args.run_number,&args.specimen_id,&args.raw_data_base_dir);
@@ -116,7 +124,9 @@ fn main() {
                 let config_path = work_dir.join(conf.name());
                 create_dir_all(&config_path).expect(&format!("unable to create {:?}",config_path));
                 let conf_file = config_path.join(conf.name());
-                conf.to_file(&conf_file);
+                if !conf_file.exists(){
+                    conf.to_file(&conf_file);
+                }
                 conf_file
             }).map(|config|{
                 match VolumeManager::no_cluster_scheduling() {

@@ -215,7 +215,6 @@ impl ReconHeadfile {
     }
 }
 
-
 impl AcqHeadfileParams {
     pub fn to_hash(&self) -> HashMap<String,String> {
         let mut h = HashMap::<String,String>::new();

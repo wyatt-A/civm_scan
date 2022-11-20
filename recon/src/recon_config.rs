@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use toml;
@@ -26,6 +27,16 @@ impl Config for ScannerSettings {
     }
 }
 
+impl RemoteSystem for ScannerSettings {
+    fn hostname(&self) -> String {
+        self.remote_host.clone()
+    }
+    fn user(&self) -> String {
+        self.remote_user.clone()
+    }
+}
+
+
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct ArchiveEngineSettings {
     pub remote_user:String,
@@ -42,6 +53,16 @@ impl Config for ArchiveEngineSettings {
         }
     }
 }
+
+impl RemoteSystem for ArchiveEngineSettings {
+    fn hostname(&self) -> String {
+        self.remote_host.clone()
+    }
+    fn user(&self) -> String {
+        self.remote_user.clone()
+    }
+}
+
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub enum BartPicsAlgo {
@@ -113,6 +134,7 @@ impl Config for ProjectSettings {
 }
 
 impl ConfigFile for ProjectSettings {
+
     fn to_file(&self, filename: &Path) {
         let t = toml::to_string_pretty(&self).unwrap();
         utils::write_to_file(&filename,&Self::file_ext(),&t);
@@ -124,6 +146,7 @@ impl ConfigFile for ProjectSettings {
     fn file_ext() -> String {
         String::from("project_settings")
     }
+
 }
 
 
@@ -178,6 +201,7 @@ pub struct VolumeManagerConfig {
 }
 
 impl ConfigFile for VolumeManagerConfig {
+
     fn to_file(&self, filename: &Path) {
         let t = toml::to_string_pretty(&self).unwrap();
         utils::write_to_file(filename,&Self::file_ext(),&t);
@@ -231,6 +255,30 @@ pub trait ConfigFile {
     fn to_file(&self, filename:&Path);
     fn from_file(filename:&Path) -> Self;
     fn file_ext() -> String;
+    fn exists(filename:&Path) -> bool {
+        filename.with_extension(Self::file_ext()).exists()
+    }
+}
+
+pub trait RemoteSystem {
+    fn hostname(&self) -> String;
+    fn user(&self) -> String;
+    fn test_connection(&self) -> bool {
+        println!("testing connection for user {} on {}",self.user(),self.hostname());
+        let mut cmd = Command::new("ssh");
+        cmd.arg("-o BatchMode=yes");
+        cmd.arg(format!("{}@{}",self.user(),self.hostname()));
+        cmd.arg("exit");
+        cmd.output().expect("failed to launch ssh").status.success()
+    }
+    fn copy_ssh_key(&self) {
+        println!("enter password for user {} on {}",self.user(),self.hostname());
+        let mut cmd = Command::new("ssh-copy-id");
+        cmd.arg(format!("{}@{}",self.user(),self.hostname()));
+        if ! cmd.output().expect("failed to launch ssh-copy-id").status.success() {
+            panic!("you must resolve ssh issues");
+        }
+    }
 }
 
 #[test]
