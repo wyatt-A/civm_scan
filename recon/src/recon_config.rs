@@ -264,19 +264,28 @@ pub trait RemoteSystem {
     fn hostname(&self) -> String;
     fn user(&self) -> String;
     fn test_connection(&self) -> bool {
-        println!("testing connection for user {} on {}",self.user(),self.hostname());
+        println!("testing connection for user {} on {}", self.user(), self.hostname());
         let mut cmd = Command::new("ssh");
         cmd.arg("-o BatchMode=yes");
-        cmd.arg(format!("{}@{}",self.user(),self.hostname()));
+        cmd.arg(format!("{}@{}", self.user(), self.hostname()));
         cmd.arg("exit");
-        cmd.output().expect("failed to launch ssh").status.success()
+        match cmd.output().expect("failed to launch ssh").status.success() {
+            true => {
+                println!("connection successful");
+                true
+            }
+            false => {
+                println!("passwordless connection failed for {} on {}",self.user(), self.hostname());
+                false
+            }
+        }
     }
     fn copy_ssh_key(&self) {
         println!("enter password for user {} on {}",self.user(),self.hostname());
         let mut cmd = Command::new("ssh-copy-id");
         cmd.arg(format!("{}@{}",self.user(),self.hostname()));
         if ! cmd.output().expect("failed to launch ssh-copy-id").status.success() {
-            panic!("you must resolve ssh issues");
+            panic!("you must resolve ssh issues. Maybe you are on a windows system? Sorry if you are");
         }
     }
 }
