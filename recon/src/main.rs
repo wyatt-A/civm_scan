@@ -1,7 +1,3 @@
-/*
-    cs_recon main is the entry point for the civm reconstruction pipeline that is using BART under
-    the hood.
-*/
 use std::fs::{create_dir, create_dir_all};
 use std::io::{stdin, stdout, Write};
 //use recon::volume_manager::{launch_volume_manager,re_launch_volume_manager};
@@ -13,7 +9,6 @@ use recon::{recon_config, slurm};
 use recon::recon_config::{Config, ConfigFile, ProjectSettings, RemoteSystem, VolumeManagerConfig};
 use recon::slurm::{BatchScript, get_job_state};
 use recon::vol_manager::{VolumeManager,};
-
 use utils::m_number_formatter;
 
 #[derive(clap::Parser,Debug)]
@@ -21,7 +16,6 @@ pub struct ReconArgs {
     #[command(subcommand)]
     pub action: ReconAction,
 }
-
 
 #[derive(clap::Subcommand,Debug)]
 pub enum ReconAction {
@@ -101,12 +95,11 @@ fn main() {
             // test connection to remote systems...
             let p = ProjectSettings::from_file(&args.project_settings);
             if !p.archive_engine_settings.test_connection() {
-                p.archive_engine_settings.copy_ssh_key();
+                //p.archive_engine_settings.copy_ssh_key();
             }
             if !p.scanner_settings.test_connection() {
-                p.scanner_settings.copy_ssh_key();
+                //p.scanner_settings.copy_ssh_key();
             }
-            return;
             let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
             let engine_work_dir = Path::new(&bg);
             let mut vm_configs = recon_config::VolumeManagerConfig::new_dti_config(&args.project_settings,&args.civm_id,&args.run_number,&args.specimen_id,&args.raw_data_base_dir);

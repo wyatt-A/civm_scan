@@ -275,18 +275,19 @@ pub trait RemoteSystem {
                 true
             }
             false => {
-                println!("passwordless connection failed for {} on {}", self.user(), self.hostname());
+                println!("passwordless connection failed for {} on {}.", self.user(), self.hostname());
+                println!("try  to run ssh-copy-id for {} on {} to fix the connection", self.user(), self.hostname());
                 false
             }
         }
     }
-    fn copy_ssh_key(&self) {
-        println!("enter password for user {} on {}", self.user(), self.hostname());
-        let mut cmd = Command::new("ssh-copy-id");
-        cmd.arg(format!("{}@{}", self.user(), self.hostname()));
-        println!("attempting to run {:?}", cmd);
-        let o = cmd.output().expect("failed to launch ssh-copy-id");
-    }
+    // fn copy_ssh_key(&self) {
+    //     println!("enter password for user {} on {}", self.user(), self.hostname());
+    //     let mut cmd = Command::new("ssh-copy-id");
+    //     cmd.arg(format!("{}@{}", self.user(), self.hostname()));
+    //     println!("attempting to run {:?}", cmd);
+    //     let o = cmd.output().expect("failed to launch ssh-copy-id");
+    // }
 }
 
 #[test]
