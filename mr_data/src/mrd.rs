@@ -42,7 +42,7 @@ fn test(){
 pub fn cs_mrd_to_kspace(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKspaceParams) {
     match params.mrd_format {
         MrdFormat::FseCSVol => fse_raw_to_cfl(mrd,cs_table,cfl_base,params),
-        MrdFormat::StandardCSVol => multi_echo_raw_to_cfl(mrd,cs_table,cfl_base,params),
+        MrdFormat::StandardCSVol => se_raw_to_vol(mrd,cs_table,cfl_base,params),
         _=> panic!("not yet implemented")
     }
 }
@@ -57,6 +57,13 @@ pub fn fse_raw_to_vol(mrd:&Path,cs_table:&Path,params:&MrdToKspaceParams) -> Arr
     let formatted = format_fse_raw(mrd,params.n_read,params.n_views,params.dummy_excitations);
     zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration)
 }
+
+pub fn se_raw_to_vol(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&MrdToKspaceParams){
+    let formatted = format_multi_echo_raw(mrd,params.n_read,params.n_views,params.dummy_excitations,0);
+    let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
+    cfl::write_cfl_vol(&vol,cfl_out_base_name);
+}
+
 
 fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&MrdToKspaceParams) {
     let fname = cfl_out_base_name.file_name().expect(&format!("cannot determine base name from {:?}",cfl_out_base_name)).to_str().unwrap();
