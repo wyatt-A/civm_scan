@@ -221,7 +221,7 @@ impl AcqHeadfileParams {
         let mut h = HashMap::<String,String>::new();
         h.insert(String::from("dim_X"),self.dim_x.to_string());
         h.insert(String::from("dim_Y"),self.dim_y.to_string());
-        h.insert(String::from("dim_Y"),self.dim_z.to_string());
+        h.insert(String::from("dim_Z"),self.dim_z.to_string());
         h.insert(String::from("fovx"),self.fovx_mm.to_string());
         h.insert(String::from("fovy"),self.fovy_mm.to_string());
         h.insert(String::from("fovz"),self.fovz_mm.to_string());
