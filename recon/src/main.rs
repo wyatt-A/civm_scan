@@ -157,8 +157,8 @@ fn main() {
                     },
                     false => {
                         let jid = VolumeManager::launch_with_slurm_now(&conf_file);
-                        let job_state = get_job_state(jid,60);
-                        println!("{} job submitted... {:?}",conf.name(),job_state);
+                        //let job_state = get_job_state(jid,60);
+                        println!("{} job submitted with id {}",conf.name(),jid);
                     }
                 }
             });
