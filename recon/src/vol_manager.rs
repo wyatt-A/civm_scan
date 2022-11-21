@@ -36,6 +36,7 @@ pub struct VolumeManager{
     image_output:Option<PathBuf>,
     image_scale:Option<f32>,
     resources:Option<VolumeManagerResources>,
+    slurm_job_id:Option<u32>,
 }
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -106,7 +107,8 @@ impl VolumeManager {
             kspace_data: None,
             image_data: None,
             image_output: None,
-            image_scale: None
+            image_scale: None,
+            slurm_job_id: None,
         }
     }
 }
@@ -236,13 +238,21 @@ impl VolumeManager {
     }
 
     pub fn launch_with_slurm_later(config:&Path,seconds_later:u32) -> u32 {
-        let vm = VolumeManager::open(config);
-        BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]).submit_later(vm.work_dir(),seconds_later)
+        let mut vm = VolumeManager::open(config);
+        let mut bs = BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]);
+        bs.options.partition = String::from("reconstruction");
+        let jid = bs.submit_later(vm.work_dir(),seconds_later);
+        vm.slurm_job_id = Some(jid);
+        jid
     }
 
     pub fn launch_with_slurm_now(config:&Path) -> u32 {
-        let vm = VolumeManager::open(config);
-        BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]).submit_now(vm.work_dir())
+        let mut vm = VolumeManager::open(config);
+        let mut bs = BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]);
+        bs.options.partition = String::from("reconstruction");
+        let jid = bs.submit_now(vm.work_dir());
+        vm.slurm_job_id = Some(jid);
+        jid
     }
 
     fn launch_cmd(config:&Path) -> Command {
@@ -258,7 +268,14 @@ impl VolumeManager {
         cmd
     }
 
-    pub fn lauch_with_srun(config:&Path) {
+    pub fn slurm_status(&self) -> Option<JobState> {
+        match self.slurm_job_id {
+            Some(jid) => Some(slurm::get_job_state(jid,60)),
+            None => None
+        }
+    }
+
+    pub fn launch_with_srun(config:&Path) {
 
         let this_exe = std::env::current_exe().expect("couldn't determine the current executable");
         let this_exe = this_exe.into_os_string();

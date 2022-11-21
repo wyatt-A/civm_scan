@@ -36,7 +36,6 @@ impl RemoteSystem for ScannerSettings {
     }
 }
 
-
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct ArchiveEngineSettings {
     pub remote_user:String,
@@ -62,7 +61,6 @@ impl RemoteSystem for ArchiveEngineSettings {
         self.remote_user.clone()
     }
 }
-
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub enum BartPicsAlgo {
@@ -198,6 +196,7 @@ pub struct VolumeManagerConfig {
     pub run_settings:RunSettings,
     pub project_settings:ProjectSettings,
     pub vm_settings:VolumeManagerSettings,
+    pub slurm_disabled:bool,
 }
 
 impl ConfigFile for VolumeManagerConfig {
@@ -219,7 +218,7 @@ impl ConfigFile for VolumeManagerConfig {
 }
 
 impl VolumeManagerConfig {
-    pub fn new_dti_config(project_settings:&Path,civm_id:&str,run_number:&str,spec_id:&str,resource_dir:&Path) -> Vec<Self> {
+    pub fn new_dti_config(project_settings:&Path,civm_id:&str,run_number:&str,spec_id:&str,resource_dir:&Path,slurm_disabled:bool) -> Vec<Self> {
         let p = ProjectSettings::from_file(project_settings);
         let r = RunSettings {
             run_number: run_number.to_string(),
@@ -230,10 +229,10 @@ impl VolumeManagerConfig {
         vms.iter().map(|s| VolumeManagerConfig{
             project_settings:p.clone(),
             vm_settings:s.clone(),
-            run_settings:r.clone()
+            run_settings:r.clone(),
+            slurm_disabled
         }).collect()
     }
-
 
     pub fn m_number(&self) -> String {
         let i = self.vm_settings.volume_index.unwrap_or(0);
@@ -248,7 +247,9 @@ impl VolumeManagerConfig {
     pub fn exists(filename:&Path) -> bool {
         filename.with_extension(Self::file_ext()).exists()
     }
-
+    pub fn is_slurm_disabled(&self) -> bool{
+        self.slurm_disabled
+    }
 }
 
 

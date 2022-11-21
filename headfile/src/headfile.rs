@@ -197,6 +197,7 @@ impl ReconHeadfile {
         h.insert(String::from("civm_image_code"),self.image_code.clone());
         h.insert(String::from("civm_image_source_tag"),self.image_tag.clone());
         h.insert(String::from("engine_work_directory"),self.engine_work_dir.to_str().unwrap_or("").to_string());
+        h.insert(String::from("F_imgformat"),String::from("raw"));
         h
     }
 

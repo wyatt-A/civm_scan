@@ -63,7 +63,7 @@ pub struct DtiRecon {
     scaling_volume:Option<u32>,
     /// run sequentially
     #[clap(long)]
-    sequential:Option<bool>
+    disable_slurm:Option<bool>
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -91,7 +91,12 @@ fn main() {
             ProjectSettings::default().to_file(&args.output_config)
         }
         ReconAction::Dti(args) => {
-            // test connection to remote systems...
+
+            // Where are we going to live?
+            let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
+            let engine_work_dir = Path::new(&bg);
+
+            // Test connections to scanner are archive engine
             let p = ProjectSettings::from_file(&args.project_settings);
             if !p.archive_engine_settings.test_connection() {
                 //p.archive_engine_settings.copy_ssh_key();
@@ -103,19 +108,30 @@ fn main() {
                 println!("you must fix the remote connection");
                 return
             }
-            let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
-            let engine_work_dir = Path::new(&bg);
-            let mut vm_configs = recon_config::VolumeManagerConfig::new_dti_config(&args.project_settings,&args.civm_id,&args.run_number,&args.specimen_id,&args.raw_data_base_dir);
 
+            // Generate a vector of volume manager configurations that will be operated on
+            let mut vm_configs = recon_config::VolumeManagerConfig::new_dti_config(
+                &args.project_settings,
+                &args.civm_id,
+                &args.run_number,
+                &args.specimen_id,
+                &args.raw_data_base_dir,
+                args.disable_slurm.unwrap_or(false)
+            );
+
+            // Modify the engine work dir for the configs
             vm_configs.iter_mut().for_each(|conf| {
                 conf.vm_settings.engine_work_dir = engine_work_dir.to_owned();
             });
 
+            // Make the .work directory
             let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
             if !work_dir.exists() {
                 create_dir(&work_dir).expect(&format!("unable to create working directory {:?}",work_dir));
             }
-            let jids:Vec<Option<u32>> = vm_configs.iter().map(|conf| {
+
+            // Write fresh volume manager config files if they don't already exist
+            vm_configs.iter().for_each(|conf|{
                 let config_path = work_dir.join(conf.name());
                 create_dir_all(&config_path).expect(&format!("unable to create {:?}",config_path));
                 let conf_file = config_path.join(conf.name());
@@ -128,28 +144,22 @@ fn main() {
                         conf.to_file(&conf_file);
                     }
                 }
-                conf_file
-            }).map(|config|{
-                match VolumeManager::no_cluster_scheduling() {
+            });
+
+            // launch the volume managers
+            vm_configs.iter().for_each(|conf|{
+                let config_path = work_dir.join(conf.name());
+                let conf_file = config_path.join(conf.name());
+                match conf.is_slurm_disabled() {
                     true => {
-                        println!("launching volume manager {:?}",&config);
-                        VolumeManager::launch(&config);
-                        //VolumeManager::lauch_with_srun(&config);
-                        None
+                        println!("launching volume manager without slurm {:?}",&conf_file);
+                        VolumeManager::launch(&conf_file);
                     },
                     false => {
-                        Some(VolumeManager::launch_with_slurm_now(&config))
+                        let jid = VolumeManager::launch_with_slurm_now(&conf_file);
+                        let job_state = get_job_state(jid,60);
+                        println!("{} job submitted... {:?}",conf.name(),job_state);
                     }
-                }
-            }).collect();
-
-            jids.iter().enumerate().for_each(|(i,j)|{
-                match j {
-                    Some(j) => {
-                        let job_state = get_job_state(*j,60);
-                        println!("{} job submitted... {:?}",vm_configs[i].name(),job_state);
-                    }
-                    None => {}
                 }
             });
         }
