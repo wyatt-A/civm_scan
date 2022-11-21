@@ -35,8 +35,8 @@ pub struct VolumeManager{
     image_data:Option<PathBuf>,
     image_output:Option<PathBuf>,
     image_scale:Option<f32>,
-    resources:Option<VolumeManagerResources>,
     slurm_job_id:Option<u32>,
+    resources:Option<VolumeManagerResources>,
 }
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -252,7 +252,7 @@ impl VolumeManager {
         let mut vm = VolumeManager::open(config);
         let mut bs = BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]);
         bs.options.partition = String::from("reconstruction");
-        bs.options.output = config.with_file_name("slurm").with_extension("out").into_os_string().to_str().unwrap().to_string();
+        bs.options.output = config.with_file_name("slurm-%j").with_extension("out").into_os_string().to_str().unwrap().to_string();
         let jid = bs.submit_now(vm.work_dir());
         vm.slurm_job_id = Some(jid);
         vm.to_file();
