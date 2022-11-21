@@ -77,6 +77,7 @@ impl BatchScript{
         let mut elems = Vec::<String>::new();
         elems.push(self.preamble.clone());
         elems.push(self.options.print());
+        elems.push(String::from("hostname"));
         elems.push(self.commands());
         return elems.join("\n");
     }
