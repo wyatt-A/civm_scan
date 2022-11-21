@@ -244,6 +244,7 @@ impl VolumeManager {
         bs.options.output = config.with_file_name("slurm-%j").with_extension("out").into_os_string().to_str().unwrap().to_string();
         let jid = bs.submit_later(vm.work_dir(),seconds_later);
         vm.slurm_job_id = Some(jid);
+        vm.to_file();
         jid
     }
 
@@ -254,6 +255,7 @@ impl VolumeManager {
         bs.options.output = config.with_file_name("slurm").with_extension("out").into_os_string().to_str().unwrap().to_string();
         let jid = bs.submit_now(vm.work_dir());
         vm.slurm_job_id = Some(jid);
+        vm.to_file();
         jid
     }
 
