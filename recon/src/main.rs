@@ -20,7 +20,8 @@ pub struct ReconArgs {
 #[derive(clap::Subcommand,Debug)]
 pub enum ReconAction {
     VolumeManager(VolumeManagerCmd),
-    DtiRecon(DtiRecon)
+    Dti(DtiRecon),
+    NewProjectTemplate(TemplateConfigArgs),
 }
 
 #[derive(clap::Args,Debug)]
@@ -33,7 +34,6 @@ pub struct VolumeManagerCmd {
 pub enum VolumeMangerAction {
     Launch(VolumeMangerLaunchArgs),
     NewConfig(NewConfigArgs),
-    NewProjectTemplate(TemplateConfigArgs),
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -76,7 +76,6 @@ pub struct VolumeMangerLaunchArgs {
     config_file:PathBuf
 }
 
-
 fn main() {
     let args = ReconArgs::parse();
     match args.action {
@@ -85,20 +84,24 @@ fn main() {
                 VolumeMangerAction::Launch(launch_cmd) => {
                     VolumeManager::launch(&launch_cmd.config_file)
                 }
-                VolumeMangerAction::NewProjectTemplate(args) => {
-                    ProjectSettings::default().to_file(&args.output_config)
-                }
                 _=> println!("not yet implemented!")
             }
         }
-        ReconAction::DtiRecon(args) => {
+        ReconAction::NewProjectTemplate(args) => {
+            ProjectSettings::default().to_file(&args.output_config)
+        }
+        ReconAction::Dti(args) => {
             // test connection to remote systems...
             let p = ProjectSettings::from_file(&args.project_settings);
             if !p.archive_engine_settings.test_connection() {
                 //p.archive_engine_settings.copy_ssh_key();
+                println!("you must fix the remote connection");
+                return
             }
             if !p.scanner_settings.test_connection() {
                 //p.scanner_settings.copy_ssh_key();
+                println!("you must fix the remote connection");
+                return
             }
             let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
             let engine_work_dir = Path::new(&bg);
@@ -112,18 +115,24 @@ fn main() {
             if !work_dir.exists() {
                 create_dir(&work_dir).expect(&format!("unable to create working directory {:?}",work_dir));
             }
-
             let jids:Vec<Option<u32>> = vm_configs.iter().map(|conf| {
                 let config_path = work_dir.join(conf.name());
                 create_dir_all(&config_path).expect(&format!("unable to create {:?}",config_path));
                 let conf_file = config_path.join(conf.name());
-                if !conf_file.exists(){
-                    conf.to_file(&conf_file);
+                match VolumeManagerConfig::exists(&conf_file){
+                    true => {
+                        println!("config already found. Will not re-initialize");
+                    }
+                    false => {
+                        println!("creating new configuration for volume manager {}",conf.name());
+                        conf.to_file(&conf_file);
+                    }
                 }
                 conf_file
             }).map(|config|{
                 match VolumeManager::no_cluster_scheduling() {
                     true => {
+                        println!("launching volume manager {:?}",&config);
                         VolumeManager::launch(&config);
                         //VolumeManager::lauch_with_srun(&config);
                         None

@@ -215,6 +215,7 @@ impl ConfigFile for VolumeManagerConfig {
     fn file_ext() -> String {
         String::from("volman_config")
     }
+
 }
 
 impl VolumeManagerConfig {
@@ -243,8 +244,12 @@ impl VolumeManagerConfig {
     pub fn name(&self) -> String {
         format!("{}_{}",self.run_settings.run_number,self.m_number())
     }
-}
 
+    pub fn exists(filename:&Path) -> bool {
+        filename.with_extension(Self::file_ext()).exists()
+    }
+
+}
 
 
 pub trait Config {
@@ -255,9 +260,6 @@ pub trait ConfigFile {
     fn to_file(&self, filename:&Path);
     fn from_file(filename:&Path) -> Self;
     fn file_ext() -> String;
-    fn exists(filename:&Path) -> bool {
-        filename.with_extension(Self::file_ext()).exists()
-    }
 }
 
 pub trait RemoteSystem {

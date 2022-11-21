@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use whoami;
 use serde_json;
 use crate::bart_wrapper::{bart_pics};
-//use crate::volume_manager::{VmState,VolumeManager,launch_volume_manager,launch_volume_manager_job,re_launch_volume_manager_job};
 use crate::slurm::{self,BatchScript, JobState};
 use std::process::{Command, exit};
 use seq_lib::pulse_sequence::MrdToKspaceParams;
@@ -76,13 +75,15 @@ pub enum VolumeManagerState {
 
 impl VolumeManager {
     pub fn open(config:&Path) -> Self {
-        let state_file = config.with_file_name(Self::file_ext());
+        let state_file = config.with_extension(Self::file_ext());
         match state_file.exists() {
             true => {
+                println!("state file already exists. will not overwrite ...");
                 let t = utils::read_to_string(config,&Self::file_ext());
                 toml::from_str(&t).expect("volume manager state file is corrupt. What happened?")
             }
             false => {
+                println!("state file not found. creating a new one ...");
                 Self::new(config)
             }
         }
@@ -292,6 +293,8 @@ impl VolumeManager {
     pub fn launch(config:&Path) {
 
         let mut vm = VolumeManager::open(config);
+
+        println!("loaded volume manager state: {:?}",vm);
 
         // attempt to advance state and return a success/failure code
         // advancement either succeeds, fails, or needs to try again later

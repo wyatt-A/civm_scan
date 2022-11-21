@@ -207,21 +207,3 @@ pub fn get_job_state(job_id:u32,n_tries:u16) -> JobState {
         }
     };
 }
-
-// #[test]
-// fn test(){
-//     let cmd = "scp mrs@stejskal:/d/smis/N20220811_00/_03_MGRE/mgre.mrd /home/wa41".to_string();
-//     let mut j = BatchScript::new("test_job");
-//     j.commands.push(cmd);
-//     j.options.output = "/home/wa41/test_log".to_string();
-//     println!("{}",j.print());
-//     j.submit_now("/home/wa41");
-//     for _ in 0..20{
-//         j.check_state();
-//         std::thread::sleep(std::time::Duration::from_millis(100));
-//         j.get_details();
-//         std::thread::sleep(std::time::Duration::from_millis(500));
-//     }
-//     let o = j.output();
-//     println!("output:\n{}",o);
-// }
