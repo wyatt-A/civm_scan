@@ -193,10 +193,10 @@ impl VolumeManagerSettings {
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct VolumeManagerConfig {
+    pub slurm_disabled:bool,
     pub run_settings:RunSettings,
     pub project_settings:ProjectSettings,
     pub vm_settings:VolumeManagerSettings,
-    pub slurm_disabled:bool,
 }
 
 impl ConfigFile for VolumeManagerConfig {
