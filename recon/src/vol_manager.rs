@@ -547,7 +547,8 @@ impl VolumeManager {
                 let p = settings.project_settings.archive_engine_settings.base_dir();
                 let runno_dir = p.join(self.name());
                 let runno_dir = runno_dir.to_str().unwrap();
-                mkdir.arg(format!("{}@{} mkdir -p {}",u,h,runno_dir));
+                mkdir.arg(format!("{}@{}",u,h));
+                mkdir.arg(format!("mkdir -p {}",runno_dir));
 
                 let mut scp = Command::new("scp");
                 scp.arg("-r");
