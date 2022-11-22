@@ -357,7 +357,7 @@ impl VolumeManager {
                     },
                     Err(e) => {
                         self.state = NeedsResources(e);
-                        match VolumeManager::no_cluster_scheduling() {
+                        match settings.is_slurm_disabled() {
                             false => StateAdvance::TryingAgainLater,
                             true => StateAdvance::TerminalFailure
                         }
@@ -454,7 +454,7 @@ impl VolumeManager {
                                     false => {
                                         // schedule to run again later
                                         println!("scale file not found yet. Expecting it to be {:?}",self.scale_file());
-                                        match VolumeManager::no_cluster_scheduling() {
+                                        match settings.is_slurm_disabled() {
                                             false => StateAdvance::TryingAgainLater,
                                             true => StateAdvance::TerminalFailure
                                         }
@@ -566,7 +566,7 @@ impl VolumeManager {
                 //     }
                 // }
 
-                
+
                 StateAdvance::TerminalFailure
 
             }
