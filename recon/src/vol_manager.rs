@@ -541,37 +541,40 @@ impl VolumeManager {
             SendingToArchiveEngine => {
                 println!("sending to archive engine ...");
                 // connect to system and make the volume directory
-                let mut cmd = Command::new("ssh");
+                let mut mkdir = Command::new("ssh");
                 let u = settings.project_settings.archive_engine_settings.user();
                 let h = settings.project_settings.archive_engine_settings.hostname();
                 let p = settings.project_settings.archive_engine_settings.base_dir();
                 let runno_dir = p.join(self.name());
                 let runno_dir = runno_dir.to_str().unwrap();
+                mkdir.arg(format!("{}@{} mkdir -p {}",u,h,runno_dir));
 
                 let mut scp = Command::new("scp");
                 scp.arg("-r");
                 scp.arg(self.image_dir().to_str().unwrap());
                 scp.arg(&format!("{}@{}:{}",u,h,runno_dir));
 
-                let args = format!("{}@{} mkdir -p {}",u,h,runno_dir);
-                let o = cmd.arg(args).output().expect("failed to launch ssh");
-
-                println!("attempting to run {:?}",cmd);
-                println!("attempting to run {:?}",scp);
-
-                // match o.status.success(){
-                //     false => {
-                //         println!("unable to create runno directory on {}",settings.project_settings.archive_engine_settings.hostname());
-                //         StateAdvance::TerminalFailure
-                //     }
-                //     true => {
-                //
-                //     }
-                // }
-
-
-                StateAdvance::TerminalFailure
-
+                let mkdir_o = mkdir.output().expect("cannot launch ssh");
+                match mkdir_o.status.success() {
+                    true => {
+                        let o = scp.output().expect("failed to launch scp");
+                        match o.status.success() {
+                            true => {
+                                println!("scp successful");
+                                self.state = VolumeManagerState::Done;
+                                StateAdvance::Succeeded
+                            }
+                            false => {
+                                println!("unable to transfer files with {:?}",scp);
+                                StateAdvance::TerminalFailure
+                            }
+                        }
+                    }
+                    false => {
+                        println!("cannot create directory on archive engine to transfer images. The command was {:?}",mkdir);
+                        StateAdvance::TerminalFailure
+                    }
+                }
             }
 
             // SendingToArchiveEngine => {
