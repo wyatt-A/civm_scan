@@ -13,7 +13,7 @@ use std::process::{Command, exit};
 use seq_lib::pulse_sequence::MrdToKspaceParams;
 //use crate::config::{ProjectSettings, Recon};
 use mr_data::mrd::{fse_raw_to_cfl, cs_mrd_to_kspace};
-use headfile::headfile::{ReconHeadfile, Headfile};
+use headfile::headfile::{ReconHeadfile, Headfile, DirParam};
 use acquire::build::{HEADFILE_NAME,HEADFILE_EXT};
 use glob::glob;
 use clap::Parser;
@@ -508,19 +508,20 @@ impl VolumeManager {
             }
             WritingHeadfile => {
                 println!("writing headfile ...");
-                let image_dir = self.image_dir();
-                let recon_headfile = ReconHeadfile {
-                    dti_vols: settings.project_settings.dti_vols.clone(),
-                    project_code: settings.project_settings.project_code.clone(),
-                    civm_id: settings.run_settings.civm_id.clone(),
+                let recon_headfile = ReconHeadfile{
                     spec_id: settings.run_settings.spec_id.clone(),
-                    scanner_vendor: settings.project_settings.scanner_settings.scanner_vendor.clone(),
-                    run_number: settings.run_settings.run_number.clone(),
-                    m_number: self.m_number(),
-                    image_code: settings.project_settings.scanner_settings.image_code.clone(),
-                    image_tag: settings.project_settings.scanner_settings.image_tag.clone(),
-                    engine_work_dir: settings.vm_settings.engine_work_dir.clone()
+                    civmid: settings.run_settings.civm_id.clone(),
+                    project_code:settings.project_settings.project_code.clone(),
+                    dti_vols: settings.project_settings.dti_vols.clone(),
+                    scanner_vendor:settings.project_settings.scanner_settings.scanner_vendor.clone(),
+                    run_number:settings.run_settings.run_number.clone(),
+                    m_number:settings.m_number(),
+                    image_code:settings.project_settings.scanner_settings.image_code.clone(),
+                    image_tag:settings.project_settings.scanner_settings.image_tag.clone(),
+                    engine_work_dir: settings.vm_settings.engine_work_dir.clone(),
+                    more_archive_info: settings.project_settings.archive_info.clone()
                 };
+                let image_dir = self.image_dir();
 
                 let headfile_name = image_dir.join(self.name()).with_extension("headfile");
                 match &self.resources.clone().unwrap().meta {

@@ -1,8 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{Read, Write};
+use std::ops::Index;
 use std::path::{Path,PathBuf};
 use serde::{Deserialize, Serialize};
+use regex::Regex;
 
 pub struct Headfile{
     file:PathBuf
@@ -157,47 +159,205 @@ pub struct DWHeadfileParams {
 
 #[derive(Clone,Serialize,Deserialize,Debug)]
 pub struct ReconHeadfile {
+    pub spec_id: String,
+    pub civmid: String,
+    pub project_code: String,
     pub dti_vols:Option<usize>,
-    pub project_code:String,
-    pub civm_id:String,
-    pub spec_id:String,
     pub scanner_vendor:String,
     pub run_number:String,
     pub m_number:String,
     pub image_code:String,
     pub image_tag:String,
     pub engine_work_dir:PathBuf,
+    pub more_archive_info:ArchiveInfo
 }
+
+
+
+// specid=211001-30:1
+// civmid=wa41
+// code=18.abb.11
+
+
+
+
+// Dir params required for successful archival of data.
+// They need to be validated before sending them off to the archive engine
+
+
+
+#[derive(Clone,Serialize,Deserialize,Debug)]
+pub struct ArchiveInfo {
+    pub coil:String,
+    pub nucleus:String,
+    pub species:String,
+    pub state:String,
+    pub orient:String,
+    pub type_:String,
+    pub focus:String,
+    pub rplane:String,
+    pub xmit:String,
+    pub optional:String,
+    pub status:String,
+}
+
+impl ArchiveInfo {
+    pub fn default() -> Self {
+        Self {
+            coil: String::from("9T_so13"),
+            nucleus: String::from("H"),
+            species: String::from("mouse"),
+            state: String::from("ex vivo"),
+            orient: String::from("NA"),
+            type_: String::from("brain"),
+            focus: String::from("whole"),
+            rplane: String::from("cor"),
+            xmit: String::from("0"),
+            optional: String::from(""),
+            status: String::from("ok")
+        }
+    }
+
+    pub fn to_hash(&self) -> HashMap<String,String> {
+        let mut h = HashMap::new();
+        h.insert(String::from("U_coil"),self.coil.clone());
+        h.insert(String::from("U_nucleus"),self.nucleus.clone());
+        h.insert(String::from("U_species"),self.species.clone());
+        h.insert(String::from("U_state"),self.state.clone());
+        h.insert(String::from("U_orient"),self.orient.clone());
+        h.insert(String::from("U_type"),self.type_.clone());
+        h.insert(String::from("U_focus"),self.focus.clone());
+        h.insert(String::from("U_rplane"),self.rplane.clone());
+        h.insert(String::from("U_xmit"),self.xmit.clone());
+        h.insert(String::from("U_status"),self.status.clone());
+        h
+    }
+
+    // need to run a check on this information to ensure it is correct
+    pub fn is_valid(&self,project_code:&str,civm_user:&str) -> bool {
+
+        let mut is_valid = true;
+
+        //todo!(implement correctness check)
+        //$WKS_SETTINGS/recon_menu.txt
+        let workstation_settings = std::env::var("WKS_SETTINGS").expect("WKS_SETTINGS not set!");
+        let filepath = Path::new(&workstation_settings).join("recon_menu.txt");
+        let mut f = File::open(&filepath).expect(&format!("cannot open file! {:?}",filepath));
+
+        let mut txt = String::new();
+        f.read_to_string(&mut txt).expect("trouble reading file");
+
+        println!("{}",txt);
+
+
+        // each line is either a menu type or a valid menu option
+        // igonore if the line begins with #
+
+
+        let r1 = Regex::new(r"ALLMENUTYPES;(\w+)").expect("invalid regex!");
+        let r2 = Regex::new(r"^(.*?);").expect("invalid regex!");
+        let r3 = Regex::new(r"MENUTYPE;(\w+)").expect("invalid regex!");
+
+        // menu field -> menu item -> scanners for menu item
+        let mut h = HashMap::<String,HashSet<String>>::new();
+
+        let mut last_field = String::new();
+
+        txt.lines().for_each(|line|{
+            if !line.starts_with("#") && !r1.is_match(line){
+                let c = r3.captures(line);
+                match c {
+                    Some(capture) =>{
+                        let m = capture.get(1).unwrap();
+                        last_field = m.as_str().to_string();
+                        println!("last_field = {}",last_field);
+                        h.insert(last_field.clone(),HashSet::<String>::new());
+                    }
+                    None => {
+                        let c = r2.captures(line).expect(&format!("unknown format!{}",line));
+                        let m = c.get(1).expect("capture group not found");
+                        h.get_mut(&last_field).unwrap().insert(m.as_str().to_string());
+                    }
+                }
+            }
+        });
+
+        // check that recognized fields have valid entries
+        let mut h2 = self.to_hash();
+        h2.insert(String::from("U_code"),project_code.to_string());
+        h2.insert(String::from("U_civmid"),civm_user.to_string());
+        h2.iter().for_each(|(key,val)|{
+            let t = key.replace("U_","");
+            match h.get(&t) {
+                Some(set) => {
+                    match &set.contains(val) {
+                        false => {
+                            println!("{} is not a valid entry for {}.",val,t);
+                            is_valid = false;
+                        }
+                        _=> {}
+                    }
+                }
+                None => {}
+            }
+        });
+
+        // check that all non-empty fields are present
+        h.iter().for_each(|(key,val)|{
+            if !val.is_empty(){
+                if !h2.contains_key(&format!("U_{}",key)){
+                    println!("{} is not present in meta-data struct",key);
+                    is_valid = false;
+                }
+            }
+        });
+        is_valid
+    }
+}
+
+// coil=9T_So13
+// nucleus=H
+// species=mouse
+// state=ex vivo
+// orient=NA
+// type=brain
+// focus=whole
+// rplane=cor
+// xmit=0
+// optional=
+// status=ok
 
 impl ReconHeadfile {
 
     pub fn default() -> Self {
         Self {
+            spec_id: String::from("mr_tacos"),
+            civmid: String::from("wa41"),
+            project_code: String::from("00.project.00"),
             dti_vols: Some(1),
-            project_code: "00.project.00".to_string(),
-            civm_id: "wa41".to_string(),
-            spec_id: "mr_tacos".to_string(),
             scanner_vendor: "mrsolutions".to_string(),
             run_number: "N60tacos".to_string(),
             m_number: "m00".to_string(),
             image_code: "t9".to_string(),
             image_tag: "imx".to_string(),
-            engine_work_dir: PathBuf::from(std::env::var("BIGGUS_DISKUS").expect("biggus diskus not set!"))
+            engine_work_dir: PathBuf::from(std::env::var("BIGGUS_DISKUS").expect("biggus diskus not set!")),
+            more_archive_info:ArchiveInfo::default()
         }
     }
 
     pub fn to_hash(&self) -> HashMap<String,String> {
         let mut h = HashMap::<String,String>::new();
-        h.insert(String::from("dti_vols"),self.dti_vols.unwrap_or(0).to_string());
-        h.insert(String::from("U_code"),self.project_code.clone());
-        h.insert(String::from("U_civmid"),self.civm_id.clone());
         h.insert(String::from("U_specid"),self.spec_id.clone());
+        h.insert(String::from("U_civmid"),self.civmid.clone());
+        h.insert(String::from("U_code"),self.project_code.clone());
+        h.insert(String::from("dti_vols"),self.dti_vols.unwrap_or(0).to_string());
         h.insert(String::from("scanner_vendor"),self.scanner_vendor.clone());
         h.insert(String::from("U_runno"),format!("{}_{}",self.run_number.clone(),self.m_number.clone()));
         h.insert(String::from("civm_image_code"),self.image_code.clone());
         h.insert(String::from("civm_image_source_tag"),self.image_tag.clone());
         h.insert(String::from("engine_work_directory"),self.engine_work_dir.to_str().unwrap_or("").to_string());
         h.insert(String::from("F_imgformat"),String::from("raw"));
+        h.extend(self.more_archive_info.to_hash());
         h
     }
 
@@ -242,4 +402,13 @@ impl DWHeadfileParams {
         h.insert(String::from("bvalue"),self.bvalue.to_string());
         h
     }
+}
+
+
+#[test]
+fn test(){
+    let a = ArchiveInfo::default();
+
+    println!("archive info is {}",a.is_valid("20.5xfad.01","wa41"));
+
 }

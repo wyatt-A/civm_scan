@@ -5,6 +5,7 @@ use std::io::{stdin, stdout, Write};
 use clap::Parser;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use headfile::headfile::DirParam;
 use recon::{recon_config, slurm};
 use recon::recon_config::{Config, ConfigFile, ProjectSettings, RemoteSystem, VolumeManagerConfig};
 use recon::slurm::{BatchScript, get_job_state};
@@ -96,8 +97,18 @@ fn main() {
             let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
             let engine_work_dir = Path::new(&bg);
 
-            // Test connections to scanner are archive engine
+            // Test connections to scanner and archive engine
             let p = ProjectSettings::from_file(&args.project_settings);
+
+            // validate project settings
+            let dir_param = DirParam::default(
+                &args.specimen_id,
+                &args.civm_id,
+                &p.project_code
+            );
+
+
+
             if !p.archive_engine_settings.test_connection() {
                 //p.archive_engine_settings.copy_ssh_key();
                 println!("you must fix the remote connection");

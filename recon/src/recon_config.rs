@@ -5,6 +5,50 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use toml;
+use headfile::headfile::ArchiveInfo;
+
+// trustworth workstation variables
+// WORKSATION_HOME
+// WORKSTATION_DATA
+// WKS_BIN
+// WKS_SETTINGS
+
+
+// validate_headfile -g -h  /privateShares/wa41/DummyRunno.work/DummyRunno_m00/DummyRunno_m00images/*headfile
+
+
+//todo!(pick on engine naming conventions)
+//todo!(use workstation variables)
+//todo!()
+
+
+// config checking
+//
+//$WKS_SETTINGS/recon_menu.txt
+
+// dir_param file struct
+
+// specid=211001-30:1
+// civmid=wa41
+// code=18.abb.11
+// coil=9T_So13
+// nucleus=H
+// species=mouse
+// state=ex vivo
+// orient=NA
+// type=brain
+// focus=whole
+// rplane=cor
+// xmit=0
+// optional=
+// status=ok
+
+
+// look for these in a "compelte headifle"
+// hf
+// date (one of these is important)
+
+
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct ScannerSettings {
@@ -116,10 +160,13 @@ impl Config for ReconSettings {
     }
 }
 
+
+
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct ProjectSettings {
     pub project_code:String,
     pub dti_vols:Option<usize>,
+    pub archive_info: ArchiveInfo,
     pub recon_settings:ReconSettings,
     pub scanner_settings:ScannerSettings,
     pub archive_engine_settings:ArchiveEngineSettings,
@@ -130,6 +177,7 @@ impl Config for ProjectSettings {
         Self {
             project_code: String::from("20.5xfad.01"),
             dti_vols: Some(67),
+            archive_info: ArchiveInfo::default(),
             recon_settings: ReconSettings::default(),
             scanner_settings: ScannerSettings::default(),
             archive_engine_settings: ArchiveEngineSettings::default(),
