@@ -43,6 +43,12 @@ pub struct ArchiveEngineSettings {
     pub base_dir:PathBuf,
 }
 
+impl ArchiveEngineSettings {
+    pub fn base_dir(&self) -> PathBuf {
+        self.base_dir.clone()
+    }
+}
+
 impl Config for ArchiveEngineSettings {
     fn default() -> Self {
         Self {

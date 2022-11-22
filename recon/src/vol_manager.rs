@@ -19,7 +19,7 @@ use glob::glob;
 use clap::Parser;
 use serde_json::to_string;
 use mr_data::cfl::{self, ImageScale, write_u16_scale};
-use crate::recon_config::{ConfigFile, VolumeManagerConfig};
+use crate::recon_config::{ConfigFile, RemoteSystem, VolumeManagerConfig};
 
 pub const SCALE_FILENAME:&str = "volume_scale_info";
 pub const DEFAULT_HIST_PERCENT:f32 = 0.9995;
@@ -147,7 +147,6 @@ impl VolumeManagerResources {
     }
 
     fn fetch(config:&Path) -> Option<PathBuf> {
-
         /*
             get settings from config (remote user,host, and data directory)
             if local resource dir doesn't exist, create one
@@ -155,7 +154,6 @@ impl VolumeManagerResources {
             if scp fails, the resource dir is removed
             return the resource directory if success, None if failed
          */
-
         let settings = VolumeManagerConfig::from_file(config);
         let user = &settings.project_settings.scanner_settings.remote_user;
         let host = &settings.project_settings.scanner_settings.remote_host;
@@ -163,7 +161,6 @@ impl VolumeManagerResources {
 
         let dir_str = dir.clone().into_os_string();
         let dir_str = dir_str.to_str().unwrap();
-
 
         let remote_system = format!("{}@{}",user,host);
         // maybe test remote system connection here
@@ -538,6 +535,40 @@ impl VolumeManager {
                 StateAdvance::Succeeded
             }
 
+            SendingToArchiveEngine => {
+                println!("sending to archive engine ...");
+                // connect to system and make the volume directory
+                let mut cmd = Command::new("ssh");
+                let u = settings.project_settings.archive_engine_settings.user();
+                let h = settings.project_settings.archive_engine_settings.hostname();
+                let p = settings.project_settings.archive_engine_settings.base_dir();
+                let runno_dir = p.join(self.name());
+                let runno_dir = runno_dir.to_str().unwrap();
+
+                let mut scp = Command::new("scp");
+                scp.arg("-r");
+                scp.arg(self.image_dir().to_str().unwrap());
+                scp.arg(&format!("{}@{}:{}",u,h,runno_dir));
+
+                let args = format!("{}@{} mkdir -p {}",u,h,runno_dir);
+                let o = cmd.arg(args).output().expect("failed to launch ssh");
+
+                println!("attempting to run {:?}",cmd);
+                println!("attempting to run {:?}",scp);
+
+                // match o.status.success(){
+                //     false => {
+                //         println!("unable to create runno directory on {}",settings.project_settings.archive_engine_settings.hostname());
+                //         StateAdvance::TerminalFailure
+                //     }
+                //     true => {
+                //
+                //     }
+                // }
+
+                StateAdvance::TerminalFailure
+
+            }
 
             // SendingToArchiveEngine => {
             //     println!("Sending images to {}",settings.project_settings.archive_engine_settings.remote_host);
