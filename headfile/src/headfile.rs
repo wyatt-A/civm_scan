@@ -204,7 +204,7 @@ pub struct ArchiveInfo {
 impl ArchiveInfo {
     pub fn default() -> Self {
         Self {
-            coil: String::from("9T_so13"),
+            coil: String::from("9T_So13"),
             nucleus: String::from("H"),
             species: String::from("mouse"),
             state: String::from("ex vivo"),
@@ -270,7 +270,6 @@ impl ArchiveInfo {
                     Some(capture) =>{
                         let m = capture.get(1).unwrap();
                         last_field = m.as_str().to_string();
-                        println!("last_field = {}",last_field);
                         h.insert(last_field.clone(),HashSet::<String>::new());
                     }
                     None => {

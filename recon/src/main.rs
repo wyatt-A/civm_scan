@@ -100,14 +100,10 @@ fn main() {
             // Test connections to scanner and archive engine
             let p = ProjectSettings::from_file(&args.project_settings);
 
-            // validate project settings
-            let dir_param = DirParam::default(
-                &args.specimen_id,
-                &args.civm_id,
-                &p.project_code
-            );
-
-
+            if !p.archive_info.is_valid(&p.project_code,&args.civm_id) {
+                println!("meta-data is incorrect for archiving. We can't continue.");
+                return
+            }
 
             if !p.archive_engine_settings.test_connection() {
                 //p.archive_engine_settings.copy_ssh_key();
