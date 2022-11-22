@@ -331,6 +331,9 @@ impl VolumeManager {
                 }
                 TerminalFailure => {
                     println!("volume manager cannot continue. Will not reschedule.");
+                    if vm.config().is_slurm_disabled() {
+                        panic!("cannot continue with any remaining volume managers");
+                    }
                     break
                 },
                 AllWorkDone => {
