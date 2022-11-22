@@ -58,6 +58,7 @@ impl AcqHeadfile for ScoutParams {
     }
 }
 
+
 impl Initialize for ScoutParams {
     fn default() -> Self {
         ScoutParams {
