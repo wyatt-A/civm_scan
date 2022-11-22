@@ -531,7 +531,7 @@ impl VolumeManager {
                         h.append(&recon_headfile.to_hash());
                     }
                 }
-                self.state = Done;
+                self.state = SendingToArchiveEngine;
                 StateAdvance::Succeeded
             }
 
