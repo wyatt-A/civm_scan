@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{Write, Read};
 use glob::glob;
+use walkdir::WalkDir;
 
 pub fn m_number_formatter(n_elements:usize) -> Vec<String>{
     let w = ((n_elements-1) as f32).log10().floor() as usize + 1;
@@ -63,5 +64,11 @@ pub fn get_first_match(dir:&Path,pattern:&str) -> Option<PathBuf>  {
     match matches.is_empty() {
         true => None,
         false => Some(matches[0].clone())
+    }
+}
+
+pub fn find_files(base_dir:&Path)  {
+    for entry in WalkDir::new(base_dir).into_iter().filter_map(|e| e.ok()) {
+        println!("{}", entry.path().display());
     }
 }

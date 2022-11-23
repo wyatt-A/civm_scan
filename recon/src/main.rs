@@ -19,6 +19,8 @@ pub struct ReconArgs {
 pub enum ReconAction {
     /// reconstruct a diffusion-weighted series of volumes
     Dti(DtiRecon),
+    /// check the status of a reconstruction by run number
+    Status(StatusArgs),
     /// create a new project template to modify for a new protocol
     NewProjectTemplate(TemplateConfigArgs),
     /// interact with a single volume manager
@@ -46,6 +48,11 @@ pub struct NewConfigArgs {
     output_config:PathBuf,
     is_scale_setter:bool,
     is_scale_dependent:bool
+}
+
+#[derive(Clone,clap::Args,Debug)]
+pub struct StatusArgs {
+    run_number:String,
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -107,6 +114,13 @@ fn main() {
         }
         ReconAction::NewProjectTemplate(args) => {
             ProjectSettings::default().to_file(&args.output_config)
+        }
+        ReconAction::Status(args) => {
+            let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
+            let engine_work_dir = Path::new(&bg);
+            let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
+            // find all volume manager config files recursively
+            utils::find_files(&work_dir);
         }
         ReconAction::Dti(args) => {
 
