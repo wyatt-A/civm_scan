@@ -142,13 +142,10 @@ fn main() {
                                 println!("{} state:{}    slurm job status:{}",vm.name(),status,"not scheduled")
                             }
                         };
-
+                        total += 1;
                         if vm.is_done(){
                             n_done += 1;
-                        }else{
-                            total += 1;
                         }
-
                     });
                 }
                 None => {
