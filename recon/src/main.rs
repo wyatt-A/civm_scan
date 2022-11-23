@@ -160,7 +160,10 @@ fn main() {
             // remind the user of their settings and confirm with them
             if !args.batch_mode.unwrap_or(false) {
                 let mut user_in = String::new();
+                println!("------------------------------------");
+                println!("specimen_id = '{}'",args.specimen_id);
                 println!("{}",p.to_txt());
+                println!("------------------------------------");
                 println!("is this configuration correct? (yes/no) to confirm/cancel");
                 stdin().read_line(&mut user_in).expect("provide an input!");
                 match user_in.as_str() {
