@@ -120,8 +120,27 @@ fn main() {
             let engine_work_dir = Path::new(&bg);
             let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
             // find all volume manager config files recursively
-            let p = utils::find_files(&work_dir,"vol_man");
-            println!("{:?}",p);
+            let state_files = utils::find_files(&work_dir,"vol_man");
+            match state_files {
+                Some(files) => {
+                    files.iter().for_each(|state_file|{
+                        let vm = VolumeManager::read(state_file).unwrap();
+                        let jstate = vm.slurm_status();
+                        let status = vm.state_string();
+                        match jstate {
+                            Some(slurm_state) => {
+                                println!("{} : {} : {:?}",vm.name(),status,slurm_state);
+                            }
+                            None => {
+                                println!("{} : {} : {}",vm.name(),status,"not scheduled");
+                            }
+                        };
+                    });
+                }
+                None => {
+                    println!("no volumes managers found in {:?}",work_dir);
+                }
+            }
         }
         ReconAction::Dti(args) => {
 

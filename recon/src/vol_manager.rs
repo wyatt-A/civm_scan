@@ -74,6 +74,18 @@ pub enum VolumeManagerState {
 
 
 impl VolumeManager {
+
+    pub fn read(config:&Path) -> Option<Self> {
+        let state_file = config.with_extension(Self::file_ext());
+        match state_file.exists() {
+            false => None,
+            true => {
+                let t = utils::read_to_string(config,&Self::file_ext());
+                Some(toml::from_str(&t).expect("volume manager state file is corrupt. What happened?"))
+            }
+        }
+    }
+
     pub fn open(config:&Path) -> Self {
         let state_file = config.with_extension(Self::file_ext());
         match state_file.exists() {
@@ -273,6 +285,10 @@ impl VolumeManager {
             Some(jid) => Some(slurm::get_job_state(jid,60)),
             None => None
         }
+    }
+
+    pub fn state_string(&self) -> String {
+        format!("{:?}",self.state)
     }
 
     pub fn launch_with_srun(config:&Path) {
