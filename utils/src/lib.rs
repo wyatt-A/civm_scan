@@ -67,9 +67,24 @@ pub fn get_first_match(dir:&Path,pattern:&str) -> Option<PathBuf>  {
     }
 }
 
-pub fn find_files(base_dir:&Path)  {
+pub fn find_files(base_dir:&Path,extension:&str) -> Option<Vec<PathBuf>>  {
+    let mut files = Vec::<PathBuf>::new();
     for entry in WalkDir::new(base_dir).into_iter().filter_map(|e| e.ok()) {
-        println!("{}",entry.file_name().to_str().unwrap())
+        match entry.path().extension() {
+            Some(ext) => {
+                match ext.to_str().unwrap() == extension {
+                    true => {
+                        files.push(entry.path().to_owned());
+                    }
+                    false => {}
+                }
+            }
+            None => {}
+        }
+    }
+    match files.len(){
+        0 => None,
+        _=> Some(files)
     }
 }
 

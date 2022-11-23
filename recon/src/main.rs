@@ -120,7 +120,8 @@ fn main() {
             let engine_work_dir = Path::new(&bg);
             let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
             // find all volume manager config files recursively
-            utils::find_files(&work_dir);
+            let p = utils::find_files(&work_dir,"vol_man");
+            println!("{:?}",p);
         }
         ReconAction::Dti(args) => {
 
