@@ -160,7 +160,8 @@ fn main() {
             // remind the user of their settings and confirm with them
             if !args.batch_mode.unwrap_or(false) {
                 let mut user_in = String::new();
-                println!("------------------------------------");
+                println!("----------------SETTINGS----------------");
+                println!("project_file = '{:?}'",args.project_settings);
                 println!("specimen_id = '{}'",args.specimen_id);
                 println!("{}",p.to_txt());
                 println!("------------------------------------");
