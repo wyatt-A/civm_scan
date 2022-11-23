@@ -129,6 +129,7 @@ fn restart(args:RunnoArgs){
     let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
     // find all volume manager config files recursively
     let config_files = utils::find_files(&work_dir,"volman_config");
+    let mut n_restarted = 0;
     match config_files {
         Some(files) => {
             for config_file in files.iter() {
@@ -141,8 +142,10 @@ fn restart(args:RunnoArgs){
                         VolumeManager::launch_with_slurm_now(config_file);
                     },
                 }
+                n_restarted += 1;
             }
             status(args);
+            println!("restarted {} volume managers.",n_restarted);
         },
         None => {
             println!("no volume manager configs found in {:?}",work_dir);
@@ -151,6 +154,7 @@ fn restart(args:RunnoArgs){
 }
 
 fn status(args:RunnoArgs) {
+    println!("running recon status check on {} ...",args.run_number);
     let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
     let engine_work_dir = Path::new(&bg);
     let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
