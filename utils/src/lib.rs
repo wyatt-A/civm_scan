@@ -69,6 +69,18 @@ pub fn get_first_match(dir:&Path,pattern:&str) -> Option<PathBuf>  {
 
 pub fn find_files(base_dir:&Path)  {
     for entry in WalkDir::new(base_dir).into_iter().filter_map(|e| e.ok()) {
-        println!("{}", entry.path().display());
+        println!("{}",entry.file_name().to_str().unwrap())
     }
 }
+
+//fn is_hidden(entry: &DirEntry) -> bool {
+//     entry.file_name()
+//          .to_str()
+//          .map(|s| s.starts_with("."))
+//          .unwrap_or(false)
+// }
+//
+// let walker = WalkDir::new("foo").into_iter();
+// for entry in walker.filter_entry(|e| !is_hidden(e)) {
+//     println!("{}", entry?.path().display());
+// }
