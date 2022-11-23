@@ -125,27 +125,28 @@ fn main() {
             let mut reports = Vec::<String>::new();
 
             match state_files {
-                Some(files) => {
+                Some(mut files) => {
+                    files.sort();
                     files.iter().for_each(|state_file|{
                         let vm = VolumeManager::read(state_file).unwrap();
                         let jstate = vm.slurm_status();
                         let status = vm.state_string();
                         let rep = match jstate {
                             Some(slurm_state) => {
-                                format!("{} state:{}    job status:{:?}",vm.name(),status,slurm_state)
+                                println!("{} state:{}    job status:{:?}",vm.name(),status,slurm_state)
                             }
                             None => {
-                                format!("{} state:{}    job status:{}",vm.name(),status,"not scheduled")
+                                println!("{} state:{}    job status:{}",vm.name(),status,"not scheduled")
                             }
                         };
-                        reports.push(rep);
+                        //reports.push(rep);
                     });
                 }
                 None => {
                     println!("no volumes managers found in {:?}",work_dir);
                 }
             }
-            
+
 
         }
         ReconAction::Dti(args) => {
