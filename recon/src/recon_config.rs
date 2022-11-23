@@ -172,6 +172,12 @@ pub struct ProjectSettings {
     pub archive_engine_settings:ArchiveEngineSettings,
 }
 
+impl ProjectSettings {
+    pub fn to_txt(&self) -> String {
+        toml::to_string_pretty(&self).unwrap()
+    }
+}
+
 impl Config for ProjectSettings {
     fn default() -> Self {
         Self {
