@@ -148,7 +148,6 @@ fn restart(args:RunnoArgs){
             println!("no volume manager configs found in {:?}",work_dir);
         }
     }
-
 }
 
 fn status(args:RunnoArgs) {

@@ -90,7 +90,7 @@ impl VolumeManager {
         let state_file = config.with_extension(Self::file_ext());
         match state_file.exists() {
             true => {
-                println!("state file already exists. will not overwrite ...");
+                //println!("state file already exists. will not overwrite ...");
                 let t = utils::read_to_string(config,&Self::file_ext());
                 toml::from_str(&t).expect("volume manager state file is corrupt. What happened?")
             }
