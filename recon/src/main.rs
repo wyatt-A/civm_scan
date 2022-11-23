@@ -122,7 +122,10 @@ fn main() {
             // find all volume manager config files recursively
             let state_files = utils::find_files(&work_dir,"vol_man");
 
-            let mut reports = Vec::<String>::new();
+            let mut reports = Vec::<bool>::new();
+
+            let mut n_done = 0;
+            let mut total = 0;
 
             match state_files {
                 Some(mut files) => {
@@ -133,21 +136,26 @@ fn main() {
                         let status = vm.state_string();
                         let rep = match jstate {
                             Some(slurm_state) => {
-                                println!("{} state:{}    job status:{:?}",vm.name(),status,slurm_state)
+                                println!("{} state:{}    slurm job status:{:?}",vm.name(),status,slurm_state)
                             }
                             None => {
-                                println!("{} state:{}    job status:{}",vm.name(),status,"not scheduled")
+                                println!("{} state:{}    slurm job status:{}",vm.name(),status,"not scheduled")
                             }
                         };
-                        //reports.push(rep);
+
+                        if vm.is_done(){
+                            n_done += 1;
+                        }else{
+                            total += 1;
+                        }
+
                     });
                 }
                 None => {
                     println!("no volumes managers found in {:?}",work_dir);
                 }
             }
-
-
+            println!("{} have completed of {}",n_done,total);
         }
         ReconAction::Dti(args) => {
 

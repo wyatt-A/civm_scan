@@ -291,6 +291,13 @@ impl VolumeManager {
         format!("{:?}",self.state)
     }
 
+    pub fn is_done(&self) -> bool {
+        match self.state {
+            VolumeManagerState::Done => true,
+            _=> false
+        }
+    }
+
     pub fn launch_with_srun(config:&Path) {
 
         let this_exe = std::env::current_exe().expect("couldn't determine the current executable");
