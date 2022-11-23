@@ -172,6 +172,7 @@ fn main() {
                         println!("lets go!");
                     }
                     _=> {
+                        println!("{}",user_in);
                         println!("ok ... we won't do any work");
                         return
                     }
