@@ -164,7 +164,7 @@ fn main() {
                 println!("project_file = '{:?}'",args.project_settings);
                 println!("specimen_id = '{}'",args.specimen_id);
                 println!("{}",p.to_txt());
-                println!("------------------------------------");
+                println!("----------------------------------------");
                 println!("is this configuration correct? (yes/no) to confirm/cancel");
                 stdin().read_line(&mut user_in).expect("provide an input!");
                 match user_in.as_str() {
@@ -177,7 +177,6 @@ fn main() {
                     }
                 }
             }
-
             // Modify the engine work dir for the configs
             vm_configs.iter_mut().for_each(|conf| {
                 conf.vm_settings.engine_work_dir = engine_work_dir.to_owned();
