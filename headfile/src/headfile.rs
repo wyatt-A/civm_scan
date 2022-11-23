@@ -5,6 +5,7 @@ use std::ops::Index;
 use std::path::{Path,PathBuf};
 use serde::{Deserialize, Serialize};
 use regex::Regex;
+use utils;
 
 
 
@@ -375,6 +376,34 @@ fn transcribe_string(hash:&mut HashMap<String,String>,old_name:&str,new_name:&st
         None => {
             println!("{} field not found... not transcribing",old_name);
         }
+    }
+}
+
+//N60200_m41,/Volumes/delosspace,256,18.abb.11,.raw
+// # recon_person=wa41
+// # tag_file_creator=James_matlab
+
+pub struct ArchiveTag {
+    runno:String,
+    civm_id:String,
+    archive_engine_base_dir:PathBuf,
+    n_raw_files:usize,
+    project_code:String,
+    raw_file_ext:String,
+}
+
+impl ArchiveTag {
+    pub fn ready_filename(&self) -> String {
+        format!("READY_{}",self.runno)
+    }
+    pub fn to_file(&self,location:&Path){
+        let base_dir = self.archive_engine_base_dir.to_str().unwrap();
+        let txt = vec![
+            format!("{},{},{},{},.{}",self.runno,base_dir,self.n_raw_files,self.project_code,self.raw_file_ext),
+            format!("# recon_person={}",self.civm_id),
+            format!("# tag_file_creator=Wyatt_rust"),
+        ].join("\n");
+        utils::write_to_file(&location.join(self.ready_filename()),"",&txt);
     }
 }
 
