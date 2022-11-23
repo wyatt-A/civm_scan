@@ -165,18 +165,8 @@ fn main() {
                 println!("specimen_id = '{}'",args.specimen_id);
                 println!("{}",p.to_txt());
                 println!("----------------------------------------");
-                println!("is this configuration correct? (yes/no) to confirm/cancel");
+                println!("is this configuration correct? Hit enter to continue or control-C to cancel");
                 stdin().read_line(&mut user_in).expect("provide an input!");
-                match user_in.as_str() {
-                    "y"|"yes"|"1"|"true" => {
-                        println!("lets go!");
-                    }
-                    _=> {
-                        println!("{}",user_in);
-                        println!("ok ... we won't do any work");
-                        return
-                    }
-                }
             }
             // Modify the engine work dir for the configs
             vm_configs.iter_mut().for_each(|conf| {
