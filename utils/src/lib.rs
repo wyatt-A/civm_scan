@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{Write, Read};
+use glob::glob;
 
 pub fn m_number_formatter(n_elements:usize) -> Vec<String>{
     let w = ((n_elements-1) as f32).log10().floor() as usize + 1;
@@ -52,5 +53,15 @@ pub fn trim_newline(s: &mut String) {
         if s.ends_with('\r') {
             s.pop();
         }
+    }
+}
+
+pub fn get_first_match(dir:&Path,pattern:&str) -> Option<PathBuf>  {
+    let pat = dir.join(pattern);
+    let pat = pat.to_str().expect("cannot coerce to str");
+    let matches:Vec<PathBuf> = glob(pat).expect("Failed to read glob pattern").flat_map(|m| m).collect();
+    match matches.is_empty() {
+        true => None,
+        false => Some(matches[0].clone())
     }
 }

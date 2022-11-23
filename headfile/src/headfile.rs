@@ -6,109 +6,7 @@ use std::path::{Path,PathBuf};
 use serde::{Deserialize, Serialize};
 use regex::Regex;
 
-pub struct Headfile{
-    file:PathBuf
-}
 
-impl Headfile{
-
-    pub fn new(file_path:&Path) -> Self {
-        File::create(file_path).expect("cannot create file");
-        Self {
-            file:file_path.to_owned()
-        }
-    }
-
-    pub fn open(file_path:&Path) -> Self {
-        match file_path.exists() {
-            false => Headfile::new(file_path),
-            true => Self{
-                file:file_path.to_owned()
-            }
-        }
-    }
-
-    pub fn append(&self,hash:&HashMap<String,String>) {
-        let mut f = File::open(&self.file).expect("where did the headfile go!?");
-        let mut s = String::new();
-        f.read_to_string(&mut s).expect("trouble reading file");
-        let mut h1 = Self::txt_to_hash(s);
-        h1 = Self::merge(h1,hash.clone());
-        let txt = Self::hash_to_txt(&h1);
-        let mut f = File::create(&self.file).expect("can't create new file");
-        f.write_all(txt.as_bytes()).expect("trouble writing to file");
-    }
-
-    fn merge(map1:HashMap<String,String>,map2:HashMap<String,String>) -> HashMap<String,String> {
-        map1.into_iter().chain(map2).collect()
-    }
-
-    // pub fn append_field<T,U>(&mut self,key:T,value:U)
-    // where T:std::string::ToString, U:std::string::ToString
-    // {
-    //     let old_val = self.items.insert(key.to_string(),value.to_string());
-    //     if old_val.is_some(){
-    //         println!("value {} updated to {}",old_val.unwrap(),value.to_string());
-    //     }
-    // }
-
-    pub fn hash_to_txt(hash:&HashMap<String,String>) -> String {
-        let mut strbuf = String::new();
-        for (key, val) in hash.iter() {
-            strbuf.push_str(key);
-            strbuf.push('=');
-            strbuf.push_str(val);
-            strbuf.push('\n');
-        }
-        strbuf
-    }
-
-    fn txt_to_hash(headfile_str:String) -> HashMap<String,String>{
-        let mut hf = HashMap::<String,String>::new();
-        headfile_str.lines().for_each(|line|{
-            // split on the first = we find
-            match line.find("="){
-                Some(index) => {
-                    let (key,val) = line.split_at(index);
-                    let key = key.to_string();
-                    let mut val = val.to_string();
-                    val.remove(0);// remove leading "="
-                    hf.insert(key.to_string(),val);
-                },
-                None => () // do not add to hash if "=" not found
-            }
-        });
-        return hf;
-    }
-
-}
-
-fn transcribe_numeric<T>(hash:&mut HashMap<String,String>,old_name:&str,new_name:&str,scale:T)
-where T: std::fmt::Display + std::str::FromStr + std::ops::MulAssign,
-<T as std::str::FromStr>::Err: std::fmt::Debug
-{
-    match hash.get(old_name){
-        Some(string) => {
-            let mut num:T = string.parse().expect("cannot parse value");
-            num *= scale;
-            let str = num.to_string();
-            hash.insert(new_name.to_string(),str);
-        }
-        None => {println!("{} field not found... not transcribing",old_name);}
-    }
-}
-
-fn transcribe_string(hash:&mut HashMap<String,String>,old_name:&str,new_name:&str)
-{
-    match hash.get(old_name){
-        Some(str) => {
-            hash.insert(new_name.to_string(),str.to_string());
-        },
-        None => {
-            println!("{} field not found... not transcribing",old_name);
-        }
-    }
-}
 
 pub trait AcqHeadfile {
     fn acq_params(&self) -> AcqHeadfileParams;
@@ -140,23 +38,6 @@ pub struct DWHeadfileParams {
 }
 
 
-/*
-                headfile=mrs_meta_data(mrd);
-                headfile.dti_vols = n_volumes;
-                headfile.U_code = project_code;
-                headfile.U_civmid = civm_userid;
-                headfile.U_specid = specimen_id;
-                headfile.scanner_vendor = scanner_vendor;
-                headfile.U_runno = strcat(run_number,'_',mnum);
-                headfile.dim_X = vol_size(1);
-                headfile.dim_Y = vol_size(2);
-                headfile.dim_Z = vol_size(3);
-                headfile.civm_image_code = 't9';
-                headfile.civm_image_source_tag = 'imx';
-                headfile.engine_work_directory = pwd;
-                */
-
-
 #[derive(Clone,Serialize,Deserialize,Debug)]
 pub struct ReconHeadfile {
     pub spec_id: String,
@@ -171,19 +52,6 @@ pub struct ReconHeadfile {
     pub engine_work_dir:PathBuf,
     pub more_archive_info:ArchiveInfo
 }
-
-
-
-// specid=211001-30:1
-// civmid=wa41
-// code=18.abb.11
-
-
-
-
-// Dir params required for successful archival of data.
-// They need to be validated before sending them off to the archive engine
-
 
 
 #[derive(Clone,Serialize,Deserialize,Debug)]
@@ -236,63 +104,72 @@ impl ArchiveInfo {
     // need to run a check on this information to ensure it is correct
     pub fn is_valid(&self,project_code:&str,civm_user:&str) -> bool {
 
+        // will will assume the fields are valid until proven otherwise
         let mut is_valid = true;
 
-        //todo!(implement correctness check)
-        //$WKS_SETTINGS/recon_menu.txt
+        //$WKS_SETTINGS/recon_menu.txt contains the fields and valid values. We read them to a string here
         let workstation_settings = std::env::var("WKS_SETTINGS").expect("WKS_SETTINGS not set!");
         let filepath = Path::new(&workstation_settings).join("recon_menu.txt");
         let mut f = File::open(&filepath).expect(&format!("cannot open file! {:?}",filepath));
-
-        let mut txt = String::new();
-        f.read_to_string(&mut txt).expect("trouble reading file");
-
-        println!("{}",txt);
+        let mut recon_menu_txt = String::new();
+        f.read_to_string(&mut recon_menu_txt).expect("trouble reading file");
 
 
-        // each line is either a menu type or a valid menu option
-        // igonore if the line begins with #
+        // define the format of the menu file with regex. Each line is one of these 3 categories
+        let all_menu_types_pattern = Regex::new(r"ALLMENUTYPES;(\w+)").expect("invalid regex!");
+        let menu_field_pattern = Regex::new(r"^(.*?);").expect("invalid regex!");
+        let menu_type_pattern = Regex::new(r"MENUTYPE;(\w+)").expect("invalid regex!");
 
+        // internal data structure for the file
+        let mut recon_menu = HashMap::<String,HashSet<String>>::new();
 
-        let r1 = Regex::new(r"ALLMENUTYPES;(\w+)").expect("invalid regex!");
-        let r2 = Regex::new(r"^(.*?);").expect("invalid regex!");
-        let r3 = Regex::new(r"MENUTYPE;(\w+)").expect("invalid regex!");
+        // we need to store the last menu type because we will parse the file in a single pass
+        let mut last_menu_type = String::new();
 
-        // menu field -> menu item -> scanners for menu item
-        let mut h = HashMap::<String,HashSet<String>>::new();
-
-        let mut last_field = String::new();
-
-        txt.lines().for_each(|line|{
-            if !line.starts_with("#") && !r1.is_match(line){
-                let c = r3.captures(line);
+        // parse the recon menu, ignoring commented lines and the "all_menu_types" pattern
+        recon_menu_txt.lines().for_each(|line|{
+            if !line.starts_with("#") && !all_menu_types_pattern.is_match(line){
+                let c = menu_type_pattern.captures(line);
                 match c {
                     Some(capture) =>{
                         let m = capture.get(1).unwrap();
-                        last_field = m.as_str().to_string();
-                        h.insert(last_field.clone(),HashSet::<String>::new());
+                        last_menu_type = m.as_str().to_string();
+                        recon_menu.insert(last_menu_type.clone(), HashSet::<String>::new());
                     }
                     None => {
-                        let c = r2.captures(line).expect(&format!("unknown format!{}",line));
+                        let c = menu_field_pattern.captures(line).expect(&format!("unknown format!{}", line));
                         let m = c.get(1).expect("capture group not found");
-                        h.get_mut(&last_field).unwrap().insert(m.as_str().to_string());
+                        recon_menu.get_mut(&last_menu_type).unwrap().insert(m.as_str().to_string());
                     }
                 }
             }
         });
 
-        // check that recognized fields have valid entries
-        let mut h2 = self.to_hash();
-        h2.insert(String::from("U_code"),project_code.to_string());
-        h2.insert(String::from("U_civmid"),civm_user.to_string());
-        h2.iter().for_each(|(key,val)|{
+        // here we check that this struct contains valid field entries with the exception
+        // of transmit, which needs to be a "number" (assuming integer for now)
+        let mut user_archive_info = self.to_hash();
+        user_archive_info.insert(String::from("U_code"), project_code.to_string());
+        user_archive_info.insert(String::from("U_civmid"), civm_user.to_string());
+        user_archive_info.iter().for_each(|(key,val)|{
             let t = key.replace("U_","");
-            match h.get(&t) {
+            match recon_menu.get(&t) {
                 Some(set) => {
                     match &set.contains(val) {
                         false => {
-                            println!("{} is not a valid entry for {}.",val,t);
-                            is_valid = false;
+                            match t.as_str() {
+                                "xmit" => { // check that transmit is a "number" (what is a number?)
+                                    val.chars().for_each(|char| {
+                                        if !char.is_numeric(){
+                                            println!("xmit contains non-numeric characters: {}",val);
+                                            is_valid = false
+                                        }
+                                    });
+                                }
+                                _=> {
+                                    println!("{} is not a valid entry for {}.",val,t);
+                                    is_valid = false;
+                                }
+                            }
                         }
                         _=> {}
                     }
@@ -301,30 +178,24 @@ impl ArchiveInfo {
             }
         });
 
-        // check that all non-empty fields are present
-        h.iter().for_each(|(key,val)|{
+        // here we check that our struct contains all fields required by the recon menu, with the
+        // exception of runno. Is runno formatting actually enforced??
+        recon_menu.iter().for_each(|(key,val)|{
             if !val.is_empty(){
-                if !h2.contains_key(&format!("U_{}",key)){
-                    println!("{} is not present in meta-data struct",key);
-                    is_valid = false;
+                match key.as_str() {
+                    "runno" => {},
+                    _=> {
+                        if !user_archive_info.contains_key(&format!("U_{}", key)) {
+                            println!("{} is not present in meta-data struct", key);
+                            is_valid = false;
+                        }
+                    }
                 }
             }
         });
         is_valid
     }
 }
-
-// coil=9T_So13
-// nucleus=H
-// species=mouse
-// state=ex vivo
-// orient=NA
-// type=brain
-// focus=whole
-// rplane=cor
-// xmit=0
-// optional=
-// status=ok
 
 impl ReconHeadfile {
 
@@ -403,11 +274,113 @@ impl DWHeadfileParams {
     }
 }
 
+pub struct Headfile{
+    file:PathBuf
+}
+
+impl Headfile{
+
+    pub fn new(file_path:&Path) -> Self {
+        File::create(file_path).expect("cannot create file");
+        Self {
+            file:file_path.to_owned()
+        }
+    }
+
+    pub fn open(file_path:&Path) -> Self {
+        match file_path.exists() {
+            false => Headfile::new(file_path),
+            true => Self{
+                file:file_path.to_owned()
+            }
+        }
+    }
+
+    pub fn append(&self,hash:&HashMap<String,String>) {
+        let mut f = File::open(&self.file).expect("where did the headfile go!?");
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect("trouble reading file");
+        let mut h1 = Self::txt_to_hash(s);
+        h1 = Self::merge(h1,hash.clone());
+        let txt = Self::hash_to_txt(&h1);
+        let mut f = File::create(&self.file).expect("can't create new file");
+        f.write_all(txt.as_bytes()).expect("trouble writing to file");
+    }
+
+    fn merge(map1:HashMap<String,String>,map2:HashMap<String,String>) -> HashMap<String,String> {
+        map1.into_iter().chain(map2).collect()
+    }
+
+    // pub fn append_field<T,U>(&mut self,key:T,value:U)
+    // where T:std::string::ToString, U:std::string::ToString
+    // {
+    //     let old_val = self.items.insert(key.to_string(),value.to_string());
+    //     if old_val.is_some(){
+    //         println!("value {} updated to {}",old_val.unwrap(),value.to_string());
+    //     }
+    // }
+
+    pub fn hash_to_txt(hash:&HashMap<String,String>) -> String {
+        let mut strbuf = String::new();
+        for (key, val) in hash.iter() {
+            strbuf.push_str(key);
+            strbuf.push('=');
+            strbuf.push_str(val);
+            strbuf.push('\n');
+        }
+        strbuf
+    }
+
+    fn txt_to_hash(headfile_str:String) -> HashMap<String,String>{
+        let mut hf = HashMap::<String,String>::new();
+        headfile_str.lines().for_each(|line|{
+            // split on the first = we find
+            match line.find("="){
+                Some(index) => {
+                    let (key,val) = line.split_at(index);
+                    let key = key.to_string();
+                    let mut val = val.to_string();
+                    val.remove(0);// remove leading "="
+                    hf.insert(key.to_string(),val);
+                },
+                None => () // do not add to hash if "=" not found
+            }
+        });
+        return hf;
+    }
+
+}
+
+fn transcribe_numeric<T>(hash:&mut HashMap<String,String>,old_name:&str,new_name:&str,scale:T)
+    where T: std::fmt::Display + std::str::FromStr + std::ops::MulAssign,
+          <T as std::str::FromStr>::Err: std::fmt::Debug
+{
+    match hash.get(old_name){
+        Some(string) => {
+            let mut num:T = string.parse().expect("cannot parse value");
+            num *= scale;
+            let str = num.to_string();
+            hash.insert(new_name.to_string(),str);
+        }
+        None => {println!("{} field not found... not transcribing",old_name);}
+    }
+}
+
+fn transcribe_string(hash:&mut HashMap<String,String>,old_name:&str,new_name:&str)
+{
+    match hash.get(old_name){
+        Some(str) => {
+            hash.insert(new_name.to_string(),str.to_string());
+        },
+        None => {
+            println!("{} field not found... not transcribing",old_name);
+        }
+    }
+}
+
 
 #[test]
 fn test(){
     let a = ArchiveInfo::default();
-
     println!("archive info is {}",a.is_valid("20.5xfad.01","wa41"));
-
 }

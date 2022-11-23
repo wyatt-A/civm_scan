@@ -1665,7 +1665,6 @@ dependencies = [
  "acquire",
  "byteorder",
  "clap",
- "glob",
  "headfile",
  "mr_data",
  "ndarray",
@@ -2127,6 +2126,9 @@ dependencies = [
 [[package]]
 name = "utils"
 version = "0.1.0"
+dependencies = [
+ "glob",
+]
 
 [[package]]
 name = "vec_map"

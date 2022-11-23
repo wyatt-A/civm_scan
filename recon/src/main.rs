@@ -1,11 +1,8 @@
 use std::fs::{create_dir, create_dir_all};
 use std::io::{stdin, stdout, Write};
-//use recon::volume_manager::{launch_volume_manager,re_launch_volume_manager};
-//use recon::test::{main_test_cluster};
 use clap::Parser;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use headfile::headfile::DirParam;
 use recon::{recon_config, slurm};
 use recon::recon_config::{Config, ConfigFile, ProjectSettings, RemoteSystem, VolumeManagerConfig};
 use recon::slurm::{BatchScript, get_job_state};
@@ -20,9 +17,12 @@ pub struct ReconArgs {
 
 #[derive(clap::Subcommand,Debug)]
 pub enum ReconAction {
-    VolumeManager(VolumeManagerCmd),
+    /// reconstruct a diffusion-weighted series of volumes
     Dti(DtiRecon),
+    /// create a new project template to modify for a new protocol
     NewProjectTemplate(TemplateConfigArgs),
+    /// interact with a single volume manager
+    VolumeManager(VolumeManagerCmd),
 }
 
 #[derive(clap::Args,Debug)]
@@ -50,30 +50,47 @@ pub struct NewConfigArgs {
 
 #[derive(Clone,clap::Args,Debug)]
 pub struct DtiRecon {
-    /// civm id (cof,wa41 ...)
+    /// civm id (cof,wa41,kjh ...)
     civm_id:String,
     /// base configuration used to define recon parameters
     project_settings:PathBuf,
-    /// run number for the collection of DTI volumes
+    /// run number for the set of DTI volumes
     run_number:String,
-    /// base path for the collection of DTI volumes
+    /// base path for the raw data. This is an absolute path on the scanner.
     raw_data_base_dir:PathBuf,
     /// civm specimen id
     specimen_id:String,
     /// index of the volume used for scaling. This is typically the first volume (defaults to 0)
-    scaling_volume:Option<u32>,
-    /// run sequentially
     #[clap(long)]
-    disable_slurm:Option<bool>
+    scaling_volume:Option<u32>,
+    /// run without slurm scheduling. This will reconstruct each volume serially in your terminal
+    #[clap(long)]
+    disable_slurm:Option<bool>,
+    /// enable this option if you want to skip the meta data check for archival
+    #[clap(long)]
+    no_archive:Option<bool>,
+    /// define the index of the last volume to reconstruct. If you only want to reconstruct the first volume, use 0
+    #[clap(long)]
+    last_volume:Option<usize>,
+    /// define the index of the first volume to reconstruct. The first volume has index 0
+    #[clap(long)]
+    first_volume:Option<usize>,
+    /// if you don't want to be reminded of the recon parameters and be asked if they are correct, enable this
+    #[clap(long,short)]
+    batch_mode:Option<bool>,
 }
 
 #[derive(Clone,clap::Args,Debug)]
 pub struct TemplateConfigArgs {
+    /// absolute path to the new config, or just a file name to save to default location.
+    /// you're file extension will not be respected.
     output_config:PathBuf,
 }
 
 #[derive(Clone,clap::Args,Debug)]
 pub struct VolumeMangerLaunchArgs {
+    /// path to a volume manager configuration file. This path will be the working directory
+    /// of the volume manager
     config_file:PathBuf
 }
 
@@ -101,17 +118,23 @@ fn main() {
             let p = ProjectSettings::from_file(&args.project_settings);
 
             if !p.archive_info.is_valid(&p.project_code,&args.civm_id) {
-                println!("meta-data is incorrect for archiving. We can't continue.");
-                return
+                match args.no_archive.unwrap_or(false) {
+                    false => {
+                        println!("project meta data is incorrect for archiving. You must repair the project settings at {:?} and try again.",args.project_settings);
+                        println!("if you want to run the recon anyway, re-run with the no archive option. Use --help to find it.");
+                        return
+                    }
+                    true => {
+                        println!("you have opted into running the recon despite not passing the meta data validation for archiving!");
+                    }
+                }
             }
 
             if !p.archive_engine_settings.test_connection() {
-                //p.archive_engine_settings.copy_ssh_key();
                 println!("you must fix the remote connection");
                 return
             }
             if !p.scanner_settings.test_connection() {
-                //p.scanner_settings.copy_ssh_key();
                 println!("you must fix the remote connection");
                 return
             }
@@ -125,6 +148,31 @@ fn main() {
                 &args.raw_data_base_dir,
                 args.disable_slurm.unwrap_or(false)
             );
+
+            // get subset of vm_configs based on user input (first and last volumes)
+            let user_last_vol = args.last_volume.unwrap_or(vm_configs.len()-1);
+            let upper_index = if user_last_vol >= vm_configs.len() {vm_configs.len()-1} else {user_last_vol};
+            let user_first_vol = args.first_volume.unwrap_or(0);
+            let lower_index = if user_first_vol >= vm_configs.len() {vm_configs.len()-1} else {user_first_vol};
+            let mut vm_configs = Vec::from_iter(vm_configs[lower_index..(upper_index +1)].iter().cloned());
+            println!("launching recon for range {} to {}. {} volumes will be launched for reconstruction", lower_index, upper_index, upper_index - lower_index +1);
+
+            // remind the user of their settings and confirm with them
+            if !args.batch_mode.unwrap_or(false) {
+                let mut user_in = String::new();
+                println!("{:?}",p);
+                println!("is this configuration correct? (y/yes/1/true) to confirm");
+                stdin().read_line(&mut user_in).expect("provide an input!");
+                match user_in.as_str() {
+                    "y"|"yes"|"1"|"true" => {
+                        println!("lets go!");
+                    }
+                    _=> {
+                        println!("ok ... we won't do any work");
+                        return
+                    }
+                }
+            }
 
             // Modify the engine work dir for the configs
             vm_configs.iter_mut().for_each(|conf| {
@@ -164,7 +212,6 @@ fn main() {
                     },
                     false => {
                         let jid = VolumeManager::launch_with_slurm_now(&conf_file);
-                        //let job_state = get_job_state(jid,60);
                         println!("{} job submitted with id {}",conf.name(),jid);
                     }
                 }

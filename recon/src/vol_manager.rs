@@ -13,9 +13,8 @@ use std::process::{Command, exit};
 use seq_lib::pulse_sequence::MrdToKspaceParams;
 //use crate::config::{ProjectSettings, Recon};
 use mr_data::mrd::{fse_raw_to_cfl, cs_mrd_to_kspace};
-use headfile::headfile::{ReconHeadfile, Headfile, DirParam};
+use headfile::headfile::{ReconHeadfile, Headfile};
 use acquire::build::{HEADFILE_NAME,HEADFILE_EXT};
-use glob::glob;
 use clap::Parser;
 use serde_json::to_string;
 use mr_data::cfl::{self, ImageScale, write_u16_scale};
@@ -119,11 +118,11 @@ impl VolumeManagerResources {
     pub fn open(config:&Path) -> Result<Self,ResourceError> {
         match Self::fetch(config) {
             Some(res_dir) => {
-                let cs_table = get_first_match(&res_dir, "*cs_table").ok_or(ResourceError::CsTableNotFound)?;
-                let raw_mrd = get_first_match(&res_dir, "*.mrd").ok_or(ResourceError::MrdNotFound)?;
-                let acq_complete = get_first_match(&res_dir, "*.ac").ok_or(ResourceError::MrdNotComplete)?;
-                let kspace_config = get_first_match(&res_dir, "*.mtk").ok_or(ResourceError::KspaceConfigNotFound)?;
-                let meta = get_first_match(&res_dir, "meta.txt");
+                let cs_table = utils::get_first_match(&res_dir, "*cs_table").ok_or(ResourceError::CsTableNotFound)?;
+                let raw_mrd = utils::get_first_match(&res_dir, "*.mrd").ok_or(ResourceError::MrdNotFound)?;
+                let acq_complete = utils::get_first_match(&res_dir, "*.ac").ok_or(ResourceError::MrdNotComplete)?;
+                let kspace_config = utils::get_first_match(&res_dir, "*.mtk").ok_or(ResourceError::KspaceConfigNotFound)?;
+                let meta = utils::get_first_match(&res_dir, "meta.txt");
                 Ok(Self {
                     cs_table,
                     raw_mrd,
@@ -578,23 +577,6 @@ impl VolumeManager {
                     }
                 }
             }
-
-            // SendingToArchiveEngine => {
-            //     println!("Sending images to {}",settings.project_settings.archive_engine_settings.remote_host);
-            //
-            //     let cmd = format!("mkidr")
-            //
-            //
-            //     let cmd = Command::new("scp")
-            //
-            //
-            // }
-            //
-            //
-            // CleaningUp => {
-            //     println!("cleaning up")
-            // }
-
             Done => {
                 println!("all work is complete.");
                 StateAdvance::AllWorkDone
@@ -603,15 +585,5 @@ impl VolumeManager {
                 panic!("not yet implemented")
             }
         }
-    }
-}
-
-fn get_first_match(dir:&Path,pattern:&str) -> Option<PathBuf>  {
-    let pat = dir.join(pattern);
-    let pat = pat.to_str().expect("cannot coerce to str");
-    let matches:Vec<PathBuf> = glob(pat).expect("Failed to read glob pattern").flat_map(|m| m).collect();
-    match matches.is_empty() {
-        true => None,
-        false => Some(matches[0].clone())
     }
 }
