@@ -158,6 +158,12 @@ fn status(args:RunnoArgs) {
     let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
     let engine_work_dir = Path::new(&bg);
     let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
+
+    if !work_dir.exists(){
+        println!("{} not found. {:?} doesn't exist.",args.run_number,work_dir);
+        return
+    }
+
     // find all volume manager state files recursively
     let state_files = utils::find_files(&work_dir,"vol_man");
 
