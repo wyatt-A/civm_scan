@@ -10,6 +10,7 @@ use serde_json;
 use crate::bart_wrapper::{bart_pics};
 use crate::slurm::{self,BatchScript, JobState};
 use std::process::{Command, exit};
+use std::time::Duration;
 use seq_lib::pulse_sequence::MrdToKspaceParams;
 //use crate::config::{ProjectSettings, Recon};
 use mr_data::mrd::{fse_raw_to_cfl, cs_mrd_to_kspace};
@@ -166,6 +167,7 @@ impl VolumeManagerResources {
             return the resource directory if success, None if failed
          */
         let settings = VolumeManagerConfig::from_file(config);
+        let vm = VolumeManager::read(config).expect("where did vol_man file go?");
         let user = &settings.project_settings.scanner_settings.remote_user;
         let host = &settings.project_settings.scanner_settings.remote_host;
         let dir = &settings.vm_settings.resource_dir.join("*");
@@ -186,10 +188,28 @@ impl VolumeManagerResources {
             &format!("{}/",local_dir_str)
         ]);
 
+
+        // use a lock file to limit ssh traffic on the scanner
+        let p = vm.work_dir().parent().unwrap();
+        let lck = p.join(vm.name()).with_extension("lck");
+        loop {
+            match utils::get_first_match(p, "*.lck") {
+                Some(lck_file) => {
+                    println!("found lock file {:?}. We will try again later.", lck_file);
+                    std::thread::sleep(Duration::from_secs(1));
+                    continue
+                }
+                None => {
+                    println!("writing lock file");
+                    File::create(&lck).expect("unable to create lock file");
+                    break
+                }
+            }
+        }
+        
         println!("attempting to run {:?}",scp_command);
-
         let o = scp_command.output().expect(&format!("failed to launch {:?}",scp_command));
-
+        std::fs::remove_file(&lck).expect("cannot remove lock file");
         match o.status.success() {
             true => {
                 println!("scp successful");
