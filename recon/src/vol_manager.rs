@@ -60,7 +60,7 @@ pub enum ResourceError {
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum VolumeManagerState {
     Idle,
-    NeedsResources(ResourceError),
+    NeedsResources,
     FormattingKspace,
     Reconstructing,
     Filtering,
@@ -372,7 +372,7 @@ impl VolumeManager {
 
         use VolumeManagerState::*;
         match &self.state {
-            Idle | NeedsResources(_) => {
+            Idle | NeedsResources => {
                 println!("gathering and checking resources ...");
                 match VolumeManagerResources::open(&self.config) {
                     Ok(resources) => {
@@ -381,7 +381,8 @@ impl VolumeManager {
                         StateAdvance::Succeeded
                     },
                     Err(e) => {
-                        self.state = NeedsResources(e);
+                        println!("encountered a resource error: {:?}",e);
+                        self.state = NeedsResources;
                         match settings.is_slurm_disabled() {
                             false => StateAdvance::TryingAgainLater,
                             true => StateAdvance::TerminalFailure
