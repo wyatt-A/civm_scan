@@ -13,7 +13,7 @@ use std::process::{Command, exit};
 use seq_lib::pulse_sequence::MrdToKspaceParams;
 //use crate::config::{ProjectSettings, Recon};
 use mr_data::mrd::{fse_raw_to_cfl, cs_mrd_to_kspace};
-use headfile::headfile::{ReconHeadfile, Headfile};
+use headfile::headfile::{ReconHeadfile, Headfile, ArchiveTag};
 use acquire::build::{HEADFILE_NAME,HEADFILE_EXT};
 use clap::Parser;
 use serde_json::to_string;
@@ -562,22 +562,46 @@ impl VolumeManager {
             }
 
             SendingToArchiveEngine => {
-                println!("sending to archive engine ...");
-                // connect to system and make the volume directory
-                let mut mkdir = Command::new("ssh");
+
+                // short-hand variables for talking to archive engine
                 let u = settings.project_settings.archive_engine_settings.user();
                 let h = settings.project_settings.archive_engine_settings.hostname();
                 let p = settings.project_settings.archive_engine_settings.base_dir();
+                let tag_dir = p.join("Archive_Tags");
+
+                // archive tag that will hopefully get sent to engine
+                let raw_image_files = utils::find_files(&self.image_dir(),"raw");
+                let n_raw = raw_image_files.expect("coudn't find any raw files in image dir. Did you delete them?").len();
+                let archive_tag = ArchiveTag{
+                    runno: settings.name(),
+                    civm_id: settings.run_settings.civm_id.clone(),
+                    archive_engine_base_dir:p.clone(),
+                    n_raw_files: n_raw,
+                    project_code: settings.project_settings.project_code.clone(),
+                    raw_file_ext: String::from("raw")
+                };
+
+                // ssh command for making image directory on remote system
+                let mut mkdir = Command::new("ssh");
                 let runno_dir = p.join(self.name());
                 let runno_dir = runno_dir.to_str().unwrap();
                 mkdir.arg(format!("{}@{}",u,h));
                 mkdir.arg(format!("mkdir -p {}",runno_dir));
 
+                // command for sending raw images
                 let mut scp = Command::new("scp");
                 scp.arg("-r");
                 scp.arg(self.image_dir().to_str().unwrap());
                 scp.arg(&format!("{}@{}:{}",u,h,runno_dir));
 
+                // command we will use to transfer archive tag
+                let tag_dir_str = tag_dir.to_str().unwrap();
+                let mut scp_archive_tag = Command::new("scp");
+                scp_archive_tag.arg(archive_tag.filepath(self.work_dir()).to_str().unwrap());
+                scp_archive_tag.arg(&format!("{}@{}:{}/",u,h,tag_dir_str));
+
+                // launch ssh and scp commands and check for errors
+                println!("sending to archive engine ...");
                 let mkdir_o = mkdir.output().expect("cannot launch ssh");
                 match mkdir_o.status.success() {
                     true => {
@@ -585,6 +609,14 @@ impl VolumeManager {
                         match o.status.success() {
                             true => {
                                 println!("scp successful");
+                                println!("writing and sending archive tag");
+                                archive_tag.to_file(&self.work_dir());
+                                match scp_archive_tag.output().expect("failed to launch scp").status.success() {
+                                    true => println!("archive tag successfully sent"),
+                                    false => {
+                                        panic!("archive tag failed to send with command {:?}",scp_archive_tag);
+                                    }
+                                }
                                 self.state = VolumeManagerState::Done;
                                 StateAdvance::Succeeded
                             }

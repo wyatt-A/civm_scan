@@ -384,16 +384,16 @@ fn transcribe_string(hash:&mut HashMap<String,String>,old_name:&str,new_name:&st
 // # tag_file_creator=James_matlab
 
 pub struct ArchiveTag {
-    runno:String,
-    civm_id:String,
-    archive_engine_base_dir:PathBuf,
-    n_raw_files:usize,
-    project_code:String,
-    raw_file_ext:String,
+    pub runno:String,
+    pub civm_id:String,
+    pub archive_engine_base_dir:PathBuf,
+    pub n_raw_files:usize,
+    pub project_code:String,
+    pub raw_file_ext:String,
 }
 
 impl ArchiveTag {
-    pub fn ready_filename(&self) -> String {
+    fn name_ready(&self) -> String {
         format!("READY_{}",self.runno)
     }
     pub fn to_file(&self,location:&Path){
@@ -403,10 +403,12 @@ impl ArchiveTag {
             format!("# recon_person={}",self.civm_id),
             format!("# tag_file_creator=Wyatt_rust"),
         ].join("\n");
-        utils::write_to_file(&location.join(self.ready_filename()),"",&txt);
+        utils::write_to_file(&self.filepath(location), "", &txt);
+    }
+    pub fn filepath(&self,location:&Path) -> PathBuf {
+        location.join(self.name_ready())
     }
 }
-
 
 #[test]
 fn test(){
