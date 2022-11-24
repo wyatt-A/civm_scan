@@ -401,7 +401,7 @@ impl ArchiveTag {
         let txt = vec![
             format!("{},{},{},{},.{}",self.runno,base_dir,self.n_raw_files,self.project_code,self.raw_file_ext),
             format!("# recon_person={}",self.civm_id),
-            format!("# tag_file_creator=Wyatt_rust"),
+            format!("# tag_file_creator=Wyatt_rust\n"),
         ].join("\n");
         utils::write_to_file(&self.filepath(location), "", &txt);
     }
