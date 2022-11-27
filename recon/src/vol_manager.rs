@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::format;
 use serde::{Deserialize, Serialize};
-use std::fs::{File,create_dir_all};
+use std::fs::{File, create_dir_all, remove_dir_all};
 use std::io::{Read,Write};
 use std::path::{Path, PathBuf};
 use whoami;
@@ -20,6 +20,7 @@ use clap::Parser;
 use serde_json::to_string;
 use mr_data::cfl::{self, ImageScale, write_u16_scale};
 use crate::recon_config::{ConfigFile, RemoteSystem, VolumeManagerConfig};
+use rand::prelude::*;
 
 pub const SCALE_FILENAME:&str = "volume_scale_info";
 pub const DEFAULT_HIST_PERCENT:f32 = 0.9995;
@@ -149,12 +150,12 @@ impl VolumeManagerResources {
     }
     fn resource_dir(config:&Path) -> PathBuf {
         let local_dir = config.with_file_name("resource");
-        if !local_dir.exists() {
-            println!("creating local dir: {:?}",local_dir);
-            create_dir_all(&local_dir).expect("cannot create local resource directory");
-        }else {
-            println!("{:?} already exists",local_dir);
+        if local_dir.exists() {
+            println!("cleaning up {:?}",local_dir);
+            remove_dir_all(&local_dir).expect("cannot remove directory");
         }
+        println!("creating fresh resource dir: {:?}",local_dir);
+        create_dir_all(&local_dir).expect("cannot create local resource directory");
         local_dir.to_owned()
     }
 
@@ -190,13 +191,19 @@ impl VolumeManagerResources {
 
 
         // use a lock file to limit ssh traffic on the scanner
+        // wait a random amount of time before checking/writing a lock file.
+        // This will reduce the chance of two lock files getting generated simultaneously by
+        // different threads (without this I saw up to 3 lock files getting written simultaneously)
         let p = vm.work_dir().parent().unwrap();
         let lck = p.join(vm.name()).with_extension("lck");
         loop {
+            let mut rng = rand::thread_rng();
+            let r:f32 = rng.gen();
+            let time_to_wait = 2.0*r; // at most 2 seconds
+            std::thread::sleep(Duration::from_secs_f32(time_to_wait));
             match utils::get_first_match(p, "*.lck") {
                 Some(lck_file) => {
                     println!("found lock file {:?}. We will try again later.", lck_file);
-                    std::thread::sleep(Duration::from_secs(1));
                     continue
                 }
                 None => {
@@ -206,7 +213,11 @@ impl VolumeManagerResources {
                 }
             }
         }
-        
+
+        // check if ac file is present where we are expecting it
+        //ssh -q mrs@stejskal [[ -f /d/dev/221125/se/ico61_6b0/m00/m00.ac ]]
+
+
         println!("attempting to run {:?}",scp_command);
         let o = scp_command.output().expect(&format!("failed to launch {:?}",scp_command));
         std::fs::remove_file(&lck).expect("cannot remove lock file");
@@ -253,6 +264,10 @@ impl VolumeManager {
         settings.name()
     }
 
+    pub fn slurm_out_dir(&self) -> PathBuf {
+        self.work_dir().join("slurm_out")
+    }
+
     fn kspace_file(&self) -> PathBuf {
         self.work_dir().join(format!("{}_kspace",self.name()))
     }
@@ -267,20 +282,29 @@ impl VolumeManager {
 
     pub fn launch_with_slurm_later(config:&Path,seconds_later:u32) -> u32 {
         let mut vm = VolumeManager::open(config);
-        let mut bs = BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]);
-        bs.options.partition = String::from("reconstruction");
-        bs.options.output = config.with_file_name("slurm-%j").with_extension("out").into_os_string().to_str().unwrap().to_string();
+        let mut bs = Self::slurm_batch_script(config);
         let jid = bs.submit_later(vm.work_dir(),seconds_later);
         vm.slurm_job_id = Some(jid);
         vm.to_file();
         jid
     }
 
-    pub fn launch_with_slurm_now(config:&Path) -> u32 {
+    pub fn slurm_batch_script(config:&Path) -> BatchScript {
         let mut vm = VolumeManager::open(config);
         let mut bs = BatchScript::new(&vm.name(),&vec![Self::launch_cmd(config)]);
         bs.options.partition = String::from("reconstruction");
-        bs.options.output = config.with_file_name("slurm-%j").with_extension("out").into_os_string().to_str().unwrap().to_string();
+        let out_dir = vm.slurm_out_dir();
+        if !out_dir.exists(){
+            create_dir_all(&out_dir).expect(&format!("unable to create {:?}",out_dir));
+        }
+        bs.options.output = out_dir.join("slurm-%j").with_extension("out").into_os_string().to_str().unwrap().to_string();
+        //bs.options.output = config.with_file_name("slurm-%j").with_extension("out").into_os_string().to_str().unwrap().to_string();
+        bs
+    }
+
+    pub fn launch_with_slurm_now(config:&Path) -> u32 {
+        let mut vm = VolumeManager::open(config);
+        let mut bs = Self::slurm_batch_script(config);
         let jid = bs.submit_now(vm.work_dir());
         vm.slurm_job_id = Some(jid);
         vm.to_file();

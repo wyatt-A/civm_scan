@@ -67,6 +67,20 @@ pub fn get_first_match(dir:&Path,pattern:&str) -> Option<PathBuf>  {
     }
 }
 
+
+// single depth search
+pub fn get_all_matches(dir:&Path,pattern:&str) -> Option<Vec<PathBuf>> {
+    let pat = dir.join(pattern);
+    let pat = pat.to_str().expect("cannot coerce to str");
+    let matches:Vec<PathBuf> = glob(pat).expect("Failed to read glob pattern").flat_map(|m| m).collect();
+    match matches.is_empty() {
+        true => None,
+        false => Some(matches)
+    }
+}
+
+
+// recursive walk
 pub fn find_files(base_dir:&Path,extension:&str) -> Option<Vec<PathBuf>>  {
     let mut files = Vec::<PathBuf>::new();
     for entry in WalkDir::new(base_dir).into_iter().filter_map(|e| e.ok()) {

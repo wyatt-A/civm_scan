@@ -297,6 +297,13 @@ impl Headfile{
         }
     }
 
+    pub fn to_hash(&self) -> HashMap<String,String> {
+        let mut f = File::open(&self.file).expect("where did the headfile go!?");
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect("trouble reading file");
+        Self::txt_to_hash(s)
+    }
+
     pub fn append(&self,hash:&HashMap<String,String>) {
         let mut f = File::open(&self.file).expect("where did the headfile go!?");
         let mut s = String::new();
