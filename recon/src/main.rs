@@ -6,7 +6,7 @@ use std::process::Command;
 use recon::{recon_config, slurm};
 use recon::recon_config::{Config, ConfigFile, ProjectSettings, RemoteSystem, VolumeManagerConfig};
 use recon::slurm::{BatchScript, get_job_state};
-use recon::vol_manager::{VolumeManager};
+use recon::vol_manager::{VolumeManager, VolumeManagerState};
 use utils::m_number_formatter;
 
 #[derive(clap::Parser,Debug)]
@@ -57,6 +57,15 @@ pub struct RestartArgs {
     run_number:String,
     #[clap(long)]
     disable_slurm:Option<bool>,
+    /// set the state of each volume manager on re-launch
+    #[clap(long)]
+    forced_state:Option<String>,
+}
+
+#[derive(Clone,clap::Args,Debug)]
+pub struct SetStateArgs {
+    run_number:String,
+    state:String,
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -141,6 +150,23 @@ fn restart(args:RestartArgs){
         Some(files) => {
             for config_file in files.iter() {
                 let mut c = VolumeManagerConfig::from_file(config_file);
+
+                // if there is a volume manager state file, set the state and write the state file
+                // back to disk
+                let mut vm = VolumeManager::read(config_file);
+                match vm {
+                    Some(mut vm) => {
+                        match &args.forced_state {
+                            Some(state) => {
+                                vm.set_state(state);
+                                vm.to_file();
+                            }
+                            None => {}
+                        }
+                    }
+                    None => {}
+                }
+
                 c.slurm_disabled = args.disable_slurm.unwrap_or(false);
                 match c.is_slurm_disabled() {
                     true => {
@@ -162,7 +188,6 @@ fn restart(args:RestartArgs){
         }
     }
 }
-
 
 fn cancel(args:RunnoArgs) {
     println!("finding jobs to cancel for {} ...",args.run_number);

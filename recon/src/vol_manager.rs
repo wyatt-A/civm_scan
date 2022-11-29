@@ -106,7 +106,7 @@ impl VolumeManager {
     pub fn config(&self) -> VolumeManagerConfig {
         VolumeManagerConfig::from_file(&self.config)
     }
-    fn to_file(&self) {
+    pub fn to_file(&self) {
         let t = toml::to_string(&self).unwrap();
         utils::write_to_file(&self.config,&Self::file_ext(),&t);
     }
@@ -265,6 +265,13 @@ impl VolumeManager {
     pub fn name(&self) -> String {
         let settings = self.config();
         settings.name()
+    }
+
+    pub fn set_state(&mut self,state:&str) {
+        match state {
+            "WritingHeadfile" => self.state = VolumeManagerState::WritingHeadfile,
+            _=> panic!("state set is not yet implemented")
+        }
     }
 
     pub fn slurm_out_dir(&self) -> PathBuf {
