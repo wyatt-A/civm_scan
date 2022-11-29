@@ -347,7 +347,7 @@ fn slurm_recon_watch(args:WaitForCompletionArgs,email:&str) {
 
     let mut b = slurm::BatchScript::new(&job_name,&vec![cmd]);
     b.options.email = Some(String::from(email));
-    b.options.memory = Some(String::from("1M"));
+    b.options.memory = Some(String::from("20M"));
     b.options.output = work_dir.join("recon_watcher-%j").with_extension("out").into_os_string().to_str().unwrap().to_string();
 
     b.submit_now(&work_dir);
@@ -470,7 +470,7 @@ fn dti(args:DtiRecon){
             },
             &args.email.clone().unwrap()
         );
-        println!("recon watcher was launched on your behalf. Check your email {} for notifications",&args.email.unwrap());
+        println!("a recon watcher was launched on your behalf. Check your email {} for notifications",&args.email.unwrap());
     }
 
 }
