@@ -335,13 +335,14 @@ fn slurm_recon_watch(args:WaitForCompletionArgs,email:&str) {
     let engine_work_dir = Path::new(&bg);
     let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
 
-    let refresh_period = args.refresh_period.unwrap_or(DEFAULT_TIME_TO_WAIT*60.0);
+    let refresh_period = args.refresh_period.unwrap_or(DEFAULT_TIME_TO_WAIT);
 
     let job_name = format!("{}_watcher",args.run_number);
 
     let this_exe = std::env::current_exe().expect("cannot determine this executable");
 
     let mut cmd = Command::new(this_exe);
+    cmd.arg("wait-for-completion");
     cmd.arg(&format!("--refresh-period={}",refresh_period));
     cmd.arg(&args.run_number);
 
