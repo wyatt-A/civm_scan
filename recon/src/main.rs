@@ -23,6 +23,8 @@ pub enum ReconAction {
     Status(RunnoArgs),
     /// restart a recon by run number
     Restart(RestartArgs),
+    /// cancel jobs associated with a run number
+    Cancel(RunnoArgs),
     /// create a new project template to modify for a new protocol
     NewProjectTemplate(TemplateConfigArgs),
     /// interact with a single volume manager
@@ -135,7 +137,8 @@ fn main() {
         }
         ReconAction::Restart(args) => restart(args),
         ReconAction::Status(args) => status(args),
-        ReconAction::Dti(args) => dti(args)
+        ReconAction::Dti(args) => dti(args),
+        ReconAction::Cancel(args) => cancel(args),
     }
 }
 
