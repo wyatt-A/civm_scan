@@ -3,6 +3,7 @@ use std::io::{stdin, stdout, Write};
 use clap::Parser;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 use recon::{recon_config, slurm};
 use recon::recon_config::{Config, ConfigFile, ProjectSettings, RemoteSystem, VolumeManagerConfig};
 use recon::slurm::{BatchScript, get_job_state};
@@ -25,6 +26,8 @@ pub enum ReconAction {
     Restart(RestartArgs),
     /// cancel jobs associated with a run number
     Cancel(RunnoArgs),
+    /// wait for this run to complete before returning
+    WaitForCompletion(WaitForCompletionArgs),
     /// create a new project template to modify for a new protocol
     NewProjectTemplate(TemplateConfigArgs),
     /// interact with a single volume manager
@@ -71,6 +74,14 @@ pub struct SetStateArgs {
 }
 
 #[derive(Clone,clap::Args,Debug)]
+pub struct WaitForCompletionArgs {
+    run_number:String,
+    /// time between completion checks in minutes
+    #[clap(long)]
+    refresh_period:Option<f32>,
+}
+
+#[derive(Clone,clap::Args,Debug)]
 pub struct RunnoArgs {
     run_number:String,
 }
@@ -105,6 +116,9 @@ pub struct DtiRecon {
     /// if you don't want to be reminded of the recon parameters and be asked if they are correct, enable this
     #[clap(long,short)]
     batch_mode:Option<bool>,
+    /// supply an email to get a notification when the recon is done
+    #[clap(long,short)]
+    email:Option<String>,
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -139,6 +153,7 @@ fn main() {
         ReconAction::Status(args) => status(args),
         ReconAction::Dti(args) => dti(args),
         ReconAction::Cancel(args) => cancel(args),
+        ReconAction::WaitForCompletion(args) => wait_for_completion(args),
     }
 }
 
@@ -279,6 +294,70 @@ fn status(args:RunnoArgs) {
     println!("{} volume managers have completed of {}",n_done,total);
 }
 
+
+const DEFAULT_TIME_TO_WAIT:f32 = 2.0; //minutes
+fn wait_for_completion(args:WaitForCompletionArgs){
+    let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
+    let engine_work_dir = Path::new(&bg);
+    let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
+
+    if !work_dir.exists(){
+        panic!("{} not found. {:?} doesn't exist.",args.run_number,work_dir)
+    }
+
+    // find all volume manager state files recursively
+    let mut state_files = utils::find_files(&work_dir,"vol_man").expect(&format!("no volumes managers found in {:?}", work_dir));
+    state_files.sort();
+
+    loop {
+        let mut n_done = 0;
+        let mut total = 0;
+        state_files.iter().for_each(|state_file| {
+            let vm = VolumeManager::read(state_file).unwrap();
+            if vm.is_done() {
+                n_done += 1
+            }
+            total += 1;
+        });
+
+        println!("{}: {} of {} are complete",args.run_number,n_done,total);
+
+        match n_done == total {
+            true => break,
+            false => std::thread::sleep(Duration::from_secs_f32(args.refresh_period.unwrap_or(DEFAULT_TIME_TO_WAIT)*60.0))
+        }
+    }
+}
+
+fn slurm_recon_watch(args:WaitForCompletionArgs,email:&str) {
+
+    let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
+    let engine_work_dir = Path::new(&bg);
+    let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
+
+    let refresh_period = args.refresh_period.unwrap_or(DEFAULT_TIME_TO_WAIT*60.0);
+
+    let job_name = format!("{}_watcher",args.run_number);
+
+    let this_exe = std::env::current_exe().expect("cannot determine this executable");
+
+    let mut cmd = Command::new(this_exe);
+    cmd.arg(&format!("--refresh_period={}",refresh_period));
+    cmd.arg(&args.run_number);
+
+    let mut b = slurm::BatchScript::new(&job_name,&vec![cmd]);
+    b.options.email = Some(String::from(email));
+    b.options.output = work_dir.join("recon_watcher-%j").with_extension("out").into_os_string().to_str().unwrap().to_string();
+
+    b.submit_now(&work_dir);
+}
+
+
+
+
+
+
+
 fn dti(args:DtiRecon){
     // Where are we going to live?
     let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
@@ -380,4 +459,17 @@ fn dti(args:DtiRecon){
             }
         }
     });
+
+    // launch a recon watcher to send email notifications when recon is complete
+    if args.email.is_some() && !args.disable_slurm.unwrap_or(false) {
+        slurm_recon_watch(
+            WaitForCompletionArgs{
+                run_number: args.run_number.clone(),
+                refresh_period:None,
+            },
+            &args.email.clone().unwrap()
+        );
+        println!("recon watcher was launched on your behalf. Check your email {} for notifications",&args.email.unwrap());
+    }
+
 }

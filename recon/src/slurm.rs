@@ -21,7 +21,8 @@ pub struct SBatchOpts{
     pub memory:Option<String>,
     pub output:String,
     pub partition:String,
-    pub start_delay_sec:Option<u32>
+    pub start_delay_sec:Option<u32>,
+    pub email:Option<String>,
 }
 
 pub struct BatchScript{
@@ -40,7 +41,8 @@ impl SBatchOpts{
             no_requeue: true,
             output:String::from(""),
             partition:String::from(""),
-            start_delay_sec:None
+            start_delay_sec:None,
+            email:None
         };
     }
     pub fn print(&self) -> String {
@@ -52,6 +54,13 @@ impl SBatchOpts{
         if !self.partition.is_empty(){ opts.push(format!("#SBATCH --partition={}",&self.partition))}
         if self.start_delay_sec.is_some() { opts.push(format!("#SBATCH --begin=now+{}",self.start_delay_sec.unwrap()))}
         opts.push(format!("#SBATCH --mem={}",self.memory.clone().expect("memory request must be specified")));
+        match &self.email {
+            Some(email) => {
+                opts.push(String::from("#SBATCH --mail-type=ALL"));
+                opts.push(format!("#SBATCH --mail-user={}",email))
+            }
+            None => {}
+        }
         return opts.join("\n");
     }
 }

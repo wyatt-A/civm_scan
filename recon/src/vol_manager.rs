@@ -23,10 +23,6 @@ use crate::recon_config::{ConfigFile, RemoteSystem, VolumeManagerConfig};
 use rand::prelude::*;
 
 pub const SCALE_FILENAME:&str = "volume_scale_info";
-pub const DEFAULT_HIST_PERCENT:f32 = 0.9995;
-pub const DEFAULT_IMAGE_CODE:&str = "t9";
-pub const DEFAULT_IMAGE_TAG:&str = "imx";
-
 
 #[derive(Debug,Serialize,Deserialize)]
 pub struct VolumeManager{
@@ -151,6 +147,9 @@ impl VolumeManagerResources {
             None => Err(ResourceError::FetchError)
         }
     }
+
+
+
     fn resource_dir(config:&Path) -> PathBuf {
         let local_dir = config.with_file_name("resource");
         if local_dir.exists() {
@@ -192,7 +191,6 @@ impl VolumeManagerResources {
             &format!("{}/",local_dir_str)
         ]);
 
-
         // use a lock file to limit ssh traffic on the scanner
         // wait a random amount of time before checking/writing a lock file.
         // This will reduce the chance of two lock files getting generated simultaneously by
@@ -219,7 +217,6 @@ impl VolumeManagerResources {
 
         // check if ac file is present where we are expecting it
         //ssh -q mrs@stejskal [[ -f /d/dev/221125/se/ico61_6b0/m00/m00.ac ]]
-
 
         println!("attempting to run {:?}",scp_command);
         let o = scp_command.output().expect(&format!("failed to launch {:?}",scp_command));
@@ -272,6 +269,10 @@ impl VolumeManager {
             "WritingHeadfile" => self.state = VolumeManagerState::WritingHeadfile,
             _=> panic!("state set is not yet implemented")
         }
+    }
+
+    pub fn state(&self) -> VolumeManagerState {
+        self.state.clone()
     }
 
     pub fn slurm_out_dir(&self) -> PathBuf {
@@ -376,16 +377,6 @@ impl VolumeManager {
 
         let o = cmd.output().expect("failed to launch srun");
         println!("{}",String::from_utf8(o.stdout).unwrap());
-    }
-
-    pub fn no_cluster_scheduling() -> bool {
-        // check to see if we are running sequentially or in parallel on the cluster
-        match std::env::var("SLURM_DISABLE").unwrap_or(String::from("no")).as_str() {
-            "yes" | "y" | "true" | "1" => {
-                true
-            },
-            _=> false
-        }
     }
 
     pub fn launch(config:&Path) {
@@ -590,9 +581,9 @@ impl VolumeManager {
             WritingHeadfile => {
                 println!("writing headfile ...");
 
-                // update the resource dir just for now
-                let res = VolumeManagerResources::open(&self.config).expect("we shoudn't be getting a resource error right now");
-                self.resources = Some(res);
+                // update the resource dir just for now (from headfile modifications)
+                //let res = VolumeManagerResources::open(&self.config).expect("we shoudn't be getting a resource error right now");
+                //self.resources = Some(res);
 
                 let recon_headfile = ReconHeadfile{
                     spec_id: settings.run_settings.spec_id.clone(),
@@ -636,7 +627,7 @@ impl VolumeManager {
                     None => {}
                 }
 
-                self.state = Done;
+                self.state = SendingToArchiveEngine;
                 StateAdvance::Succeeded
             }
 
@@ -697,7 +688,7 @@ impl VolumeManager {
                                     }
                                 }
                                 self.state = VolumeManagerState::Done;
-                                StateAdvance::Succeeded
+                                StateAdvance::AllWorkDone
                             }
                             false => {
                                 println!("unable to transfer files with {:?}",scp);
