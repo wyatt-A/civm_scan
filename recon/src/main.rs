@@ -342,7 +342,7 @@ fn slurm_recon_watch(args:WaitForCompletionArgs,email:&str) {
     let this_exe = std::env::current_exe().expect("cannot determine this executable");
 
     let mut cmd = Command::new(this_exe);
-    cmd.arg(&format!("--refresh_period={}",refresh_period));
+    cmd.arg(&format!("--refresh-period={}",refresh_period));
     cmd.arg(&args.run_number);
 
     let mut b = slurm::BatchScript::new(&job_name,&vec![cmd]);
