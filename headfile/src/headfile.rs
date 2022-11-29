@@ -324,6 +324,7 @@ impl Headfile{
             let commented_line = format!("{}{}\n",comment_char,line);
             s.push_str(&commented_line);
         });
+        let mut f = File::create(&self.file).expect("can't create new file");
         f.write_all(s.as_bytes()).expect("unable to update headfile");
     }
 
