@@ -183,6 +183,18 @@ pub fn is_running(job_id:u32){
     println!("{:?}",o.stdout);
 }
 
+pub fn cancel(job_id:u32) -> bool {
+    let mut cmd = Command::new("scancel");
+    cmd.arg(&format!("{}",job_id));
+    match cmd.output(){
+        Ok(o) => o.status.success(),
+        Err(_) => {
+            println!("scancel not found");
+            false
+        }
+    }
+}
+
 pub fn get_job_state(job_id:u32,n_tries:u16) -> JobState {
     let mut cmd = Command::new("sacct");
     cmd.arg("-j").arg(job_id.to_string()).arg("--format").arg("state");

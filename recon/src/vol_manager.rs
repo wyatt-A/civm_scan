@@ -345,6 +345,10 @@ impl VolumeManager {
         }
     }
 
+    pub fn job_id(&self) -> Option<u32> {
+        self.slurm_job_id.clone()
+    }
+
     pub fn launch_with_srun(config:&Path) {
 
         let this_exe = std::env::current_exe().expect("couldn't determine the current executable");

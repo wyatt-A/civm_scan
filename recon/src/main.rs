@@ -53,6 +53,13 @@ pub struct NewConfigArgs {
 }
 
 #[derive(Clone,clap::Args,Debug)]
+pub struct RestartArgs {
+    run_number:String,
+    #[clap(long)]
+    disable_slurm:Option<bool>,
+}
+
+#[derive(Clone,clap::Args,Debug)]
 pub struct RunnoArgs {
     run_number:String,
 }
@@ -123,7 +130,7 @@ fn main() {
     }
 }
 
-fn restart(args:RunnoArgs){
+fn restart(args:RestartArgs){
     let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
     let engine_work_dir = Path::new(&bg);
     let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
@@ -133,7 +140,8 @@ fn restart(args:RunnoArgs){
     match config_files {
         Some(files) => {
             for config_file in files.iter() {
-                let c = VolumeManagerConfig::from_file(config_file);
+                let mut c = VolumeManagerConfig::from_file(config_file);
+                c.slurm_disabled = args.disable_slurm.unwrap_or(false);
                 match c.is_slurm_disabled() {
                     true => {
                         VolumeManager::launch(config_file);
@@ -144,7 +152,9 @@ fn restart(args:RunnoArgs){
                 }
                 n_restarted += 1;
             }
-            status(args);
+            status(RunnoArgs{
+                run_number:args.run_number.clone()
+            });
             println!("restarted {} volume managers.",n_restarted);
         },
         None => {
@@ -152,6 +162,48 @@ fn restart(args:RunnoArgs){
         }
     }
 }
+
+
+fn cancel(args:RunnoArgs) {
+    println!("finding jobs to cancel for {} ...",args.run_number);
+    let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
+    let engine_work_dir = Path::new(&bg);
+    let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
+
+    if !work_dir.exists(){
+        println!("{} not found. {:?} doesn't exist.",args.run_number,work_dir);
+        return
+    }
+
+    // find all volume manager state files recursively
+    let state_files = utils::find_files(&work_dir,"vol_man");
+
+    let mut states = match state_files {
+        None => {
+            println!("no volume managers found!");
+            return
+        }
+        Some(state_files) => state_files
+    };
+
+    states.sort();
+
+    for s in states {
+        let vm = VolumeManager::read(&s).unwrap();
+        match vm.job_id() {
+            Some(jid) => match slurm::cancel(jid){
+                true => println!("{} cancelled",vm.name()),
+                false => println!("a problem occurred when attempting to cancel {}",vm.name())
+            }
+            None => {
+                println!("no job id found for {}",vm.name())
+            }
+        }
+    }
+
+
+}
+
 
 fn status(args:RunnoArgs) {
     println!("running recon status check on {} ...",args.run_number);
