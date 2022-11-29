@@ -22,7 +22,7 @@ pub enum ReconAction {
     /// check the status of a reconstruction by run number
     Status(RunnoArgs),
     /// restart a recon by run number
-    Restart(RunnoArgs),
+    Restart(RestartArgs),
     /// create a new project template to modify for a new protocol
     NewProjectTemplate(TemplateConfigArgs),
     /// interact with a single volume manager
