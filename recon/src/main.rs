@@ -147,7 +147,8 @@ fn restart(args:RestartArgs){
     let config_files = utils::find_files(&work_dir,"volman_config");
     let mut n_restarted = 0;
     match config_files {
-        Some(files) => {
+        Some(mut files) => {
+            files.sort();
             for config_file in files.iter() {
                 let mut c = VolumeManagerConfig::from_file(config_file);
 
