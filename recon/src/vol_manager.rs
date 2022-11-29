@@ -636,7 +636,7 @@ impl VolumeManager {
                     None => {}
                 }
 
-                self.state = SendingToArchiveEngine;
+                self.state = Done;
                 StateAdvance::Succeeded
             }
 
