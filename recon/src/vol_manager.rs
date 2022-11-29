@@ -578,6 +578,11 @@ impl VolumeManager {
             }
             WritingHeadfile => {
                 println!("writing headfile ...");
+
+                // update the resource dir just for now
+                let res = VolumeManagerResources::open(&self.config).expect("we shoudn't be getting a resource error right now");
+                self.resources = Some(res);
+
                 let recon_headfile = ReconHeadfile{
                     spec_id: settings.run_settings.spec_id.clone(),
                     civmid: settings.run_settings.civm_id.clone(),
