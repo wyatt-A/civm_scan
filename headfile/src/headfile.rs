@@ -315,6 +315,18 @@ impl Headfile{
         f.write_all(txt.as_bytes()).expect("trouble writing to file");
     }
 
+    pub fn append_comment_block(&self,txt:&str,comment_char:&str) {
+        let mut f = File::open(&self.file).expect("where did the headfile go!?");
+        let mut s = String::new();
+        f.read_to_string(&mut s).expect("trouble reading file");
+        s.push('\n');
+        txt.lines().for_each(|line|{
+            let commented_line = format!("{}{}\n",comment_char,line);
+            s.push_str(&commented_line);
+        });
+        f.write_all(s.as_bytes()).expect("unable to update headfile");
+    }
+
     fn merge(map1:HashMap<String,String>,map2:HashMap<String,String>) -> HashMap<String,String> {
         map1.into_iter().chain(map2).collect()
     }
@@ -415,10 +427,4 @@ impl ArchiveTag {
     pub fn filepath(&self,location:&Path) -> PathBuf {
         location.join(self.name_ready())
     }
-}
-
-#[test]
-fn test(){
-    let a = ArchiveInfo::default();
-    println!("archive info is {}",a.is_valid("20.5xfad.01","wa41"));
 }

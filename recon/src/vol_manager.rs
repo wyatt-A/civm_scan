@@ -47,6 +47,7 @@ struct VolumeManagerResources {
     acq_complete:PathBuf,
     kspace_config:PathBuf,
     meta:Option<PathBuf>,
+    pulse_program:Option<PathBuf>,
 }
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -137,12 +138,14 @@ impl VolumeManagerResources {
                 let acq_complete = utils::get_first_match(&res_dir, "*.ac").ok_or(ResourceError::MrdNotComplete)?;
                 let kspace_config = utils::get_first_match(&res_dir, "*.mtk").ok_or(ResourceError::KspaceConfigNotFound)?;
                 let meta = utils::get_first_match(&res_dir, "meta.txt");
+                let pulse_program = utils::get_first_match(&res_dir,"*.ppl");
                 Ok(Self {
                     cs_table,
                     raw_mrd,
                     acq_complete,
                     kspace_config,
                     meta,
+                    pulse_program,
                 })
             }
             None => Err(ResourceError::FetchError)
@@ -591,6 +594,8 @@ impl VolumeManager {
                 let image_dir = self.image_dir();
 
                 let headfile_name = image_dir.join(self.name()).with_extension("headfile");
+
+                // append meta data (if it exists) to the headfile
                 match &self.resources.clone().unwrap().meta {
                     Some(meta) => {
                         std::fs::copy(&meta, &meta.with_file_name("temp")).expect("cannot copy headfile to temp");
@@ -602,6 +607,19 @@ impl VolumeManager {
                         h.append(&recon_headfile.to_hash());
                     }
                 }
+
+                // if we find a pulse program, append it as a comment block
+                match &self.resources.clone().unwrap().pulse_program {
+                    Some(pulse_program) => {
+
+                        let mut ppl_str = String::new();
+                        let mut ppl_file = File::open(pulse_program).expect("cannot open ppl file");
+                        ppl_file.read_to_string(&mut ppl_str).expect("cannot read ppl file");
+                        Headfile::open(&headfile_name).append_comment_block(&ppl_str,"#");
+                    }
+                    None => {}
+                }
+
                 self.state = SendingToArchiveEngine;
                 StateAdvance::Succeeded
             }
