@@ -119,6 +119,9 @@ pub struct DtiRecon {
     /// supply an email to get a notification when the recon is done
     #[clap(long,short)]
     email:Option<String>,
+    /// set this to true to disable sending data to archive engine
+    #[clap(long,short)]
+    skip_send:Option<bool>,
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -353,10 +356,6 @@ fn slurm_recon_watch(args:WaitForCompletionArgs,email:&str) {
 
     b.submit_now(&work_dir);
 }
-
-
-
-
 
 
 

@@ -113,6 +113,8 @@ fn main() {
 struct MyApp {
     image_buffer:Option<egui::TextureHandle>,
     image_volume:Option<ImageVolume>,
+    image_dir:Option<String>,
+    valid_dir:Option<PathBuf>,
     index:usize,
 }
 
@@ -122,6 +124,8 @@ impl Default for MyApp {
             image_buffer:None,
             image_volume:None,
             index:200,
+            image_dir:None,
+            valid_dir:None,
         }
     }
 }
@@ -133,19 +137,34 @@ impl eframe::App for MyApp {
             // get image info if not loaded
 
 
-            let texture:&egui::TextureHandle = self.image_buffer.get_or_insert_with(|| {
-                let v = self.image_volume.get_or_insert(ImageVolume::from_dir(Path::new("c:/Users/waust/review/N60204_m00")));
-                ui.ctx().load_texture(
-                    "my-image",
-                    v.color_image(self.index),
-                    egui::TextureFilter::Linear
-                )
-            });
-
             ui.heading("Image Review");
             ui.label("slice and dice");
 
-            ui.image(texture,texture.size_vec2());
+
+            if self.valid_dir.is_some(){
+                println!("this is running");
+                let p = self.valid_dir.clone().unwrap();
+                let texture:&egui::TextureHandle = self.image_buffer.get_or_insert_with(|| {
+                    let v = self.image_volume.get_or_insert(ImageVolume::from_dir(&p));
+                    ui.ctx().load_texture(
+                        "my-image",
+                        v.color_image(self.index),
+                        egui::TextureFilter::Linear
+                    )
+                });
+                ui.image(texture,texture.size_vec2());
+            }
+
+            ui.text_edit_singleline(self.image_dir.get_or_insert(String::from("")));
+            if ui.button("open").clicked(){
+                let imgp = self.image_dir.clone().unwrap_or(String::from("-"));
+                let img_path = Path::new(&imgp);
+                if img_path.exists(){
+                    println!("setting path {:?}",img_path);
+                    self.valid_dir = Some(img_path.to_owned());
+                    self.image_buffer = None;
+                }
+            }
 
             ui.horizontal(|ui| {
                 if ui.button("<--").clicked() && self.index != 0{
