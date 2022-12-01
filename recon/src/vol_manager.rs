@@ -266,10 +266,7 @@ impl VolumeManager {
     }
 
     pub fn set_state(&mut self,state:&str) {
-        match state {
-            "WritingHeadfile" => self.state = VolumeManagerState::WritingHeadfile,
-            _=> panic!("state set is not yet implemented")
-        }
+        self.state = VolumeManager::state_decode(state);
     }
 
     fn state_decode(state:&str) -> VolumeManagerState {
