@@ -121,7 +121,7 @@ pub struct DtiRecon {
     /// supply an email to get a notification when the recon is done
     #[clap(long,short)]
     email:Option<String>,
-    /// set this to true to disable sending data to archive engine
+    /// set this to false to disable sending data to archive engine
     #[clap(long,short)]
     send_to_engine:Option<bool>,
 }
@@ -176,7 +176,7 @@ fn restart(args:RestartArgs){
 
                 let mut c = VolumeManagerConfig::from_file(config_file);
                 if args.disable_slurm.is_some(){c.slurm_disabled = args.disable_slurm.unwrap();}
-                if args.skip_send_to_engine.is_some(){c.send_to_engine = !args.skip_send_to_engine.unwrap();}
+                if args.skip_send_to_engine.is_some(){c.send_to_engine = args.skip_send_to_engine.unwrap();}
                 c.to_file(config_file);
 
                 // if there is a volume manager state file, set the state and write the state file
