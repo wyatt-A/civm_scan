@@ -620,7 +620,8 @@ impl VolumeManager {
                     None => {}
                 }
 
-                match settings.vm_settings.skip_send_to_engine.unwrap_or(false) {
+                // if we don't want to send to archive engine, we skip to the done state
+                match settings.send_to_engine {
                     false => self.state = SendingToArchiveEngine,
                     true => self.state = Done
                 };

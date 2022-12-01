@@ -173,7 +173,11 @@ fn restart(args:RestartArgs){
         Some(mut files) => {
             files.sort();
             for config_file in files.iter() {
+
                 let mut c = VolumeManagerConfig::from_file(config_file);
+                if args.disable_slurm.is_some(){c.slurm_disabled = args.disable_slurm.unwrap();}
+                if args.skip_send_to_engine.is_some(){c.send_to_engine = !args.skip_send_to_engine.unwrap();}
+                c.to_file(config_file);
 
                 // if there is a volume manager state file, set the state and write the state file
                 // back to disk
@@ -191,9 +195,6 @@ fn restart(args:RestartArgs){
                     None => {}
                 }
 
-                c.slurm_disabled = args.disable_slurm.unwrap_or(false);
-                c.vm_settings.skip_send_to_engine = Some(args.skip_send_to_engine.unwrap_or(false));
-                c.to_file(config_file);
                 match c.is_slurm_disabled() {
                     true => {
                         VolumeManager::launch(config_file);
@@ -384,10 +385,11 @@ fn dti(args:DtiRecon){
         }
     }
 
-    if !p.archive_engine_settings.test_connection() {
+    if !args.skip_send_to_engine.unwrap_or(false) && !p.archive_engine_settings.test_connection(){
         println!("you must fix the remote connection");
         return
     }
+
     if !p.scanner_settings.test_connection() {
         println!("you must fix the remote connection");
         return
@@ -400,7 +402,8 @@ fn dti(args:DtiRecon){
         &args.run_number,
         &args.specimen_id,
         &args.raw_data_base_dir,
-        args.disable_slurm.unwrap_or(false)
+        args.disable_slurm.unwrap_or(false),
+        !args.skip_send_to_engine.unwrap_or(false)
     );
 
     // get subset of vm_configs based on user input (first and last volumes)

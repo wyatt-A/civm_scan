@@ -219,7 +219,6 @@ pub struct VolumeManagerSettings {
     //pub work_dir:PathBuf,
     //pub m_number:String,
     pub volume_index:Option<usize>,
-    pub skip_send_to_engine:Option<bool>,
     pub engine_work_dir:PathBuf,
     pub resource_dir:PathBuf,
     pub is_scale_dependent:bool,
@@ -234,7 +233,6 @@ impl VolumeManagerSettings {
             resource_dir: resource_directory.to_owned(),
             is_scale_dependent,
             is_scale_setter,
-            skip_send_to_engine:Some(false),
         }
     }
     pub fn new_dti_settings(resource_base_dir:&Path,n_volumes:usize) -> Vec<Self> {
@@ -255,6 +253,7 @@ impl VolumeManagerSettings {
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct VolumeManagerConfig {
     pub slurm_disabled:bool,
+    pub send_to_engine:bool,
     pub run_settings:RunSettings,
     pub project_settings:ProjectSettings,
     pub vm_settings:VolumeManagerSettings,
@@ -279,7 +278,7 @@ impl ConfigFile for VolumeManagerConfig {
 }
 
 impl VolumeManagerConfig {
-    pub fn new_dti_config(project_settings:&Path,civm_id:&str,run_number:&str,spec_id:&str,resource_dir:&Path,slurm_disabled:bool) -> Vec<Self> {
+    pub fn new_dti_config(project_settings:&Path,civm_id:&str,run_number:&str,spec_id:&str,resource_dir:&Path,slurm_disabled:bool,send_to_engine:bool) -> Vec<Self> {
         let p = ProjectSettings::from_file(project_settings);
         let r = RunSettings {
             run_number: run_number.to_string(),
@@ -291,7 +290,8 @@ impl VolumeManagerConfig {
             project_settings:p.clone(),
             vm_settings:s.clone(),
             run_settings:r.clone(),
-            slurm_disabled
+            slurm_disabled,
+            send_to_engine,
         }).collect()
     }
 
