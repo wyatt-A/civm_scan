@@ -280,6 +280,10 @@ impl JobCollection {
         }
     }
 
+    pub fn push(&mut self,job_id:u32){
+        self.job_ids.push(job_id);
+    }
+
     /*
         Checks that all job ids are known to slurm and have a state
      */
@@ -335,10 +339,6 @@ impl JobCollection {
         h
     }
 }
-
-
-
-//sacct --parsable2 --noheader -j 37622723,37622790 --format=job,state
 
 
 /*

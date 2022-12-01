@@ -71,7 +71,6 @@ pub enum VolumeManagerState {
     Done,
 }
 
-
 impl VolumeManager {
 
     pub fn read(config:&Path) -> Option<Self> {
@@ -627,7 +626,11 @@ impl VolumeManager {
                     None => {}
                 }
 
-                self.state = SendingToArchiveEngine;
+                match settings.vm_settings.skip_send_to_engine.unwrap_or(false) {
+                    false => self.state = SendingToArchiveEngine,
+                    true => self.state = Done
+                };
+
                 StateAdvance::Succeeded
             }
 

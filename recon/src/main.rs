@@ -65,6 +65,8 @@ pub struct RestartArgs {
     /// set the state of each volume manager on re-launch
     #[clap(long)]
     forced_state:Option<String>,
+    #[clap(long,short)]
+    skip_send_to_engine:Option<bool>,
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -121,7 +123,7 @@ pub struct DtiRecon {
     email:Option<String>,
     /// set this to true to disable sending data to archive engine
     #[clap(long,short)]
-    skip_send:Option<bool>,
+    skip_send_to_engine:Option<bool>,
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -190,6 +192,8 @@ fn restart(args:RestartArgs){
                 }
 
                 c.slurm_disabled = args.disable_slurm.unwrap_or(false);
+                c.vm_settings.skip_send_to_engine = Some(args.skip_send_to_engine.unwrap_or(false));
+                c.to_file(config_file);
                 match c.is_slurm_disabled() {
                     true => {
                         VolumeManager::launch(config_file);

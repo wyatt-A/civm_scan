@@ -207,7 +207,6 @@ impl ConfigFile for ProjectSettings {
 
 }
 
-
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct RunSettings {
     pub run_number:String,
@@ -220,6 +219,7 @@ pub struct VolumeManagerSettings {
     //pub work_dir:PathBuf,
     //pub m_number:String,
     pub volume_index:Option<usize>,
+    pub skip_send_to_engine:Option<bool>,
     pub engine_work_dir:PathBuf,
     pub resource_dir:PathBuf,
     pub is_scale_dependent:bool,
@@ -233,7 +233,8 @@ impl VolumeManagerSettings {
             engine_work_dir: PathBuf::from("/privateShares/wa41"),
             resource_dir: resource_directory.to_owned(),
             is_scale_dependent,
-            is_scale_setter
+            is_scale_setter,
+            skip_send_to_engine:Some(false),
         }
     }
     pub fn new_dti_settings(resource_base_dir:&Path,n_volumes:usize) -> Vec<Self> {
