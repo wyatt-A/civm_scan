@@ -167,7 +167,7 @@ impl VolumeManagerResources {
             return the resource directory if success, None if failed
          */
         let settings = VolumeManagerConfig::from_file(config);
-        let vm = VolumeManager::read(config).expect("where did vol_man file go?");
+        let vm = VolumeManager::read(config).expect(&format!("where did vol_man file go? Expecting it at {:?}",config));
         let user = &settings.project_settings.scanner_settings.remote_user;
         let host = &settings.project_settings.scanner_settings.remote_host;
         let dir = &settings.vm_settings.resource_dir.join("*");
