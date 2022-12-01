@@ -100,9 +100,11 @@ impl VolumeManager {
             }
         }
     }
+
     pub fn config(&self) -> VolumeManagerConfig {
         VolumeManagerConfig::from_file(&self.config)
     }
+
     pub fn to_file(&self) {
         let t = toml::to_string(&self).unwrap();
         utils::write_to_file(&self.config,&Self::file_ext(),&t);
@@ -624,8 +626,8 @@ impl VolumeManager {
 
                 // if we don't want to send to archive engine, we skip to the done state
                 match settings.send_to_engine {
-                    false => self.state = SendingToArchiveEngine,
-                    true => self.state = Done
+                    true => self.state = SendingToArchiveEngine,
+                    false => self.state = Done
                 };
 
                 StateAdvance::Succeeded
