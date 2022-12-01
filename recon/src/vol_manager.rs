@@ -94,7 +94,9 @@ impl VolumeManager {
             }
             false => {
                 println!("state file not found. creating a new one ...");
-                Self::new(config)
+                let c = Self::new(config);
+                c.to_file();
+                c
             }
         }
     }
