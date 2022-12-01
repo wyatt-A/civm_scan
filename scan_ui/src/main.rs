@@ -3,6 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use eframe::egui;
+use eframe::egui::Color32;
 
 use build_sequence::build_directory::build_directory;
 
@@ -20,6 +21,7 @@ struct MyApp {
     age: u32,
     work_dir_buff: String,
     work_dir:Option<PathBuf>,
+    texture: Option<egui::TextureHandle>,
 }
 
 impl Default for MyApp {
@@ -28,14 +30,33 @@ impl Default for MyApp {
             name: "How motivated are you?".to_string(),
             age: 42,
             work_dir_buff: "dummy_path".to_string(),
-            work_dir:None
+            work_dir:None,
+            texture:None,
         }
     }
 }
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+
+
+
+
         egui::CentralPanel::default().show(ctx, |ui| {
+
+            let texture: &egui::TextureHandle = self.texture.get_or_insert_with(|| {
+                // Load the texture only once.
+                let p = Color32::from_gray(255).to_srgba_unmultiplied();
+                let mut img = egui::ColorImage::from_rgba_unmultiplied([1,1],&p);
+                img.size = [2,2];
+                ui.ctx().load_texture(
+                    "my-image",
+                    img,
+                    egui::TextureFilter::Linear
+                )
+            });
+
+
             ui.heading("Civm Scan");
             ui.label("Working Directory");
             ui.horizontal(|ui| {
@@ -63,6 +84,30 @@ impl eframe::App for MyApp {
             if ui.button("compile sequence").clicked() {
                 build_directory(Path::new("d:/dev/221011"));
             }
+            ui.image(texture, texture.size_vec2());
         });
+    }
+}
+
+struct MyImage {
+    texture: Option<egui::TextureHandle>,
+}
+
+impl MyImage {
+    fn ui(&mut self, ui: &mut egui::Ui) {
+        let texture: &egui::TextureHandle = self.texture.get_or_insert_with(|| {
+            // Load the texture only once.
+            ui.ctx().load_texture(
+                "my-image",
+                egui::ColorImage::example(),
+                egui::TextureFilter::Linear
+            )
+        });
+
+        // Show the image:
+        //ui.add(egui::Image::new(texture, texture.size_vec2()));
+
+        // Shorter version:
+        ui.image(texture, texture.size_vec2());
     }
 }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{Write, Read};
 use std::process::Command;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,24 @@ pub enum JobState {
     Cancelled,
     Unknown,
 }
+
+impl JobState {
+    pub fn encode(state_str: &str) -> Self {
+        match state_str {
+            "pending" => JobState::Pending,
+            "cancelled" => JobState::Cancelled,
+            "failed" => JobState::Failed,
+            "running" => JobState::Running,
+            "completed" => JobState::Completed,
+            _ => JobState::Unknown,
+        }
+    }
+    pub fn decode(&self) -> String {
+        format!("{:?}",&self)
+    }
+}
+
+
 
 pub struct SBatchOpts{
     // convert to hash map/set (time permitting :D)
@@ -228,4 +247,112 @@ pub fn get_job_state(job_id:u32,n_tries:u16) -> JobState {
             }
         }
     };
+}
+
+
+pub fn job_state(job_id:u32) -> Option<JobState> {
+    match JobCollection::from_id(job_id).state().get(&job_id) {
+        Some(job_state) => Some(job_state.clone()),
+        None => None
+    }
+}
+
+
+pub struct JobCollection {
+    job_ids:Vec<u32>,
+}
+
+impl JobCollection {
+    pub fn new() -> Self {
+        Self {
+            job_ids:Vec::<u32>::new()
+        }
+    }
+    pub fn from_array(job_ids:&Vec<u32>) -> Self {
+        Self {
+            job_ids:job_ids.clone()
+        }
+    }
+
+    pub fn from_id(job_id:u32) -> Self {
+        Self {
+            job_ids:vec![job_id]
+        }
+    }
+
+    /*
+        Checks that all job ids are known to slurm and have a state
+     */
+    pub fn is_valid(&self) -> bool {
+        let hash = self.state();
+        for id in self.job_ids.iter(){
+            match hash.contains_key(id) {
+                false => return false,
+                true => continue,
+            }
+        }
+        true
+    }
+
+    pub fn is_complete(&self) -> bool {
+        let hash = self.state();
+        for state in hash.values() {
+            match state {
+                JobState::Completed => continue,
+                _=> return false
+            }
+        }
+        true
+    }
+
+    /*
+        Get the state of multiple jobs in the form of a hash map
+    */
+    pub fn state(&self) -> HashMap<u32,JobState> {
+        let jid_str:Vec<String> = self.job_ids.iter().map(|j_id| j_id.to_string()).collect();
+        let jid_str = jid_str.join(",");
+        let mut cmd = Command::new("sacct");
+        cmd.args(vec!["--parsable2","--noheader","--format=job,state","-j",&jid_str]);
+        let o = cmd.output().expect("sacct failed to launch");
+        let mut h = HashMap::<u32,JobState>::new();
+        match o.status.success(){
+            true => {
+                let stdout = String::from_utf8(o.stdout).expect("unable to parse stdout");
+                stdout.lines().for_each(|line|{
+                    let split = line.split_once('|').expect("delimeter | not found in sacct response");
+                    // only parses job ids that are just a number (no extensions)
+                    match split.0.parse::<u32>() {
+                        Ok(job_id) => {
+                            let j_state = JobState::encode(&split.1.to_ascii_lowercase());
+                            h.insert(job_id, j_state);
+                        }
+                        _=> {/*ignore errors*/}
+                    }
+                });
+            }
+            false => panic!("sacct failed")
+        }
+        h
+    }
+}
+
+
+
+//sacct --parsable2 --noheader -j 37622723,37622790 --format=job,state
+
+
+/*
+simple check to see that slurm is installed on the system
+sinfo -V
+*/
+pub fn is_installed() -> bool{
+    let mut cmd = Command::new("sinfo");
+    cmd.arg("-V");
+    match cmd.output(){
+        Err(_) => {
+            println!("slurm not found on system");
+            false
+        }
+        Ok(_) => true
+    }
 }
