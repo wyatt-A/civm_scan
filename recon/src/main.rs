@@ -385,7 +385,7 @@ fn dti(args:DtiRecon){
         }
     }
 
-    if !args.send_to_engine.unwrap_or(false) && !p.archive_engine_settings.test_connection(){
+    if args.send_to_engine.unwrap_or(true) && !p.archive_engine_settings.test_connection(){
         println!("you must fix the remote connection");
         return
     }
