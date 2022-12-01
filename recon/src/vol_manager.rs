@@ -281,7 +281,7 @@ impl VolumeManager {
             "writingheadfile" => VolumeManagerState::WritingHeadfile,
             "sendingtoarchiveengine" => VolumeManagerState::SendingToArchiveEngine,
             "done" => VolumeManagerState::Done,
-            _=> panic!("volume manager state not recognized. Here are the possible states:\n{}",
+            _=> panic!("volume manager state not recognized. Here are the possible states:\n{}\n",
                 vec![
                     format!("{:?}",VolumeManagerState::Idle),
                     format!("{:?}",VolumeManagerState::NeedsResources),
