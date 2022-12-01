@@ -123,7 +123,7 @@ pub struct DtiRecon {
     email:Option<String>,
     /// set this to true to disable sending data to archive engine
     #[clap(long,short)]
-    skip_send_to_engine:Option<bool>,
+    send_to_engine:Option<bool>,
 }
 
 #[derive(Clone,clap::Args,Debug)]
@@ -385,7 +385,7 @@ fn dti(args:DtiRecon){
         }
     }
 
-    if !args.skip_send_to_engine.unwrap_or(false) && !p.archive_engine_settings.test_connection(){
+    if !args.send_to_engine.unwrap_or(false) && !p.archive_engine_settings.test_connection(){
         println!("you must fix the remote connection");
         return
     }
@@ -402,8 +402,6 @@ fn dti(args:DtiRecon){
         &args.run_number,
         &args.specimen_id,
         &args.raw_data_base_dir,
-        args.disable_slurm.unwrap_or(false),
-        !args.skip_send_to_engine.unwrap_or(false)
     );
 
     // get subset of vm_configs based on user input (first and last volumes)
@@ -425,9 +423,12 @@ fn dti(args:DtiRecon){
         println!("is this configuration correct? Hit enter to continue or control-C to cancel");
         stdin().read_line(&mut user_in).expect("provide an input!");
     }
-    // Modify the engine work dir for the configs
+
+    // Modify the volume manager configs based on options
     vm_configs.iter_mut().for_each(|conf| {
         conf.vm_settings.engine_work_dir = engine_work_dir.to_owned();
+        conf.send_to_engine = args.send_to_engine.unwrap_or(true);
+        conf.slurm_disabled = args.disable_slurm.unwrap_or(false);
     });
 
     // Make the .work directory

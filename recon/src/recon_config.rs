@@ -278,7 +278,7 @@ impl ConfigFile for VolumeManagerConfig {
 }
 
 impl VolumeManagerConfig {
-    pub fn new_dti_config(project_settings:&Path,civm_id:&str,run_number:&str,spec_id:&str,resource_dir:&Path,slurm_disabled:bool,send_to_engine:bool) -> Vec<Self> {
+    pub fn new_dti_config(project_settings:&Path,civm_id:&str,run_number:&str,spec_id:&str,resource_dir:&Path) -> Vec<Self> {
         let p = ProjectSettings::from_file(project_settings);
         let r = RunSettings {
             run_number: run_number.to_string(),
@@ -290,8 +290,8 @@ impl VolumeManagerConfig {
             project_settings:p.clone(),
             vm_settings:s.clone(),
             run_settings:r.clone(),
-            slurm_disabled,
-            send_to_engine,
+            slurm_disabled:false,
+            send_to_engine:true,
         }).collect()
     }
 
