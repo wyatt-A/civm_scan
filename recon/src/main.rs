@@ -271,6 +271,24 @@ fn status(args:RunnoArgs) {
     // find all volume manager state files recursively
     let state_files = utils::find_files(&work_dir,"vol_man");
 
+
+    // match state_files {
+    //     Some(mut files) => {
+    //         files.sort();
+    //         let job_ids:Vec<u32> = files.iter().flat_map(|file|{
+    //             let vm = VolumeManager::read(file).unwrap();
+    //             vm.job_id()
+    //         }).collect();
+    //
+    //         let job_states = slurm::JobCollection::from_array(&job_ids).state();
+    //
+    //     }
+    //     None => {
+    //         println!("no volumes managers found in {:?}",work_dir);
+    //     }
+    // }
+
+
     let mut n_done = 0;
     let mut total = 0;
 
