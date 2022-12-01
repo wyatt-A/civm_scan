@@ -272,6 +272,35 @@ impl VolumeManager {
         }
     }
 
+    fn state_decode(state:&str) -> VolumeManagerState {
+        match state.to_ascii_lowercase().as_str() {
+            "idle" => VolumeManagerState::Idle,
+            "needsresources" => VolumeManagerState::NeedsResources,
+            "formattingkspace" => VolumeManagerState::FormattingKspace,
+            "reconstructing" => VolumeManagerState::Reconstructing,
+            "filtering" => VolumeManagerState::Filtering,
+            "scaling" => VolumeManagerState::Scaling,
+            "writingimagedata" => VolumeManagerState::WritingImageData,
+            "writingheadfile" => VolumeManagerState::WritingHeadfile,
+            "sendingtoarchiveengine" => VolumeManagerState::SendingToArchiveEngine,
+            "done" => VolumeManagerState::Done,
+            _=> panic!("volume manager state not recognized. Here are the possible states:\n{:?}",
+                vec![
+                    format!("{:?}",VolumeManagerState::Idle),
+                    format!("{:?}",VolumeManagerState::NeedsResources),
+                    format!("{:?}",VolumeManagerState::FormattingKspace),
+                    format!("{:?}",VolumeManagerState::Reconstructing),
+                    format!("{:?}",VolumeManagerState::Filtering),
+                    format!("{:?}",VolumeManagerState::Scaling),
+                    format!("{:?}",VolumeManagerState::WritingImageData),
+                    format!("{:?}",VolumeManagerState::WritingHeadfile),
+                    format!("{:?}",VolumeManagerState::SendingToArchiveEngine),
+                    format!("{:?}",VolumeManagerState::Done),
+                ].join("\n")
+            )
+        }
+    }
+
     pub fn state(&self) -> VolumeManagerState {
         self.state.clone()
     }
