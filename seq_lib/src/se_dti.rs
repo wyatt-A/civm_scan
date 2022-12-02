@@ -73,7 +73,7 @@ impl CompressedSense for SeDtiParams {
 
 
 impl Simulate for SeDtiParams {
-    fn set_repetitions(&mut self) {
+    fn set_sim_repetitions(&mut self) {
         self.n_repetitions = 2;
     }
 }

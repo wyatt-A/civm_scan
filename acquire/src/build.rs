@@ -4,7 +4,7 @@ use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use cs_table::cs_table::CSTable;
-use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims};
+use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims, SetScout};
 use headfile::headfile::Headfile;
 use dyn_clone::clone_box;
 use encoding::all::ISO_8859_1;
@@ -14,7 +14,12 @@ use regex::Regex;
 use seq_lib::fse_dti::FseDtiParams;
 use crate::args::{ApplySetupArgs, NewArgs, NewConfigArgs, NewDiffusionExperimentArgs};
 use std::fs::copy;
+use seq_lib::scout::ScoutParams;
+use seq_lib::se_2d::Se2DParams;
 use seq_lib::se_dti::SeDtiParams;
+use seq_tools::ppl::Orientation;
+use utils;
+use crate::build::Sequence::Se2D;
 
 const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
 //const SEQUENCE_LIB:&str = "/home/wyatt/projects/test_data/build_test";
@@ -30,6 +35,8 @@ pub enum Sequence {
     SeDti,
     MGRE,
     GRE,
+    Scout,
+    Se2D,
 }
 
 impl Sequence {
@@ -39,6 +46,9 @@ impl Sequence {
             Self::decode(&Self::SeDti),
             Self::decode(&Self::MGRE),
             Self::decode(&Self::GRE),
+            Self::decode(&Self::Scout),
+            Self::decode(&Self::Se2D),
+
         ].join("\n")
     }
     pub fn encode(name:&str) -> Self {
@@ -47,6 +57,8 @@ impl Sequence {
             "se_dti" => Self::SeDti,
             "mgre" => Self::MGRE,
             "gre" => Self::GRE,
+            "scout" => Self::Scout,
+            "se_2d" => Self::Se2D,
             _=> panic!("name not recognized")
         }
     }
@@ -56,10 +68,11 @@ impl Sequence {
             Self::SeDti => String::from("se_dti"),
             Self::MGRE => String::from("mgre"),
             Self::GRE => String::from("gre"),
+            Self::Scout => String::from("scout"),
+            Self::Se2D => String::from("se_2d"),
         }
     }
 }
-
 
 
 pub fn acq_dims(cfg_file:&Path) -> AcqDims {
@@ -75,9 +88,27 @@ fn load_params(cfg_file:&Path) -> Box<dyn SequenceParameters> {
         Sequence::SeDti => {
             Box::new(SeDtiParams::load(&cfg_file))
         },
+        Sequence::Scout => {
+            Box::new(ScoutParams::load(&cfg_file))
+        }
+        Sequence::Se2D => {
+            Box::new(Se2DParams::load(&cfg_file))
+        }
         _=> panic!("not yet implemented")
     }
 }
+
+
+fn load_scout_params(cfg_file:&Path) -> Box<dyn SetScout> {
+    let cfg_str = read_to_string(cfg_file);
+    match find_seq_name_from_config(&cfg_str) {
+        Sequence::Scout => {
+            Box::new(ScoutParams::load(&cfg_file))
+        }
+        _=> panic!("not yet implemented")
+    }
+}
+
 
 fn load_dw_params(cfg_file:&Path) -> Box<dyn DWSequenceParameters> {
     let cfg_str = read_to_string(cfg_file);
@@ -94,7 +125,8 @@ fn load_dw_params(cfg_file:&Path) -> Box<dyn DWSequenceParameters> {
 
 pub fn new_simulation(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_params(&cfg_file);
+    let mut params = load_params(&cfg_file);
+    params.configure_simulation();
     build_simulation(params,&args.destination,BUILD);
 }
 
@@ -127,6 +159,12 @@ pub fn new_config(args:&NewConfigArgs){
         Sequence::SeDti => {
             SeDtiParams::write_default(&path_out);
         }
+        Sequence::Scout => {
+            ScoutParams::write_default(&path_out);
+        }
+        Sequence::Se2D => {
+            Se2DParams::write_default(&path_out);
+        }
         _=> panic!("not yet implemented")
     }
 }
@@ -146,6 +184,11 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
     build_diffusion_experiment(params, &args.destination, b_table, BUILD);
 }
 
+pub fn new_scout_experiment(args:&NewArgs) {
+    let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
+    let params = load_scout_params(&cfg_file);
+    build_scout_experiment(params, &args.destination, BUILD);
+}
 
 pub fn apply_setup(args:&ApplySetupArgs) {
     if args.children.is_file() {
@@ -337,6 +380,29 @@ pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,bu
         }
         _=> {}
     }
+}
+
+pub fn build_scout_experiment(sequence_params:Box<dyn SetScout>, work_dir:&Path, build:bool) {
+    let mut s = clone_box(&*sequence_params);
+    let orientations = vec![Orientation::Scout0,Orientation::Scout1,Orientation::Scout2];
+
+    let fovs = vec![(12.0,12.0),(19.7,12.0),(19.7,12.0)];
+    let samps = vec![(128,128),(210,128),(210,128)];
+
+    orientations.iter().enumerate().for_each(|(index,orient)|{
+        s.set_orientation(orient);
+        s.set_samples(samps[index].clone());
+        s.set_fov(fovs[index].clone());
+        let label = utils::m_number(index,3);
+        let dir = work_dir.join(&label);
+        create_dir_all(&dir).expect("trouble building directory");
+        let mut to_build = s.instantiate();
+        s.mrd_to_kspace_params().to_file(&dir.join("mrd_to_kspace"));
+        let h = Headfile::new(&dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
+        h.append(&s.acq_params().to_hash());
+        to_build.ppl_export(&dir,&label,false,build);
+        to_build.param_export(&dir);
+    });
 }
 
 pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>, work_dir:&Path, b_table:&Path, build:bool) {

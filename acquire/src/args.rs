@@ -13,6 +13,7 @@ pub enum Action {
     New(NewArgs),
     NewSimulation(NewArgs),
     NewDiffusionExperiment(NewDiffusionExperimentArgs),
+    NewScout(NewArgs),
     NewSetup(NewArgs),
     ApplySetup(ApplySetupArgs),
     ListSequences,

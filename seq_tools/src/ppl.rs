@@ -76,7 +76,10 @@ pub enum Orientation {
     CivmStandard,
     Ortho1,
     Ortho2,
-    Simulation
+    Simulation,
+    Scout0,
+    Scout1,
+    Scout2,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -107,12 +110,14 @@ impl GradClock {
 impl Orientation {
     pub fn base_matrix(&self) -> (i16,i16,i16) {
         match self {
-            Orientation::CivmStandard => (-900,0,0),
-            Orientation::Simulation => (0,0,0),
-            Orientation::Ortho1 => (0,-900,0),
-            Orientation::Ortho2 => (0,0,-900),
+            Orientation::CivmStandard => (-900, 0, 0),
+            Orientation::Simulation => (0, 0, 0),
+            Orientation::Ortho1 => (0, -900, 0),
+            Orientation::Ortho2 => (0, 0, -900),
+            Orientation::Scout0 => (0, 0, 900),
+            Orientation::Scout1 => (-900, 0, 0),
+            Orientation::Scout2 => (-900, -900, 0),
         }
-
     }
     pub fn print(&self) -> String {
         let mat = self.base_matrix();
@@ -697,7 +702,9 @@ impl Header {
             }
             None => {}
         }
-        out.join("\n")
+        let mut o = out.join("\n");
+        o.push('\n');
+        o
     }
 }
 

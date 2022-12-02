@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::fs::{File};
@@ -21,13 +22,13 @@ use cs_table::cs_table::CSTable;
 use headfile::headfile::{DWHeadfile, DWHeadfileParams, AcqHeadfile, AcqHeadfileParams};
 use crate::pulse_sequence;
 
-impl Simulate for ScoutParams {
+impl Simulate for Se2DParams {
     fn set_sim_repetitions(&mut self) {
-        self.n_repetitions = 2;
+        self.samples.1 = 2;
     }
 }
 
-impl AcqDimensions for ScoutParams {
+impl AcqDimensions for Se2DParams {
     fn acq_dims(&self) -> AcqDims {
         AcqDims {
             n_read: self.samples.0 as i32,
@@ -40,7 +41,7 @@ impl AcqDimensions for ScoutParams {
     }
 }
 
-impl AcqHeadfile for ScoutParams {
+impl AcqHeadfile for Se2DParams {
     fn acq_params(&self) -> AcqHeadfileParams {
         AcqHeadfileParams {
             dim_x: self.samples.0 as i32,
@@ -59,20 +60,21 @@ impl AcqHeadfile for ScoutParams {
     }
 }
 
-impl Initialize for ScoutParams {
+impl Initialize for Se2DParams {
     fn default() -> Self {
-        ScoutParams {
-            name: "scout".to_string(),
+        Se2DParams {
+            name: "se_2d".to_string(),
             fov: (19.7, 12.0),
             samples: (210, 128),
             slice_thickness: 1.0,
             sample_discards: 0,
-            orientation: Orientation::Scout1,
+            orientation: Orientation::CivmStandard,
             spectral_width: SpectralWidth::SW100kH,
             rf_duration: 140E-6,
+            rf_180_duration: 280E-6,
             ramp_time: 140E-6,
             phase_encode_time: 550E-6,
-            echo_time: 5E-3,
+            echo_time: 10E-3,
             obs_freq_offset: 0.0,
             rep_time: 50E-3,
             n_averages: 1,
@@ -94,7 +96,7 @@ impl Initialize for ScoutParams {
     }
 }
 
-impl MrdToKspace for ScoutParams {
+impl MrdToKspace for Se2DParams {
     fn mrd_to_kspace_params(&self) -> MrdToKspaceParams {
         MrdToKspaceParams {
             mrd_format:MrdFormat::StandardSlice,
@@ -109,21 +111,8 @@ impl MrdToKspace for ScoutParams {
     }
 }
 
-impl SetScout for ScoutParams {
-    fn set_orientation(&mut self, orient: &Orientation) {
-        self.orientation = orient.clone();
-    }
 
-    fn set_fov(&mut self, fov: (f32, f32)) {
-        self.fov = fov;
-    }
-
-    fn set_samples(&mut self, samples: (u16, u16)) {
-        self.samples = samples;
-    }
-}
-
-impl CompressedSense for ScoutParams {
+impl CompressedSense for Se2DParams {
     fn is_cs(&self) -> bool {
         false
     }
@@ -136,7 +125,7 @@ impl CompressedSense for ScoutParams {
     }
 }
 
-impl Setup for ScoutParams {
+impl Setup for Se2DParams {
     fn set_mode(&mut self) {
     }
 
@@ -144,10 +133,10 @@ impl Setup for ScoutParams {
     }
 }
 
-impl SequenceParameters for ScoutParams {
+impl SequenceParameters for Se2DParams {
 
     fn name(&self) -> String {
-        String::from("scout")
+        String::from("se_2d")
     }
     fn write(&self,params_file: &Path){
         let str = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
@@ -155,11 +144,11 @@ impl SequenceParameters for ScoutParams {
         f.write_all(str.as_bytes()).expect("trouble writing to file");
     }
     fn instantiate(&self) -> Box<dyn Build> {
-        Box::new(Scout::new(self.clone()))
+        Box::new(Se2D::new(self.clone()))
     }
 }
 
-impl Build for Scout {
+impl Build for Se2D {
     fn place_events(&self) -> EventQueue {
         self.place_events()
     }
@@ -184,7 +173,7 @@ impl Build for Scout {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct ScoutParams {
+pub struct Se2DParams {
     name: String,
     fov: (f32, f32),
     samples: (u16, u16),
@@ -193,6 +182,7 @@ pub struct ScoutParams {
     orientation:Orientation,
     spectral_width: SpectralWidth,
     rf_duration: f32,
+    rf_180_duration: f32,
     ramp_time: f32,
     phase_encode_time: f32,
     echo_time: f32,
@@ -204,16 +194,18 @@ pub struct ScoutParams {
 }
 
 #[derive(Clone)]
-pub struct Scout {
-    params: ScoutParams,
-    events: ScoutEvents,
+pub struct Se2D {
+    params: Se2DParams,
+    events: Se2DEvents,
 }
 
 #[derive(Clone)]
-pub struct ScoutEvents {
+pub struct Se2DEvents {
     slice_sel: GradEvent<Trapezoid>,
     slice_ref: GradEvent<Trapezoid>,
     excitation: RfEvent<Hardpulse>,
+    refocus: RfEvent<CompositeHardpulse>,
+    ref_slice_sel: GradEvent<Trapezoid>,
     phase_encode: GradEvent<Trapezoid>,
     readout: GradEvent<Trapezoid>,
     acquire: AcqEvent,
@@ -222,10 +214,12 @@ pub struct ScoutEvents {
 
 struct Waveforms {
     excitation: Hardpulse,
+    refocus:CompositeHardpulse,
     phase_encode: Trapezoid,
     readout: Trapezoid,
     slice_sel:Trapezoid,
     slice_ref:Trapezoid,
+    ref_slice_sel:Trapezoid,
 }
 
 struct GradMatrices {
@@ -234,11 +228,12 @@ struct GradMatrices {
     rewinder: Matrix,
     slice_sel: Matrix,
     slice_ref: Matrix,
+    ref_slice_sel: Matrix,
 }
 
-impl Scout {
+impl Se2D {
 
-    pub fn new(params: ScoutParams) -> Scout {
+    pub fn new(params: Se2DParams) -> Se2D {
         let events = Self::events(&params);
         Self {
             events,
@@ -246,25 +241,29 @@ impl Scout {
         }
     }
 
-    fn waveforms(params: &ScoutParams) -> Waveforms {
+    fn waveforms(params: &Se2DParams) -> Waveforms {
         let n_read = params.samples.0;
         let read_sample_time_sec = params.spectral_width.sample_time(n_read + params.sample_discards);
         let excitation = Hardpulse::new(params.rf_duration);
+        let refocus = CompositeHardpulse::new_180(params.rf_180_duration);
         let readout = Trapezoid::new(params.ramp_time, read_sample_time_sec);
         let phase_encode = Trapezoid::new(params.ramp_time, params.phase_encode_time);
         let slice_sel = Trapezoid::new(params.ramp_time,2.0*params.rf_duration);
         let slice_ref = Trapezoid::new(params.ramp_time,params.rf_duration);
+        let ref_slice_sel = Trapezoid::new(params.ramp_time,2.0*params.rf_180_duration);
 
         Waveforms {
             excitation,
+            refocus,
             phase_encode,
             readout,
             slice_sel,
             slice_ref,
+            ref_slice_sel
         }
     }
 
-    fn gradient_matrices(params: &ScoutParams) -> GradMatrices {
+    fn gradient_matrices(params: &Se2DParams) -> GradMatrices {
         let waveforms = Self::waveforms(params);
         let mat_count = Matrix::new_tracker();
         let n_read = params.samples.0;
@@ -302,6 +301,9 @@ impl Scout {
         let grad = 10.0*waveforms.excitation.bandwidth_hz()/params.slice_thickness;
         let slice_dac = grad_cal::grad_to_dac(grad);
 
+        let grad = 10.0*waveforms.refocus.bandwidth_hz()/params.slice_thickness;
+        let ref_dac = grad_cal::grad_to_dac(grad);
+
         let slice_sel = Matrix::new_static(
             "slice_sel_mat",
             DacValues::new(None,None,Some(slice_dac)),
@@ -318,16 +320,25 @@ impl Scout {
             &mat_count
         );
 
+        let ref_slice_sel = Matrix::new_static(
+            "ref_slice_sel_mat",
+            DacValues::new(None,None,Some(ref_dac)),
+            (false,false,false),
+            false,
+            &mat_count
+        );
+
         GradMatrices {
             phase_encode1,
             readout,
             rewinder,
             slice_sel,
             slice_ref,
+            ref_slice_sel
         }
     }
 
-    fn events(params: &ScoutParams) -> ScoutEvents {
+    fn events(params: &Se2DParams) -> Se2DEvents {
         let w = Self::waveforms(params);
         let m = Self::gradient_matrices(params);
 
@@ -339,14 +350,29 @@ impl Scout {
             "slice_sel"
         );
 
+        let ref_slice_sel = GradEvent::new(
+            (None,None,Some(w.ref_slice_sel)),
+            &m.ref_slice_sel,
+            GradEventType::NonBlocking,
+            "ref_slice_sel"
+        );
 
         let excitation = RfEvent::new(
             "excitation",
             1,
             w.excitation,
-            RfStateType::Adjustable(100, None),
+            RfStateType::Adjustable(400, None),
             RfStateType::Static(0)
         );
+
+        let refocus = RfEvent::new(
+            "refocus",
+            2,
+            w.refocus,
+            RfStateType::Adjustable(800, None),
+            RfStateType::Adjustable(400,None)
+        );
+
 
         let slice_ref = GradEvent::new(
             (None,None,Some(w.slice_ref)),
@@ -384,7 +410,7 @@ impl Scout {
             "rewind"
         );
 
-        ScoutEvents {
+        Se2DEvents {
             slice_sel,
             slice_ref,
             excitation,
@@ -392,35 +418,63 @@ impl Scout {
             readout,
             acquire,
             rewinder,
+            refocus,
+            ref_slice_sel
         }
     }
 
 
     fn place_events(&self) -> EventQueue {
         let te = self.params.echo_time;
+        let tau = te/2.0;
 
         let sd = utils::sec_to_clock(2.0*self.params.ramp_time + 2.0*self.params.rf_duration) as u32;
 
         let excitation = Event::new(self.events.excitation.as_reference(), Origin);
-
-        let slice_sel = Event::new(self.events.slice_sel.as_reference(),ExactFromOrigin(300));
+        let slice_sel = Event::new(self.events.slice_sel.as_reference(),ExactFromOrigin(0 + 300));
         let slice_ref = Event::new(self.events.slice_ref.as_reference(),After(excitation.clone(),sd));
 
+
+        let ref_slice_sel = Event::new(self.events.ref_slice_sel.as_reference(),ExactFromOrigin(sec_to_clock(tau)));
+        let refocus = Event::new(self.events.refocus.as_reference(),ExactFromOrigin(sec_to_clock(tau)));
         let readout = Event::new(self.events.readout.as_reference(), ExactFromOrigin(sec_to_clock(te)));
         let acquire1 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te)));
         let phase_encode1 = Event::new(self.events.phase_encode.as_reference(), Before(readout.clone(), 0));
         let rewinder = Event::new(self.events.rewinder.as_reference(), After(acquire1.clone(), 0));
 
+        let r_arr:Vec<Rc<RefCell<Event>>> = (0..10).map(|echo|{
+            let t = ((echo+1) as i32)*sec_to_clock(te);
+            Event::new(self.events.readout.as_reference(), ExactFromOrigin(t))
+        }).collect();
+
+        let a_arr:Vec<Rc<RefCell<Event>>> = (0..10).map(|echo|{
+            let t = ((echo+1) as i32)*sec_to_clock(te);
+            Event::new(self.events.acquire.as_reference(), ExactFromOrigin(t))
+        }).collect();
+
+        let ref_arr:Vec<Rc<RefCell<Event>>> = (0..10).map(|echo|{
+            let t = ((echo+1) as i32)*sec_to_clock(te) - sec_to_clock(tau);
+            Event::new(self.events.refocus.as_reference(), ExactFromOrigin(t))
+        }).collect();
+
+        let ref_sel_arr:Vec<Rc<RefCell<Event>>> = (0..10).map(|echo|{
+            let t = ((echo+1) as i32)*sec_to_clock(te) - sec_to_clock(tau);
+            Event::new(self.events.ref_slice_sel.as_reference(), ExactFromOrigin(t+300))
+        }).collect();
+
+
+        let mut v = Vec::<Rc<RefCell<Event>>>::new();
+
+        v.push(excitation);
+        v.push(slice_sel);
+        v.push(slice_ref);
+        v.extend(r_arr);
+        v.extend(a_arr);
+        v.extend(ref_arr);
+        v.extend(ref_sel_arr);
+
         EventQueue::new(
-            &vec![
-                excitation,
-                slice_sel,
-                slice_ref,
-                phase_encode1,
-                readout,
-                acquire1,
-                rewinder,
-            ]
+            &v
         )
     }
 }

@@ -130,6 +130,7 @@ fn zero_fill(array:&Array2::<Complex<f32>>,
     let mut zf_arr = Array4::<f32>::zeros([dims.2,dims.1,dims.0,2]);
     let mut zf_arr = Array3::<Complex<f32>>::zeros([dims.2,dims.1,dims.0]);
     for (i,index) in cs_table.indices(dummy_excitations*view_acceleration).iter().enumerate() {
+        println!("cs table index = {:?}",index);
         let mut zf_slice = zf_arr.slice_mut(s![index.0 as usize,index.1 as usize,..]);
         zf_slice += &array.slice(s![i,..]);
     }

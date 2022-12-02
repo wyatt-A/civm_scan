@@ -75,6 +75,12 @@ CompressedSense+Simulate+AcqDimensions+DynClone+MrdToKspace+Setup+AcqHeadfile {
     fn instantiate(&self) -> Box<dyn Build>;
 }
 
+pub trait SetScout:SequenceParameters {
+    fn set_orientation(&mut self,orient:&Orientation);
+    fn set_fov(&mut self,fov:(f32,f32));
+    fn set_samples(&mut self,samples:(u16,u16));
+}
+
 pub trait Setup {
     fn set_mode(&mut self);
     fn set_repetitions(&mut self);
@@ -85,9 +91,9 @@ pub trait Setup {
 }
 
 pub trait Simulate {
-    fn set_repetitions(&mut self);
+    fn set_sim_repetitions(&mut self);
     fn configure_simulation(&mut self) {
-        self.set_repetitions();
+        self.set_sim_repetitions();
     }
 }
 

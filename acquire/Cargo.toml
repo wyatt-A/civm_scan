@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+utils = {path = "../utils"}
 headfile = {path = "../headfile"}
 seq_tools = {path = "../seq_tools"}
 seq_lib = {path = "../seq_lib"}

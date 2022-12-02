@@ -122,6 +122,9 @@ impl Hardpulse {
     pub fn new(duration:f32) -> Hardpulse {
         Hardpulse{duration}
     }
+    pub fn bandwidth_hz(&self) -> f32 {
+        1.0/(4.0*self.duration)
+    }
 }
 
 
@@ -162,6 +165,9 @@ impl CompositeHardpulse {
             duration,
             phase_divisions:vec![0.0,90.0,90.0,0.0]
         }
+    }
+    pub fn bandwidth_hz(&self) -> f32 {
+        1.0/(4.0*self.duration)
     }
 }
 
