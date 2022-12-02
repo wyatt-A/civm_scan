@@ -129,9 +129,30 @@ fn zero_fill(array:&Array2::<Complex<f32>>,
     let cs_table = CSTable::open(cs_table,dims.1 as i16,dims.2 as i16);
     let mut zf_arr = Array4::<f32>::zeros([dims.2,dims.1,dims.0,2]);
     let mut zf_arr = Array3::<Complex<f32>>::zeros([dims.2,dims.1,dims.0]);
+
+
+    let indices = cs_table.indices(dummy_excitations*view_acceleration);
+    // scan the indices to make sure non are out of range.
+
+    // the min index must be 0, and the max must be dim - 1
+
+
+    let mut offset = (0,0);
+    for index in indices.iter(){
+        if index.0 as usize == dims.2 {
+            offset.0 = -1;
+        }
+        if index.1 as usize == dims.1 {
+            offset.1 = -1;
+        }
+        if index.0 < 0 || index.1 < 0 {
+            panic!("this cs table is producing negative matrix indices! Please fix it!");
+        }
+    }
+
     for (i,index) in cs_table.indices(dummy_excitations*view_acceleration).iter().enumerate() {
         println!("cs table index = {:?}",index);
-        let mut zf_slice = zf_arr.slice_mut(s![index.0 as usize,index.1 as usize,..]);
+        let mut zf_slice = zf_arr.slice_mut(s![(index.0+offset.0) as usize,(index.1+offset.1) as usize,..]);
         zf_slice += &array.slice(s![i,..]);
     }
     zf_arr
