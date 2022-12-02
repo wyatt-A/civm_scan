@@ -75,7 +75,13 @@ CompressedSense+Simulate+AcqDimensions+DynClone+MrdToKspace+Setup+AcqHeadfile {
     fn instantiate(&self) -> Box<dyn Build>;
 }
 
-pub trait SetScout:SequenceParameters {
+pub trait AdjustmentParameters {
+    fn name(&self) -> String;
+    fn write(&self,params_file:&Path);
+    fn instantiate(&self) -> Box<dyn Build>;
+}
+
+pub trait ScoutConfig:SequenceParameters {
     fn set_orientation(&mut self,orient:&Orientation);
     fn set_fov(&mut self,fov:(f32,f32));
     fn set_samples(&mut self,samples:(u16,u16));
@@ -148,32 +154,6 @@ impl MrdToKspaceParams {
 pub trait MrdToKspace {
     fn mrd_to_kspace_params(&self) -> MrdToKspaceParams;
 }
-
-
-
-/*
-transcribe_numeric(meta_hash,"fov_read","fovx",1000.0 as f32);
-        transcribe_numeric(meta_hash,"fov_phase","fovy",1000.0 as f32);
-        transcribe_numeric(meta_hash,"fov_slice","fovz",1000.0 as f32);
-        transcribe_numeric(meta_hash,"echo_time","te",1000.0 as f32);
-        transcribe_numeric(meta_hash,"rep_time","tr",1000000.0 as f32);
-        transcribe_numeric(meta_hash,"flip","alpha",1.0 as f32);
-        transcribe_numeric(meta_hash,"bandwidth","bw",0.5 as f32);
-        transcribe_numeric(meta_hash,"ppr_no_echoes","ne",1 as i32);
-        transcribe_string(meta_hash,"acq_Sequence","S_PSDname");
-                        hf.append_field("dim_X", dims[0]);
-                hf.append_field("dim_Y", dims[1]);
-                hf.append_field("dim_Z", dims[2]);
-
-
-
-bval_dir=3:1,0.579607171122 0.278002034221 0.7660093969090001
-bvalue=3000
- */
-
-
-
-
 
 pub trait AcqDimensions {
     fn acq_dims(&self) -> AcqDims;

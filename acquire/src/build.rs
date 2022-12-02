@@ -4,7 +4,7 @@ use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use cs_table::cs_table::CSTable;
-use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims, SetScout};
+use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims, ScoutConfig, AdjustmentParameters};
 use headfile::headfile::Headfile;
 use dyn_clone::clone_box;
 use encoding::all::ISO_8859_1;
@@ -12,14 +12,14 @@ use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use glob::glob;
 use regex::Regex;
 use seq_lib::fse_dti::FseDtiParams;
-use crate::args::{ApplySetupArgs, NewArgs, NewConfigArgs, NewDiffusionExperimentArgs};
+use crate::args::{ApplySetupArgs, NewAdjArgs, NewArgs, NewConfigArgs, NewDiffusionExperimentArgs};
 use std::fs::copy;
+use seq_lib::one_pulse::OnePulseParams;
 use seq_lib::scout::ScoutParams;
 use seq_lib::se_2d::Se2DParams;
 use seq_lib::se_dti::SeDtiParams;
 use seq_tools::ppl::Orientation;
 use utils;
-use crate::build::Sequence::Se2D;
 
 const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
 //const SEQUENCE_LIB:&str = "/home/wyatt/projects/test_data/build_test";
@@ -37,6 +37,7 @@ pub enum Sequence {
     GRE,
     Scout,
     Se2D,
+    OnePulse,
 }
 
 impl Sequence {
@@ -48,7 +49,7 @@ impl Sequence {
             Self::decode(&Self::GRE),
             Self::decode(&Self::Scout),
             Self::decode(&Self::Se2D),
-
+            Self::decode(&Self::OnePulse),
         ].join("\n")
     }
     pub fn encode(name:&str) -> Self {
@@ -59,6 +60,7 @@ impl Sequence {
             "gre" => Self::GRE,
             "scout" => Self::Scout,
             "se_2d" => Self::Se2D,
+            "one_pulse" => Self::OnePulse,
             _=> panic!("name not recognized")
         }
     }
@@ -70,6 +72,7 @@ impl Sequence {
             Self::GRE => String::from("gre"),
             Self::Scout => String::from("scout"),
             Self::Se2D => String::from("se_2d"),
+            Self::OnePulse => String::from("one_pulse")
         }
     }
 }
@@ -98,8 +101,18 @@ fn load_params(cfg_file:&Path) -> Box<dyn SequenceParameters> {
     }
 }
 
+fn load_adj_params(cfg_file:&Path) -> Box<dyn AdjustmentParameters> {
+    let cfg_str = read_to_string(cfg_file);
+    match find_seq_name_from_config(&cfg_str) {
+        Sequence::OnePulse => {
+            Box::new(OnePulseParams::load(&cfg_file))
+        },
+        _ => panic!("not yet implemented")
+    }
+}
 
-fn load_scout_params(cfg_file:&Path) -> Box<dyn SetScout> {
+
+fn load_scout_params(cfg_file:&Path) -> Box<dyn ScoutConfig> {
     let cfg_str = read_to_string(cfg_file);
     match find_seq_name_from_config(&cfg_str) {
         Sequence::Scout => {
@@ -143,6 +156,12 @@ pub fn new_setup(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
     let params = load_params(&cfg_file);
     build_setup(params,&args.destination,BUILD);
+}
+
+pub fn new_adjustment(args:&NewAdjArgs) {
+    let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
+    let params = load_adj_params(&cfg_file);
+    build_adj(params,&args.destination,BUILD);
 }
 
 pub fn new_config(args:&NewConfigArgs){
@@ -366,6 +385,13 @@ pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bo
     to_build.param_export(&work_dir);
 }
 
+pub fn build_adj(adj_params:Box<dyn AdjustmentParameters>,work_dir:&Path,build:bool){
+    let mut to_build = adj_params.instantiate();
+    create_dir_all(work_dir).expect("trouble building directory");
+    to_build.ppl_export(work_dir,&adj_params.name(),false,build);
+    to_build.param_export(&work_dir);
+}
+
 pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
     let mut setup_params = clone_box(&*sequence_params);
     setup_params.configure_setup();
@@ -382,7 +408,7 @@ pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,bu
     }
 }
 
-pub fn build_scout_experiment(sequence_params:Box<dyn SetScout>, work_dir:&Path, build:bool) {
+pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>, work_dir:&Path, build:bool) {
     let mut s = clone_box(&*sequence_params);
     let orientations = vec![Orientation::Scout0,Orientation::Scout1,Orientation::Scout2];
 

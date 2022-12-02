@@ -1,5 +1,5 @@
 use clap::Parser;
-use acquire::build::{apply_setup, new, new_config, new_diffusion_experiment, new_scout_experiment, new_setup, new_simulation, Sequence};
+use acquire::build::{apply_setup, new, new_adjustment, new_config, new_diffusion_experiment, new_scout_experiment, new_setup, new_simulation, Sequence};
 use acquire::args::*;
 
 fn main(){
@@ -14,6 +14,7 @@ fn main(){
         NewSetup(args) => new_setup(&args),
         ApplySetup(args) => apply_setup(&args),
         NewSimulation(args) => new_simulation(&args),
+        NewAdjustment(args) => new_adjustment(&args),
         _=> {}
     }
 }

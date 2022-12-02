@@ -14,7 +14,7 @@ use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid}
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, SetScout};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig};
 use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
@@ -109,7 +109,7 @@ impl MrdToKspace for ScoutParams {
     }
 }
 
-impl SetScout for ScoutParams {
+impl ScoutConfig for ScoutParams {
     fn set_orientation(&mut self, orient: &Orientation) {
         self.orientation = orient.clone();
     }

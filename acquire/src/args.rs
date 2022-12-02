@@ -15,6 +15,7 @@ pub enum Action {
     NewDiffusionExperiment(NewDiffusionExperimentArgs),
     NewScout(NewArgs),
     NewSetup(NewArgs),
+    NewAdjustment(NewAdjArgs),
     ApplySetup(ApplySetupArgs),
     ListSequences,
 }
@@ -44,4 +45,10 @@ pub struct ApplySetupArgs {
     pub children:PathBuf,
     #[clap(short, long)]
     pub depth:Option<u16>
+}
+
+#[derive(clap::Args,Debug)]
+pub struct NewAdjArgs {
+    pub alias:String,
+    pub destination:PathBuf,
 }
