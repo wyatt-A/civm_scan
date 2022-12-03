@@ -369,6 +369,13 @@ impl VolumeManager {
         }
     }
 
+    pub fn cancel_job(&self) -> bool {
+        match self.job_id() {
+            Some(jid) => slurm::cancel(jid),
+            None => false
+        }
+    }
+
     pub fn state_string(&self) -> String {
         format!("{:?}",self.state)
     }

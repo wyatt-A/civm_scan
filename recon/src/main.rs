@@ -173,14 +173,15 @@ fn restart(args:RestartArgs){
         Some(mut files) => {
             files.sort();
             for config_file in files.iter() {
-
                 let mut c = VolumeManagerConfig::from_file(config_file);
-                if args.disable_slurm.is_some(){c.slurm_disabled = args.disable_slurm.unwrap();}
-                if args.skip_send_to_engine.is_some(){c.send_to_engine = args.skip_send_to_engine.unwrap();}
+                if args.disable_slurm.is_some() { c.slurm_disabled = args.disable_slurm.unwrap(); }
+                if args.skip_send_to_engine.is_some() { c.send_to_engine = args.skip_send_to_engine.unwrap(); }
                 c.to_file(config_file);
-
-                // if there is a volume manager state file, set the state and write the state file
-                // back to disk
+                /*
+                    If we see a volume manager (vm) state file, and we are forcing a particular state,
+                    set the state of the vm and write the state file back to disk. Then, if the volume manager
+                    is not in the "Done" state, cancel the existing job and relaunch it.
+                 */
                 let mut vm = VolumeManager::read(config_file);
                 match vm {
                     Some(mut vm) => {
@@ -189,21 +190,24 @@ fn restart(args:RestartArgs){
                                 vm.set_state(state);
                                 vm.to_file();
                             }
-                            None => {}
+                            _=> {}
+                        }
+                        match vm.state(){
+                            VolumeManagerState::Done => {},
+                            _=> {
+                                match c.is_slurm_disabled() {
+                                    true => {VolumeManager::launch(config_file);}
+                                    false => {
+                                        vm.cancel_job();
+                                        VolumeManager::launch_with_slurm_now(config_file);
+                                    }
+                                }
+                                n_restarted += 1;
+                            }
                         }
                     }
-                    None => {}
+                    _=> {}
                 }
-
-                match c.is_slurm_disabled() {
-                    true => {
-                        VolumeManager::launch(config_file);
-                    },
-                    false => {
-                        VolumeManager::launch_with_slurm_now(config_file);
-                    },
-                }
-                n_restarted += 1;
             }
             status(RunnoArgs{
                 run_number:args.run_number.clone()
