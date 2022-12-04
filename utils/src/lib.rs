@@ -3,6 +3,9 @@ use std::fs::File;
 use std::io::{Write, Read};
 use glob::glob;
 use walkdir::WalkDir;
+use rustfft::{FftPlanner};
+use num_complex::Complex;
+use argmin::solver::newton::Newton;
 
 pub fn m_number_formatter(n_elements:usize) -> Vec<String>{
     let w = ((n_elements-1) as f32).log10().floor() as usize + 1;
@@ -101,6 +104,43 @@ pub fn find_files(base_dir:&Path,extension:&str) -> Option<Vec<PathBuf>>  {
         _=> Some(files)
     }
 }
+
+/// fourier transform array of real floating points and return the resulting real magnitude.
+/// fft shift=true will shift zero-frequency to the center of the array
+pub fn fft_real_abs(real:&Vec<f32>,fftshift:bool) -> Vec<f32> {
+    let n = real.len();
+    let mut fft_planner = FftPlanner::<f32>::new();
+    let fft = fft_planner.plan_fft_forward(n);
+    let mut complex_tmp:Vec<Complex<f32>> = real.iter().map(|val| Complex::<f32>::new(*val, 0.0)).collect();
+    fft.process(&mut complex_tmp);
+    if fftshift {
+        complex_tmp.rotate_right(n/2);
+    }
+    complex_tmp.iter().map(|complex_val| complex_val.norm()).collect()
+}
+
+pub fn normalize(real:&Vec<f32>) -> Vec<f32> {
+    let abs_max = real
+        .iter()
+        .max_by(|x, y| x.abs().partial_cmp(&y.abs()).unwrap())
+        .unwrap();
+    real.iter().map(|x| x/abs_max).collect()
+}
+
+/// get the index of the zero-crossing point of the real-valued vector
+// pub fn fzero_idx(real:&Vec<f32>) -> Option<usize> {
+//     let solver:Newton<f32> = Newton::new();
+// }
+
+
+
+//    let mut fft_planner = FftPlanner::<f32>::new();
+//     let fft = fft_planner.plan_fft_forward(n);
+//
+//     vol.outer_iter_mut().for_each(|mut slice|{
+//         slice.outer_iter_mut().for_each(|mut line|{
+//             let mut temp = line.to_vec();
+//             fft.process(&mut temp);
 
 //fn is_hidden(entry: &DirEntry) -> bool {
 //     entry.file_name()

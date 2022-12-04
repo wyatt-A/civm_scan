@@ -15,6 +15,11 @@ use crate::utils;
 
 pub trait Pulse {
     fn duration(&self) -> f32;
+    // fn slice_thickness(&self,grad_strength_hzpmm:f32,time_step_us:usize) -> f32{
+    //     let w = self.render(time_step_us);
+    //     // take fourier transform of w and find full-width half-max
+    //
+    // }
     fn function(&self,time_step:usize) -> Vec<Function>;
     fn n_samples(&self,time_step:usize) -> usize {
         self.function(time_step).iter().map(|f| f.n_samples()).sum()
@@ -59,15 +64,6 @@ impl Pulse for Trapezoid {
     fn duration(&self) -> f32 {
         2.0*self.ramp_time + self.plateau_time
     }
-    fn power_net(&self,magnitude:f32) -> f32 {
-        magnitude*(self.ramp_time + self.plateau_time)
-    }
-    fn magnitude_net(&self,power:f32) -> f32 {
-        power/(self.ramp_time + self.plateau_time)
-    }
-    fn power_abs(&self,magnitude:f32) -> f32 {
-        self.power_net(magnitude).abs()
-    }
     fn function(&self,time_step_us:usize) -> Vec<Function>{
         let n_ramp_samples = utils::sec_to_samples(self.ramp_time,time_step_us);
         let n_plateau_samples = utils::sec_to_samples(self.plateau_time,time_step_us);
@@ -78,6 +74,15 @@ impl Pulse for Trapezoid {
             Function::Plateau(plat_params),
             Function::RampDown(ramp_params)
         ]
+    }
+    fn power_net(&self,magnitude:f32) -> f32 {
+        magnitude*(self.ramp_time + self.plateau_time)
+    }
+    fn magnitude_net(&self,power:f32) -> f32 {
+        power/(self.ramp_time + self.plateau_time)
+    }
+    fn power_abs(&self,magnitude:f32) -> f32 {
+        self.power_net(magnitude).abs()
     }
 }
 

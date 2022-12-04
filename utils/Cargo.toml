@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 glob = "0.3.0"
 walkdir = "2"
+rustfft = "6.1.0"
+num-complex = "0.4.2"
+argmin = "0.7.0"
