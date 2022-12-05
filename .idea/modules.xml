@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/civm_scan.iml" filepath="$PROJECT_DIR$/civm_scan.iml" />
+      <module fileurl="file://$PROJECT_DIR$/matlab_prototypes/matlab_prototypes.iml" filepath="$PROJECT_DIR$/matlab_prototypes/matlab_prototypes.iml" />
     </modules>
   </component>
 </project>

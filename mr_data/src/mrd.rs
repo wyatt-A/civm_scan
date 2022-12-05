@@ -64,7 +64,6 @@ pub fn se_raw_to_vol(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&Mr
     cfl::write_cfl_vol(&vol,cfl_out_base_name);
 }
 
-
 fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&MrdToKspaceParams) {
     let fname = cfl_out_base_name.file_name().expect(&format!("cannot determine base name from {:?}",cfl_out_base_name)).to_str().unwrap();
     let n = params.n_objects;
