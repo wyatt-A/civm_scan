@@ -283,7 +283,7 @@ impl VolumeManagerCollection {
     pub fn restart(&self) {
         self.cancel();
         self.launch();
-        println!("restarted {} volume managers",self.vm_config_files.len());
+        println!("restarted {} volume managers.",self.vm_config_files.len());
     }
 
     pub fn force_state(&self,state:&str) {
