@@ -127,7 +127,7 @@ pub fn normalize(real:&Vec<f32>) -> Vec<f32> {
     real.iter().map(|x| x/abs_max).collect()
 }
 
-/// get the index of the zero-crossing point of the real-valued vector
+// get the index of the zero-crossing point of the real-valued vector
 // pub fn fzero_idx(real:&Vec<f32>) -> Option<usize> {
 //     let solver:Newton<f32> = Newton::new();
 // }

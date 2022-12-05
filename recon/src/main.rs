@@ -19,7 +19,7 @@ pub struct ReconArgs {
 #[derive(clap::Subcommand,Debug)]
 pub enum ReconAction {
     /// reconstruct a diffusion-weighted series of volumes
-    Dti(NewRecon),
+    New(NewRecon),
     /// check the status of a reconstruction by run number
     Status(RunnoArgs),
     /// restart a recon by run number
@@ -90,6 +90,8 @@ pub struct RunnoArgs {
 
 #[derive(Clone,clap::Args,Debug)]
 pub struct NewRecon {
+    /// recon type (dti,single-volume,multi-echo)
+    recon_type:String,
     /// civm id (cof,wa41,kjh ...)
     civm_id:String,
     /// base configuration used to define recon parameters
@@ -156,7 +158,7 @@ fn main() {
         }
         ReconAction::Restart(args) => restart(args),
         ReconAction::Status(args) => status(args),
-        ReconAction::Dti(args) => _dti(args),
+        ReconAction::New(args) => recon(args),
         ReconAction::Cancel(args) => cancel(args),
         ReconAction::WaitForCompletion(args) => wait_for_completion(args),
     }
@@ -179,6 +181,23 @@ pub enum VMCollectionType {
     Single,
 }
 
+impl VMCollectionType {
+    pub fn decode(type_str:&str) -> Self {
+        match type_str{
+            "Dti" | "dti" | "DTI" => Self::Dti,
+            "multi-echo" | "multiecho" | "MULTIECHO" => Self::MultiEcho,
+            "single" | "Single" | "SINGLE" => Self::Single,
+            _=> panic!("recon type {} not recognized. Recognized types are \n{}\n",type_str,
+                format!("{}\n{}\n{}",
+                    "dti",
+                    "single",
+                    "multi-echo"
+                )
+            )
+        }
+    }
+}
+
 
 pub struct VolumeManagerCollection {
     work_dir:PathBuf,
@@ -197,6 +216,13 @@ impl VolumeManagerCollection {
                     &settings.specimen_id,
                     &settings.raw_data_base_dir
                 ),
+            Single => VolumeManagerConfig::new_single_volume(
+                &settings.project_settings,
+                &settings.civm_id,
+                &settings.run_number,
+                &settings.specimen_id,
+                &settings.raw_data_base_dir
+            ),
             _=> panic!("{:?} not yet implemented for volume manager collection!",collection_type)
         };
 
@@ -571,64 +597,27 @@ fn slurm_recon_watch(args:WaitForCompletionArgs,email:&str) {
     b.submit_now(&work_dir);
 }
 
-
-fn _dti(args: NewRecon) {
-    let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
-    let engine_work_dir = Path::new(&bg);
-
-
-    // Test connections to scanner and archive engine
-    let p = ProjectSettings::from_file(&args.project_settings);
-
-    if !p.archive_info.is_valid(&p.project_code,&args.civm_id) {
-        match args.no_archive.unwrap_or(false) {
-            false => {
-                println!("project meta data is incorrect for archiving. You must repair the project settings at {:?} and try again.",args.project_settings);
-                println!("if you want to run the recon anyway, re-run with the no archive option. Use --help to find it.");
-                return
-            }
-            true => {
-                println!("you have opted into running the recon despite not passing the meta data validation for archiving!");
-            }
-        }
-    }
-
-    if args.send_to_engine.unwrap_or(true) && !p.archive_engine_settings.test_connection(){
-        println!("you must fix the remote connection");
-        return
-    }
-
-    if !p.scanner_settings.test_connection() {
-        println!("you must fix the remote connection");
-        return
-    }
-
+fn recon(args: NewRecon){
+    let vmc_type = VMCollectionType::decode(&args.recon_type);
     let work_dir = work_dir_big_disk(&args.run_number);
-    let vm_collection = VolumeManagerCollection::new(VMCollectionType::Dti,&args,&work_dir);
-
-    if !args.batch_mode.unwrap_or(false) {
-        let mut user_in = String::new();
-        println!("----------------SETTINGS----------------");
-        println!("project_file = '{:?}'",args.project_settings);
-        println!("specimen_id = '{}'",args.specimen_id);
-        println!("{}",p.to_txt());
-        println!("----------------------------------------");
-        println!("is this configuration correct? Hit enter to continue or control-C to cancel");
-        stdin().read_line(&mut user_in).expect("provide an input!");
+    if !preflight_check(&args){
+        println!("pre-flight check failed.");
+        return
     }
-
-    vm_collection.launch();
-
+    VolumeManagerCollection::new(vmc_type,&args,&work_dir).launch();
 }
 
+// fn _dti(args: NewRecon) {
+//     let work_dir = work_dir_big_disk(&args.run_number);
+//     if !preflight_check(&args){
+//         println!("pre-flight check failed.");
+//         return
+//     }
+//     let vm_collection = VolumeManagerCollection::new(VMCollectionType::Dti,&args,&work_dir);
+//     vm_collection.launch();
+// }
 
-
-fn dti(args: NewRecon){
-    // Where are we going to live?
-    let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
-    let engine_work_dir = Path::new(&bg);
-
-    // Test connections to scanner and archive engine
+fn preflight_check(args: &NewRecon) -> bool {
     let p = ProjectSettings::from_file(&args.project_settings);
 
     if !p.archive_info.is_valid(&p.project_code,&args.civm_id) {
@@ -636,7 +625,7 @@ fn dti(args: NewRecon){
             false => {
                 println!("project meta data is incorrect for archiving. You must repair the project settings at {:?} and try again.",args.project_settings);
                 println!("if you want to run the recon anyway, re-run with the no archive option. Use --help to find it.");
-                return
+                return false
             }
             true => {
                 println!("you have opted into running the recon despite not passing the meta data validation for archiving!");
@@ -646,99 +635,147 @@ fn dti(args: NewRecon){
 
     if args.send_to_engine.unwrap_or(true) && !p.archive_engine_settings.test_connection(){
         println!("you must fix the remote connection");
-        return
+        return false
     }
 
     if !p.scanner_settings.test_connection() {
         println!("you must fix the remote connection");
-        return
+        return false
     }
 
+    review_settings(args);
 
-    // Generate a vector of volume manager configurations that will be operated on
-    let mut vm_configs = recon_config::VolumeManagerConfig::new_dti_config(
-        &args.project_settings,
-        &args.civm_id,
-        &args.run_number,
-        &args.specimen_id,
-        &args.raw_data_base_dir,
-    );
-
-    // get subset of vm_configs based on user input (first and last volumes)
-    let user_last_vol = args.last_volume.unwrap_or(vm_configs.len()-1);
-    let upper_index = if user_last_vol >= vm_configs.len() {vm_configs.len()-1} else {user_last_vol};
-    let user_first_vol = args.first_volume.unwrap_or(0);
-    let lower_index = if user_first_vol >= vm_configs.len() {vm_configs.len()-1} else {user_first_vol};
-    let mut vm_configs = Vec::from_iter(vm_configs[lower_index..(upper_index +1)].iter().cloned());
-    println!("launching recon for range {} to {}. {} volumes will be launched for reconstruction", lower_index, upper_index, upper_index - lower_index +1);
-
-    // remind the user of their settings and confirm with them
-    if !args.batch_mode.unwrap_or(false) {
-        let mut user_in = String::new();
-        println!("----------------SETTINGS----------------");
-        println!("project_file = '{:?}'",args.project_settings);
-        println!("specimen_id = '{}'",args.specimen_id);
-        println!("{}",p.to_txt());
-        println!("----------------------------------------");
-        println!("is this configuration correct? Hit enter to continue or control-C to cancel");
-        stdin().read_line(&mut user_in).expect("provide an input!");
-    }
-
-    // Modify the volume manager configs based on options
-    vm_configs.iter_mut().for_each(|conf| {
-        conf.vm_settings.engine_work_dir = engine_work_dir.to_owned();
-        conf.send_to_engine = args.send_to_engine.unwrap_or(true);
-        conf.slurm_disabled = args.disable_slurm.unwrap_or(false);
-    });
-
-    // Make the .work directory
-    let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
-    if !work_dir.exists() {
-        create_dir(&work_dir).expect(&format!("unable to create working directory {:?}",work_dir));
-    }
-
-    // Write fresh volume manager config files if they don't already exist
-    vm_configs.iter().for_each(|conf|{
-        let config_path = work_dir.join(conf.name());
-        create_dir_all(&config_path).expect(&format!("unable to create {:?}",config_path));
-        let conf_file = config_path.join(conf.name());
-        match VolumeManagerConfig::exists(&conf_file){
-            true => {
-                println!("config already found. Will not re-initialize");
-            }
-            false => {
-                println!("creating new configuration for volume manager {}",conf.name());
-                conf.to_file(&conf_file);
-            }
-        }
-    });
-
-    // launch the volume managers
-    vm_configs.iter().for_each(|conf|{
-        let config_path = work_dir.join(conf.name());
-        let conf_file = config_path.join(conf.name());
-        match conf.is_slurm_disabled() {
-            true => {
-                println!("launching volume manager without slurm {:?}",&conf_file);
-                VolumeManager::launch(&conf_file);
-            },
-            false => {
-                let jid = VolumeManager::launch_with_slurm_now(&conf_file);
-                println!("{} job submitted with id {}",conf.name(),jid);
-            }
-        }
-    });
-
-    // launch a recon watcher to send email notifications when recon is complete
-    if args.email.is_some() && !args.disable_slurm.unwrap_or(false) {
-        slurm_recon_watch(
-            WaitForCompletionArgs{
-                run_number: args.run_number.clone(),
-                refresh_period:None,
-            },
-            &args.email.clone().unwrap()
-        );
-        println!("a recon watcher was launched on your behalf. Check your email {} for notifications",&args.email.unwrap());
-    }
-
+    true
 }
+
+fn review_settings(args:&NewRecon){
+    let p = ProjectSettings::from_file(&args.project_settings);
+    let mut user_in = String::new();
+    println!("----------------SETTINGS----------------");
+    println!("project_file = '{:?}'",args.project_settings);
+    println!("specimen_id = '{}'",args.specimen_id);
+    println!("{}",p.to_txt());
+    println!("----------------------------------------");
+    println!("is this configuration correct? Hit enter to continue or control-C to cancel");
+    stdin().read_line(&mut user_in).expect("provide an input!");
+}
+
+// fn dti(args: NewRecon){
+//     // Where are we going to live?
+//     let bg = std::env::var("BIGGUS_DISKUS").expect("BIGGUS_DISKUS must be set on this workstation");
+//     let engine_work_dir = Path::new(&bg);
+//
+//     // Test connections to scanner and archive engine
+//     let p = ProjectSettings::from_file(&args.project_settings);
+//
+//     if !p.archive_info.is_valid(&p.project_code,&args.civm_id) {
+//         match args.no_archive.unwrap_or(false) {
+//             false => {
+//                 println!("project meta data is incorrect for archiving. You must repair the project settings at {:?} and try again.",args.project_settings);
+//                 println!("if you want to run the recon anyway, re-run with the no archive option. Use --help to find it.");
+//                 return
+//             }
+//             true => {
+//                 println!("you have opted into running the recon despite not passing the meta data validation for archiving!");
+//             }
+//         }
+//     }
+//
+//     if args.send_to_engine.unwrap_or(true) && !p.archive_engine_settings.test_connection(){
+//         println!("you must fix the remote connection");
+//         return
+//     }
+//
+//     if !p.scanner_settings.test_connection() {
+//         println!("you must fix the remote connection");
+//         return
+//     }
+//
+//
+//     // Generate a vector of volume manager configurations that will be operated on
+//     let mut vm_configs = recon_config::VolumeManagerConfig::new_dti_config(
+//         &args.project_settings,
+//         &args.civm_id,
+//         &args.run_number,
+//         &args.specimen_id,
+//         &args.raw_data_base_dir,
+//     );
+//
+//     // get subset of vm_configs based on user input (first and last volumes)
+//     let user_last_vol = args.last_volume.unwrap_or(vm_configs.len()-1);
+//     let upper_index = if user_last_vol >= vm_configs.len() {vm_configs.len()-1} else {user_last_vol};
+//     let user_first_vol = args.first_volume.unwrap_or(0);
+//     let lower_index = if user_first_vol >= vm_configs.len() {vm_configs.len()-1} else {user_first_vol};
+//     let mut vm_configs = Vec::from_iter(vm_configs[lower_index..(upper_index +1)].iter().cloned());
+//     println!("launching recon for range {} to {}. {} volumes will be launched for reconstruction", lower_index, upper_index, upper_index - lower_index +1);
+//
+//     // remind the user of their settings and confirm with them
+//     if !args.batch_mode.unwrap_or(false) {
+//         let mut user_in = String::new();
+//         println!("----------------SETTINGS----------------");
+//         println!("project_file = '{:?}'",args.project_settings);
+//         println!("specimen_id = '{}'",args.specimen_id);
+//         println!("{}",p.to_txt());
+//         println!("----------------------------------------");
+//         println!("is this configuration correct? Hit enter to continue or control-C to cancel");
+//         stdin().read_line(&mut user_in).expect("provide an input!");
+//     }
+//
+//     // Modify the volume manager configs based on options
+//     vm_configs.iter_mut().for_each(|conf| {
+//         conf.vm_settings.engine_work_dir = engine_work_dir.to_owned();
+//         conf.send_to_engine = args.send_to_engine.unwrap_or(true);
+//         conf.slurm_disabled = args.disable_slurm.unwrap_or(false);
+//     });
+//
+//     // Make the .work directory
+//     let work_dir = engine_work_dir.join(format!("{}.work",&args.run_number));
+//     if !work_dir.exists() {
+//         create_dir(&work_dir).expect(&format!("unable to create working directory {:?}",work_dir));
+//     }
+//
+//     // Write fresh volume manager config files if they don't already exist
+//     vm_configs.iter().for_each(|conf|{
+//         let config_path = work_dir.join(conf.name());
+//         create_dir_all(&config_path).expect(&format!("unable to create {:?}",config_path));
+//         let conf_file = config_path.join(conf.name());
+//         match VolumeManagerConfig::exists(&conf_file){
+//             true => {
+//                 println!("config already found. Will not re-initialize");
+//             }
+//             false => {
+//                 println!("creating new configuration for volume manager {}",conf.name());
+//                 conf.to_file(&conf_file);
+//             }
+//         }
+//     });
+//
+//     // launch the volume managers
+//     vm_configs.iter().for_each(|conf|{
+//         let config_path = work_dir.join(conf.name());
+//         let conf_file = config_path.join(conf.name());
+//         match conf.is_slurm_disabled() {
+//             true => {
+//                 println!("launching volume manager without slurm {:?}",&conf_file);
+//                 VolumeManager::launch(&conf_file);
+//             },
+//             false => {
+//                 let jid = VolumeManager::launch_with_slurm_now(&conf_file);
+//                 println!("{} job submitted with id {}",conf.name(),jid);
+//             }
+//         }
+//     });
+//
+//     // launch a recon watcher to send email notifications when recon is complete
+//     if args.email.is_some() && !args.disable_slurm.unwrap_or(false) {
+//         slurm_recon_watch(
+//             WaitForCompletionArgs{
+//                 run_number: args.run_number.clone(),
+//                 refresh_period:None,
+//             },
+//             &args.email.clone().unwrap()
+//         );
+//         println!("a recon watcher was launched on your behalf. Check your email {} for notifications",&args.email.unwrap());
+//     }
+//
+// }

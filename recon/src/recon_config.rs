@@ -246,6 +246,9 @@ impl VolumeManagerSettings {
         vms[0].is_scale_dependent = false;
         vms
     }
+    pub fn new_single_volume_settings(resource_base_dir:&Path) -> Self {
+        VolumeManagerSettings::new(resource_base_dir,false,false,None)
+    }
 }
 
 
@@ -293,6 +296,23 @@ impl VolumeManagerConfig {
             slurm_disabled:false,
             send_to_engine:true,
         }).collect()
+    }
+
+    pub fn new_single_volume(project_settings:&Path,civm_id:&str,run_number:&str,spec_id:&str,resource_dir:&Path) -> Vec<Self> {
+        let p = ProjectSettings::from_file(project_settings);
+        let r = RunSettings {
+            run_number: run_number.to_string(),
+            civm_id: civm_id.to_string(),
+            spec_id: spec_id.to_string()
+        };
+        let vms = VolumeManagerSettings::new_single_volume_settings(resource_dir);
+        vec![VolumeManagerConfig {
+            slurm_disabled: false,
+            send_to_engine: true,
+            run_settings: r.clone(),
+            project_settings: p.clone(),
+            vm_settings: vms
+        }]
     }
 
     pub fn m_number(&self) -> String {
