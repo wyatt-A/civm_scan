@@ -186,7 +186,7 @@ impl VMCollectionType {
         match type_str{
             "Dti" | "dti" | "DTI" => Self::Dti,
             "multi-echo" | "multiecho" | "MULTIECHO" => Self::MultiEcho,
-            "single" | "Single" | "SINGLE" => Self::Single,
+            "single-volume" | "single" | "Single" | "SINGLE" => Self::Single,
             _=> panic!("recon type {} not recognized. Recognized types are \n{}\n",type_str,
                 format!("{}\n{}\n{}",
                     "dti",
