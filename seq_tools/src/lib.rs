@@ -5,7 +5,7 @@ pub mod rf_event;
 pub mod pulse;
 pub mod gradient_frame;
 pub mod rf_frame;
-pub mod utils;
+pub mod _utils;
 pub mod lut_driver;
 pub mod matrix_driver;
 pub mod gradient_list;

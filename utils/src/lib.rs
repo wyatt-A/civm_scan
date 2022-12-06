@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{Write, Read};
+use std::os::unix::prelude::CommandExt;
 use glob::glob;
 use walkdir::WalkDir;
 use rustfft::{FftPlanner};
@@ -127,29 +128,91 @@ pub fn normalize(real:&Vec<f32>) -> Vec<f32> {
     real.iter().map(|x| x/abs_max).collect()
 }
 
-// get the index of the zero-crossing point of the real-valued vector
-// pub fn fzero_idx(real:&Vec<f32>) -> Option<usize> {
-//     let solver:Newton<f32> = Newton::new();
-// }
+pub fn real_to_complex(x:&Vec<f32>) -> Vec<Complex<f32>> {
+    x.iter().map(|real| Complex::new(*real,0.0)).collect()
+}
+
+pub fn complex_to_real(x:&Vec<Complex<f32>>) -> Vec<f32> {
+    x.iter().map(|c| c.re).collect()
+}
+
+pub fn complex_to_imaginary(x:&Vec<Complex<f32>>) -> Vec<f32> {
+    x.iter().map(|c| c.im).collect()
+}
+
+pub fn complex_to_norm(x:&Vec<Complex<f32>>) -> Vec<f32> {
+    x.iter().map(|c| c.norm()).collect()
+}
+
+pub fn fft(x:&Vec<Complex<f32>>,n:usize) -> Vec<Complex<f32>> {
+    let mut fft_planner = FftPlanner::<f32>::new();
+    let fft = fft_planner.plan_fft_forward(n);
+    let mut buff = x.clone();
+    fft.process(&mut buff);
+    buff
+}
+
+pub fn fft_shift(x:&Vec<Complex<f32>>) -> Vec<Complex<f32>> {
+    let n = x.len();
+    let mut r = x.clone();
+    r.rotate_right(n/2);
+    r
+}
+
+pub fn freq_spectrum(x:&Vec<Complex<f32>>,n:usize) -> Vec<f32> {
+
+    let mut buff = x.clone();
+
+    let lenx = x.len();
+    if n > lenx {
+        buff.extend(real_to_complex(&vec![0.0;n-lenx]))
+    } else if lenx < n {
+        buff = buff[0..n].to_vec()
+    }
+
+    let y = fft(&buff,n);
+    // normalize values based on length of transform
+    y.iter().map(|val| val.scale(1.0/n as f32).norm()).collect()
+}
+
+pub fn freq_axis(sample_period:f32,n:usize) -> Vec<f32> {
+    let fs = 1.0/sample_period;
+    (0..n/2+1).map(|s| fs * s as f32 / n as f32).collect()
+}
+
+pub fn abs(x:&Vec<f32>) -> Vec<f32> {
+    x.iter().map(|val| val.abs()).collect()
+}
+
+// bandwidth of a finite time domain signal (used for slice thickness calculations)
+// result is in hertz
+pub fn bandwidth(time_domain_signal:&Vec<Complex<f32>>,dt:f32) -> f32 {
+    let n_fft_samples = 65536;
+
+    let spec = freq_spectrum(time_domain_signal,n_fft_samples);
+    let spec = normalize(&spec);
+    let axis = freq_axis(dt,n_fft_samples);
+
+    // find where spec drops below 0.5 for full-width at half-max
+    let mut f_index = 0;
+    for i in 0..n_fft_samples-1 {
+        if spec[i] >= 0.5 && spec[i+1] < 0.5 {
+            f_index = i;
+            break
+        }
+        if i >= axis.len(){
+            panic!("error finding full width at half max")
+        }
+    }
+    // full bandwidth of time domain signal
+    axis[f_index] + axis[f_index+1]
+}
 
 
-
-//    let mut fft_planner = FftPlanner::<f32>::new();
-//     let fft = fft_planner.plan_fft_forward(n);
-//
-//     vol.outer_iter_mut().for_each(|mut slice|{
-//         slice.outer_iter_mut().for_each(|mut line|{
-//             let mut temp = line.to_vec();
-//             fft.process(&mut temp);
-
-//fn is_hidden(entry: &DirEntry) -> bool {
-//     entry.file_name()
-//          .to_str()
-//          .map(|s| s.starts_with("."))
-//          .unwrap_or(false)
-// }
-//
-// let walker = WalkDir::new("foo").into_iter();
-// for entry in walker.filter_entry(|e| !is_hidden(e)) {
-//     println!("{}", entry?.path().display());
-// }
+pub fn trapz(x:&Vec<f32>,dt:Option<f32>) -> f32 {
+    let mut s = 0.0;
+    for i in 0..x.len()-1{
+        s = s + x[i] + x[i+1];
+    }
+    dt.unwrap_or(1.0)*s/2.0
+}

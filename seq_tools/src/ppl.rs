@@ -10,7 +10,7 @@ use crate::command_string::CommandString;
 use crate::acq_event::SpectralWidth;
 use crate::event_block::EventQueue;
 use crate::ppl_function;
-use crate::utils;
+use crate::_utils;
 use crate::rf_frame::RF_MAX_DAC;
 use crate::seqframe::{FrameType, RF_SEQ_FILE_LABEL, GRAD_SEQ_FILE_LABEL};
 use crate::seqframe::FrameType::Grad;
@@ -777,7 +777,7 @@ impl CalcBlock {
     }
     pub fn duration_clocks(&self) -> i32 {
         // todo! estimate required duration from body
-        utils::ms_to_clock(3)
+        _utils::ms_to_clock(3)
     }
     pub fn print(&self) -> String {
         let h:Vec<String> = self.header().iter().map(|cmds| cmds.commands.clone()).collect();

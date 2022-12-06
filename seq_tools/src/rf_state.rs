@@ -22,7 +22,7 @@ pub struct RfDriver{
 pub enum RfDriverType{
     PhaseCycle3D(PhaseCycleStrategy),
     PhaseCycle2D(PhaseCycleStrategy),
-    PowerRamp(f32)
+    PowerRamp(i16,i16) // scale and offset
 }
 
 #[derive(Clone,Debug)]
@@ -45,14 +45,6 @@ impl RfDriver {
             kind:driver_type,
             driver_var:driver_variable.varname(),
             echo_index:echo_index.unwrap_or(0)
-        }
-    }
-    pub fn render(&self,state:RfState) -> String {
-        match &self.kind {
-            RfDriverType::PowerRamp(scale) => {
-                panic!("not yet implemented")
-            }
-            _=> "not yet implemented".to_owned()
         }
     }
 }
@@ -203,10 +195,10 @@ impl RfState {
             }
             Some(RfStateType::Driven(driver)) => {
                 match &driver.kind {
-                    RfDriverType::PowerRamp(scale) => {
-                        Some(format!("{} = {}*{}",self.power_var(),driver.driver_var,scale))
+                    RfDriverType::PowerRamp(dac_per_driver_val,offset) => {
+                        Some(format!("{} = {}*{} + {};",self.power_var(),driver.driver_var,dac_per_driver_val,offset))
                     }
-                    _=> Some("".to_owned())
+                    _=> panic!("rf driver type not yet implemented")
                 }
             }
             None => None

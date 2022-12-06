@@ -1,7 +1,7 @@
 use crate::execution::{BlockExecution, ExecutionBlock, PlotTrace, WaveformData, EventType};
 use crate::command_string::CommandString;
 use crate::rf_state::{RfState, RfStateType};
-use crate::{ppl_function, utils};
+use crate::{ppl_function, _utils};
 use crate::pulse_function::{Function,FunctionParams};
 use crate::ppl::Adjustment;
 use crate::grad_cal;
@@ -12,7 +12,7 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use crate::gradient_matrix::{Matrix, DacValues};
 use crate::event_block::GradEventType;
-use crate::utils::sec_to_clock;
+use crate::_utils::sec_to_clock;
 
 // time allocated for setting reciever phase
 const TIME_BLOCK_1:i32 = 500;
@@ -109,7 +109,7 @@ impl AcqEvent{
     }
     pub fn readout_event(&self,fov_mm:f32) -> (f32,i16) {
         let dac_val = self.sample_rate.fov_to_dac(fov_mm);
-        let sample_time = utils::clock_to_sec(self.sample_time_clocks());
+        let sample_time = _utils::clock_to_sec(self.sample_time_clocks());
         (sample_time,dac_val)
     }
 }
@@ -167,7 +167,7 @@ impl ExecutionBlock for AcqEvent {
         self.label.clone()
     }
     fn render_normalized(&self, time_step_us:usize) -> WaveformData {
-        let step = utils::clock_to_sec(self.sample_period_clocks());
+        let step = _utils::clock_to_sec(self.sample_period_clocks());
         let n = self.n_samples();
         let t:Vec<f32> = (0..n).map(|x| x as f32 * step).collect();
         let a:Vec<f32> = vec![1.0;n as usize];
@@ -188,20 +188,20 @@ impl ExecutionBlock for AcqEvent {
     }
 }
 
-#[test]
-fn test(){
-
-    let phase = RfStateType::Static(0);
-    let acq = AcqEvent::new("acq", SpectralWidth::SW100kH, 128, 0, phase);
-
-    //let header = acq.block_header_statements();
-    let dec = acq.block_declaration();
-    let consts = acq.block_constant_initialization();
-    let init = acq.block_initialization();
-    let calc = acq.block_calculation();
-    let exec = acq.block_execution(64).cmd_string();
-    println!("{}",dec.commands);
-    println!("{}",init.commands);
-    println!("{}",calc.unwrap().commands);
-    println!("{}",exec.commands);
-}
+// #[test]
+// fn test(){
+//
+//     let phase = RfStateType::Static(0);
+//     let acq = AcqEvent::new("acq", SpectralWidth::SW100kH, 128, 0, phase);
+//
+//     //let header = acq.block_header_statements();
+//     let dec = acq.block_declaration();
+//     let consts = acq.block_constant_initialization();
+//     let init = acq.block_initialization();
+//     let calc = acq.block_calculation();
+//     let exec = acq.block_execution(64).cmd_string();
+//     println!("{}",dec.commands);
+//     println!("{}",init.commands);
+//     println!("{}",calc.unwrap().commands);
+//     println!("{}",exec.commands);
+// }

@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::fs::{File};
 use std::io::{Read, Write};
-use seq_tools::{grad_cal, utils};
+use seq_tools::{grad_cal, _utils};
 use seq_tools::acq_event::{AcqEvent, SpectralWidth};
 use seq_tools::event_block::{Event, EventQueue, GradEventType};
 use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin, Origin};
@@ -13,7 +13,7 @@ use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
 use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
-use seq_tools::utils::{sec_to_clock};
+use seq_tools::_utils::{sec_to_clock};
 use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig};
 use serde_json;
 use serde::{Serialize,Deserialize};
@@ -399,7 +399,7 @@ impl Scout {
     fn place_events(&self) -> EventQueue {
         let te = self.params.echo_time;
 
-        let sd = utils::sec_to_clock(2.0*self.params.ramp_time + 2.0*self.params.rf_duration) as u32;
+        let sd = _utils::sec_to_clock(2.0*self.params.ramp_time + 2.0*self.params.rf_duration) as u32;
 
         let excitation = Event::new(self.events.excitation.as_reference(), Origin);
 

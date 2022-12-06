@@ -10,7 +10,8 @@
 use std::f32::consts::PI;
 use crate::execution::PlotTrace;
 use crate::pulse_function::{Function, FunctionParams};
-use crate::utils;
+use crate::_utils;
+use utils;
 
 
 pub trait Pulse {
@@ -20,7 +21,7 @@ pub trait Pulse {
     //     // take fourier transform of w and find full-width half-max
     //
     // }
-    fn function(&self,time_step:usize) -> Vec<Function>;
+    fn function(&self,time_step_us:usize) -> Vec<Function>;
     fn n_samples(&self,time_step:usize) -> usize {
         self.function(time_step).iter().map(|f| f.n_samples()).sum()
     }
@@ -36,13 +37,27 @@ pub trait Pulse {
     }
     fn render_normalized(&self, time_step_us:usize) -> PlotTrace {
         let y = self.render(time_step_us);
-        let x = (0..self.n_samples(time_step_us)).map(|i| utils::us_to_sec((i*time_step_us) as i32)).collect();
+        let x = (0..self.n_samples(time_step_us)).map(|i| _utils::us_to_sec((i*time_step_us) as i32)).collect();
         PlotTrace::new(x,y)
     }
     fn render_magnitude(&self,time_step:usize,dac:i16) -> PlotTrace {
         let mut pt = self.render_normalized(time_step);
         pt.y.iter_mut().for_each(|value| *value *= dac as f32);
         pt
+    }
+}
+
+pub trait SliceSelective:Pulse {
+    fn bandwidth(&self) -> f32 {
+        let w = self.render(2);
+        let c = utils::real_to_complex(&w);
+        utils::bandwidth(&c,2.0E-6)
+    }
+    fn slice_thickness_mm(&self,grad_strength_hzpmm:f32) -> f32 {
+        self.bandwidth()/grad_strength_hzpmm
+    }
+    fn grad_strength_hzpmm(&self,slice_thickness_mm:f32) -> f32 {
+        self.bandwidth()/slice_thickness_mm
     }
 }
 
@@ -65,8 +80,8 @@ impl Pulse for Trapezoid {
         2.0*self.ramp_time + self.plateau_time
     }
     fn function(&self,time_step_us:usize) -> Vec<Function>{
-        let n_ramp_samples = utils::sec_to_samples(self.ramp_time,time_step_us);
-        let n_plateau_samples = utils::sec_to_samples(self.plateau_time,time_step_us);
+        let n_ramp_samples = _utils::sec_to_samples(self.ramp_time, time_step_us);
+        let n_plateau_samples = _utils::sec_to_samples(self.plateau_time, time_step_us);
         let ramp_params = FunctionParams::new(n_ramp_samples,1.0);
         let plat_params = FunctionParams::new(n_plateau_samples,1.0);
         vec![
@@ -103,7 +118,7 @@ impl Pulse for HalfSin {
         self.duration
     }
     fn function(&self, time_step_us: usize) -> Vec<Function> {
-        let params = FunctionParams::new(utils::sec_to_samples(self.duration,time_step_us),1.0);
+        let params = FunctionParams::new(_utils::sec_to_samples(self.duration, time_step_us), 1.0);
         vec![Function::HalfSin(params)]
     }
     fn power_net(&self, magnitude: f32) -> f32 {
@@ -132,7 +147,7 @@ impl Hardpulse {
     }
 }
 
-
+impl SliceSelective for Hardpulse{}
 impl Pulse for Hardpulse {
     fn duration(&self) -> f32 {
         self.duration
@@ -144,7 +159,7 @@ impl Pulse for Hardpulse {
         self.power_net(magnitude).abs()
     }
     fn function(&self,time_step_us:usize) -> Vec<Function>{
-        let n_central_samples = utils::sec_to_us(self.duration()) as usize/time_step_us;
+        let n_central_samples = _utils::sec_to_us(self.duration()) as usize/time_step_us;
         let central_pulse = FunctionParams::new(n_central_samples,1.0);
         let end_point = FunctionParams::new(1,0.0);
         vec![
@@ -176,6 +191,7 @@ impl CompositeHardpulse {
     }
 }
 
+impl SliceSelective for CompositeHardpulse{}
 impl Pulse for CompositeHardpulse {
     fn duration(&self) -> f32 {
         self.duration
@@ -187,7 +203,7 @@ impl Pulse for CompositeHardpulse {
         self.power_net(magnitude).abs()
     }
     fn function(&self,time_step_us:usize) -> Vec<Function>{
-        let n_central_samples = utils::sec_to_us(self.duration()) as usize/time_step_us;
+        let n_central_samples = _utils::sec_to_us(self.duration()) as usize/time_step_us;
         let central_pulse = FunctionParams::new(n_central_samples,1.0);
         let end_point = FunctionParams::new(1,0.0);
         vec![
@@ -201,12 +217,48 @@ impl Pulse for CompositeHardpulse {
     }
 }
 
-#[test]
-fn test(){
-    println!("pulse test ...");
-    println!("trapezoid ...");
+pub struct SincPulse {
+    duration:f32,
+    n_lobes:u16,
+}
 
-    let t = Trapezoid::new(100E-6,5E-3);
-    let tr = t.render_normalized(2);
-    println!("{:?}",tr);
+impl SincPulse {
+    pub fn new(duration:f32,lobes:u16) -> Self{
+        let lobes = if lobes%2 == 0 {lobes+1} else {lobes};
+        Self {
+            duration,
+            n_lobes: lobes
+        }
+    }
+}
+
+impl SliceSelective for SincPulse{}
+impl Pulse for SincPulse {
+    fn duration(&self) -> f32 {
+        self.duration
+    }
+
+    fn function(&self, time_step_us: usize) -> Vec<Function> {
+        let n = (self.duration/ _utils::us_to_sec(time_step_us as i32) as f32).floor() as usize;
+        let p = FunctionParams::new(n,1.0);
+        vec![
+            Function::Sinc(self.n_lobes,p),
+        ]
+    }
+
+    fn power_net(&self, magnitude: f32) -> f32 {
+        let a = utils::abs(&self.render(2));
+        let p = utils::trapz(&a,Some(2.0E-6));
+        p*magnitude
+    }
+
+    fn magnitude_net(&self, power_net: f32) -> f32 {
+        let a = utils::abs(&self.render(2));
+        let p = utils::trapz(&a,Some(2.0E-6));
+        power_net/p
+    }
+
+    fn power_abs(&self, magnitude: f32) -> f32 {
+        self.power_net(magnitude)
+    }
 }

@@ -9,7 +9,7 @@ use crate::command_string::CommandString;
 use crate::event_block::GradEventType;
 use crate::execution::{ExecutionBlock, WaveformData, PlotTrace, BlockExecution, EventType};
 use crate::ppl_function;
-use crate::utils;
+use crate::_utils;
 use crate::resource::Resource;
 use crate::gradient_matrix::MatrixDriverType::PhaseEncode;
 use crate::ppl::Adjustment;
@@ -168,15 +168,15 @@ impl<GF> GradEvent<GF> where GF:GradFrame + Copy {
     pub fn frame_duration_clocks(&self,chann:Channel) -> Option<i32> {
         match chann {
             Channel::Read => match self.read_frame {
-                Some(frame) => Some(utils::sec_to_clock(frame.duration())),
+                Some(frame) => Some(_utils::sec_to_clock(frame.duration())),
                 None => None
             }
             Channel::Phase => match self.phase_frame {
-                Some(frame) => Some(utils::sec_to_clock(frame.duration())),
+                Some(frame) => Some(_utils::sec_to_clock(frame.duration())),
                 None => None
             }
             Channel::Slice => match self.slice_frame {
-                Some(frame) => Some(utils::sec_to_clock(frame.duration())),
+                Some(frame) => Some(_utils::sec_to_clock(frame.duration())),
                 None => None
             }
         }

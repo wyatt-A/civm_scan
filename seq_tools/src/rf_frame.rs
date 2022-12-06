@@ -1,6 +1,6 @@
 use crate::pulse::{Pulse,Trapezoid, Hardpulse, CompositeHardpulse};
 use crate::seqframe::{self, SeqFrame, FrameType, SeqFrameExpression};
-use crate::utils;
+use crate::_utils;
 use crate::pulse_function::{Function,FunctionParams};
 
 pub const RF_MAX_DAC:i16 = 2047;

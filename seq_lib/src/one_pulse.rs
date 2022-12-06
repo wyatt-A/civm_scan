@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::fs::{File};
 use std::io::{Read, Write};
-use seq_tools::{grad_cal, utils};
+use seq_tools::{grad_cal, _utils};
 use seq_tools::acq_event::{AcqEvent, SpectralWidth};
 use seq_tools::event_block::{Event, EventQueue, GradEventType};
 use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin, Origin};
@@ -13,7 +13,7 @@ use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
 use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
-use seq_tools::utils::{sec_to_clock};
+use seq_tools::_utils::{sec_to_clock};
 use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, AdjustmentParameters};
 use serde_json;
 use serde::{Serialize,Deserialize};
@@ -170,7 +170,7 @@ impl OnePulse {
 
     fn place_events(&self) -> EventQueue {
         let excitation = Event::new(self.events.excitation.as_reference(), Origin);
-        let acquire = Event::new(self.events.acquire.as_reference(), After(excitation.clone(),utils::sec_to_clock(self.params.echo_time) as u32));
+        let acquire = Event::new(self.events.acquire.as_reference(), After(excitation.clone(), _utils::sec_to_clock(self.params.echo_time) as u32));
         EventQueue::new(
             &vec![
                 excitation,

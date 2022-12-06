@@ -7,7 +7,7 @@ use crate::command_string::CommandString;
 use crate::gradient_event::GradEvent;
 use crate::gradient_matrix::{DacValues, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
 use crate::rf_state::PhaseCycleStrategy::LUTNinetyTwoSeventy;
-use crate::{ppl_function, utils};
+use crate::{ppl_function, _utils};
 use serde::{Serialize};
 use std::fs::File;
 use std::io::Write;

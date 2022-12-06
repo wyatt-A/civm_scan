@@ -4,11 +4,11 @@ use crate::rf_frame::RfFrame;
 use crate::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfState, RfStateType};
 use crate::command_string::CommandString;
 use crate::pulse::{CompositeHardpulse, Pulse};
-use crate::utils;
+use crate::_utils;
 use crate::execution::{ExecutionBlock, WaveformData, PlotTrace, BlockExecution, EventType};
 use crate::ppl_function;
 use crate::pulse_function::render_function_vector;
-use crate::utils::us_to_clock;
+use crate::_utils::us_to_clock;
 use crate::ppl::Adjustment;
 use crate::seqframe::{RF_SEQ_FILE_LABEL, SeqFrame};
 
@@ -35,10 +35,10 @@ impl<RF> RfEvent<RF> where RF:RfFrame {
         }
     }
     pub fn pulse_duration_us(&self) -> i32 {
-        utils::sec_to_us(self.rf_frame.duration())
+        _utils::sec_to_us(self.rf_frame.duration())
     }
     pub fn pulse_duration_clocks(&self) -> i32 {
-        utils::us_to_clock(self.pulse_duration_us())
+        _utils::us_to_clock(self.pulse_duration_us())
     }
     pub fn init_list(&self) -> String {
         let d_us = self.pulse_duration_us();
@@ -66,7 +66,7 @@ impl<RF: 'static> ExecutionBlock for RfEvent<RF> where RF:RfFrame + Clone{
             ppl_function::resync(),
             ppl_function::set_phase_with_var(&self.rf_state.phase_var()),
             ppl_function::wait_timer(TIME_BLOCK),
-            ppl_function::rf_start(self.uid,self.pulse_duration_us() as u16,&self.rf_state.power_var(),utils::clock_to_us(RFSTART_PREDELAY) as u16),
+            ppl_function::rf_start(self.uid, self.pulse_duration_us() as u16, &self.rf_state.power_var(), _utils::clock_to_us(RFSTART_PREDELAY) as u16),
         ];
         let cmd_str = CommandString::new_hardware_exec(&cmd_str.join("\n"));
         BlockExecution::new(cmd_str,post_delay)

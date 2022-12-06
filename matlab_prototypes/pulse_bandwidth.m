@@ -29,8 +29,8 @@ bandwidth = (index-1)*freq_bin;
 
 %%
 
-Fs = 1000;            % Sampling frequency                    
-T = 1/Fs;             % Sampling period       
+Fs = 1000;            % Sampling frequency (Hz)                  
+T = 1/Fs;             % Sampling period
 L = 1500;             % Length of signal
 t = (0:L-1)*T;        % Time vector
 
@@ -39,15 +39,52 @@ S = 0.7*sin(2*pi*50*t) + sin(2*pi*120*t);
 X = S + 2*randn(size(t));
 
 Y = fft(X);
-%Compute the two-sided spectrum P2. Then compute the single-sided spectrum P1 based on P2 and the even-valued signal length L.
 
 P2 = abs(Y/L);
 P1 = P2(1:L/2+1);
 P1(2:end-1) = 2*P1(2:end-1);
-%Define the frequency domain f and plot the single-sided amplitude spectrum P1. The amplitudes are not exactly at 0.7 and 1, as expected, because of the added noise. On average, longer signals produce better frequency approximations.
 
 f = Fs*(0:(L/2))/L;
 plot(f,P1) 
 title("Single-Sided Amplitude Spectrum of X(t)")
 xlabel("f (Hz)")
 ylabel("|P1(f)|")
+
+%%
+
+
+dur = 1e-3;
+sample_period = 2e-6;
+n = floor(dur/sample_period);
+
+x = sinc(linspace(-2,2,n));
+
+figure
+plot(abs(x))
+
+trapz(sample_period,abs(x))
+
+%%
+x = complex(x);
+
+trapz(dt,abs(x))
+
+
+%%
+figure
+x = importdata('out.csv');
+t = importdata('out2.csv');
+plot(t,x(1:numel(t)))
+
+
+
+
+
+
+
+
+
+
+
+
+

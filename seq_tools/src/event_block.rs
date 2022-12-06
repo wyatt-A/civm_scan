@@ -6,7 +6,7 @@ use serde::{Serialize};
 use serde_json;
 use crate::command_string::CommandString;
 use crate::ppl::{FlatLoopStructure, Adjustment};
-use crate::utils;
+use crate::_utils;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use crate::acq_event::SpectralWidth;
@@ -51,7 +51,7 @@ impl Event {
                 }
             }
         };
-        println!("event center for {} set to {}",exec_block.label(),utils::clock_to_sec(center));
+        println!("event center for {} set to {}", exec_block.label(), _utils::clock_to_sec(center));
         let is_origin = match &placement {
             Origin => true,
             _ => false
@@ -73,24 +73,24 @@ impl Event {
         self.center + self.execution.block_start()
     }
     pub fn event_graph_normalized(&self, time_step_us:usize) -> EventGraph {
-        let start_sec = utils::clock_to_sec(self.block_start());
-        let end_sec = utils::clock_to_sec(self.block_end());
+        let start_sec = _utils::clock_to_sec(self.block_start());
+        let end_sec = _utils::clock_to_sec(self.block_end());
             EventGraph{
                 label:self.unique_label.to_owned(),
                 block_interval:(start_sec,end_sec),
-                waveform_start:start_sec + utils::clock_to_sec(self.execution.time_to_start()),
+                waveform_start:start_sec + _utils::clock_to_sec(self.execution.time_to_start()),
                 wave_data:self.execution.render_normalized(time_step_us)
                 }
     }
     pub fn event_graph_dynamic(&self, time_step_us:usize, driver_var:u32) -> EventGraph {
-        let start_sec = utils::clock_to_sec(self.block_start());
-        let end_sec = utils::clock_to_sec(self.block_end());
-        println!("waveform start for {} = {}",self.label,start_sec + utils::clock_to_sec(self.execution.time_to_start()));
+        let start_sec = _utils::clock_to_sec(self.block_start());
+        let end_sec = _utils::clock_to_sec(self.block_end());
+        println!("waveform start for {} = {}",self.label,start_sec + _utils::clock_to_sec(self.execution.time_to_start()));
         //println!("waveform start for {} = {}",self.label,start_sec);
         EventGraph{
             label:self.unique_label.to_owned(),
             block_interval:(start_sec,end_sec),
-            waveform_start:start_sec + utils::clock_to_sec(self.execution.time_to_start()),
+            waveform_start:start_sec + _utils::clock_to_sec(self.execution.time_to_start()),
             wave_data:self.execution.render_magnitude(time_step_us,driver_var)
         }
     }
@@ -174,10 +174,10 @@ impl EventQueue {
         let first_event_start = self.events[0].borrow().block_start();
         let last_event_idx = self.events.len()-1;
         let last_event_end = self.events[last_event_idx].borrow().block_end();
-        let tr = utils::sec_to_clock(rep_time);
+        let tr = _utils::sec_to_clock(rep_time);
         let makeup = tr + first_event_start - last_event_end - loop_time - calc_time;
         if makeup < 0 {
-            let adj = rep_time - utils::clock_to_sec(makeup);
+            let adj = rep_time - _utils::clock_to_sec(makeup);
             panic!("rep time is too short. It needs to be at least {} seconds for loop execution",adj)
         }
         self.events[last_event_idx].as_ref().borrow_mut().set_post_delay(makeup);
