@@ -30,6 +30,15 @@ pub struct EventGraph {
     pub wave_data:WaveformData
 }
 
+impl EventGraph {
+    pub fn waveform_start(&self) -> f32 {
+        self.waveform_start
+    }
+    pub fn waveform_end(&self) -> f32 {
+        self.waveform_start + self.wave_data.waveform_duration()
+    }
+}
+
 
 impl Event {
     pub fn new(exec_block:Box<dyn ExecutionBlock>,placement:EventPlacementType) -> Rc<RefCell<Self>> {
