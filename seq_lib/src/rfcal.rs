@@ -78,7 +78,7 @@ impl Initialize for RfCalParams {
 impl AdjustmentParameters for RfCalParams {
 
     fn name(&self) -> String {
-        String::from("one_pulse")
+        String::from("rf_cal")
     }
     fn write(&self,params_file: &Path){
         let str = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
@@ -99,12 +99,12 @@ impl Build for RfCal {
             n_averages: 1,
             n_repetitions: self.params.n_repetitions,
             rep_time: self.params.rep_time,
-            base_frequency: BaseFrequency::civm9p4t(0.0),
+            base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset),
             orientation: CivmStandard,
             grad_clock: GradClock::CPS20,
             phase_unit: PhaseUnit::Min,
             view_acceleration: 1,
-            waveform_sample_period_us: 2
+            waveform_sample_period_us: 10
         }
     }
     fn param_export(&self, filepath: &Path) {
@@ -130,7 +130,7 @@ pub struct RfCalParams {
     rep_time: f32,
     ramp_time: f32,
     n_repetitions: u32,
-    pub obs_freq_offset: f64,
+    pub obs_freq_offset: f32,
     setup_mode: bool,
 }
 
@@ -222,7 +222,12 @@ impl RfCal {
                 if params.start_rf_dac > params.end_rf_dac {
                     panic!("start rf dac must be less than end rf dac");
                 }
-                let dac_per_rep = (params.end_rf_dac - params.start_rf_dac)/(params.n_repetitions-1) as i16;
+
+                let dac_per_rep = match params.n_repetitions {
+                    1 => 0,
+                    _=> (params.end_rf_dac - params.start_rf_dac)/(params.n_repetitions-1) as i16
+                };
+
                 let max_rf_dac = dac_per_rep*(params.n_repetitions-1) as i16 + params.start_rf_dac;
                 if max_rf_dac > RF_MAX_DAC {
                     panic!("max rf dac is exceeded!");
@@ -233,7 +238,7 @@ impl RfCal {
                     "excitation",
                     1,
                     w.rf_pulse,
-                    RfStateType::Driven(d),
+                    RfStateType::Driven(d.clone()),
                     RfStateType::Static(0)
                 )
             }

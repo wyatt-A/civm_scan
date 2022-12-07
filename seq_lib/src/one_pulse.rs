@@ -32,13 +32,13 @@ impl Initialize for OnePulseParams {
     fn default() -> Self {
         OnePulseParams {
             name: "one_pulse".to_string(),
-            samples:512,
+            samples:4096,
             sample_discards: 0,
             spectral_width: SpectralWidth::SW100kH,
-            rf_duration: 140E-6,
-            echo_time: 5E-3,
+            rf_duration: 10E-6,
+            echo_time: 300E-6,
             obs_freq_offset: 0.0,
-            rep_time: 50E-3,
+            rep_time: 1.0,
             n_repetitions: 128,
         }
     }

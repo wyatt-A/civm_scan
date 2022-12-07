@@ -157,7 +157,10 @@ fn main(){
 
 fn setup_ppr(args:RunDirectoryArgs) {
     let ppr = args.path.to_owned();
-    set_ppr(&ppr);
+
+    if !set_ppr(&ppr){
+        panic!("ppr not set. Cannot continue.");
+    }
     match &args.cs_table {
         Some(table_pat) => {
             let pat = ppr.with_file_name(format!("*{}*",table_pat));
@@ -211,10 +214,6 @@ fn run_directory(args:RunDirectoryArgs){
     let pat = base_dir.join(pattern);
     let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
     let pairs:Vec<(PathBuf,PathBuf)> = paths.iter().map(|ppr| (ppr.clone(),ppr.with_extension("mrd"))).collect();
-
-    //todo!(check for already running)
-    //todo!(move loop after run_acquisition to block next run)
-    //todo!(write a "done" file when mrd acq is complete ".ac file")
 
     // check to make sure we are not already running something before we start
     match scan_status() {

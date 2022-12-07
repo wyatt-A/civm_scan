@@ -15,6 +15,7 @@ use seq_lib::fse_dti::FseDtiParams;
 use crate::args::{ApplySetupArgs, NewAdjArgs, NewArgs, NewConfigArgs, NewDiffusionExperimentArgs};
 use std::fs::copy;
 use seq_lib::one_pulse::OnePulseParams;
+use seq_lib::rfcal::RfCalParams;
 use seq_lib::scout::ScoutParams;
 use seq_lib::se_2d::Se2DParams;
 use seq_lib::se_dti::SeDtiParams;
@@ -38,6 +39,7 @@ pub enum Sequence {
     Scout,
     Se2D,
     OnePulse,
+    RfCal,
 }
 
 impl Sequence {
@@ -50,6 +52,7 @@ impl Sequence {
             Self::decode(&Self::Scout),
             Self::decode(&Self::Se2D),
             Self::decode(&Self::OnePulse),
+            Self::decode(&Self::RfCal),
         ].join("\n")
     }
     pub fn encode(name:&str) -> Self {
@@ -61,6 +64,7 @@ impl Sequence {
             "scout" => Self::Scout,
             "se_2d" => Self::Se2D,
             "one_pulse" => Self::OnePulse,
+            "rf_cal" => Self::RfCal,
             _=> panic!("name not recognized")
         }
     }
@@ -72,7 +76,8 @@ impl Sequence {
             Self::GRE => String::from("gre"),
             Self::Scout => String::from("scout"),
             Self::Se2D => String::from("se_2d"),
-            Self::OnePulse => String::from("one_pulse")
+            Self::OnePulse => String::from("one_pulse"),
+            Self::RfCal => String::from("rf_cal"),
         }
     }
 }
@@ -106,6 +111,9 @@ fn load_adj_params(cfg_file:&Path) -> Box<dyn AdjustmentParameters> {
     match find_seq_name_from_config(&cfg_str) {
         Sequence::OnePulse => {
             Box::new(OnePulseParams::load(&cfg_file))
+        },
+        Sequence::RfCal => {
+            Box::new(RfCalParams::load(&cfg_file))
         },
         _ => panic!("not yet implemented")
     }
@@ -142,6 +150,7 @@ pub fn new_simulation(args:&NewArgs) {
     params.configure_simulation();
     build_simulation(params,&args.destination,BUILD);
 }
+
 
 pub fn new(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
@@ -183,6 +192,12 @@ pub fn new_config(args:&NewConfigArgs){
         }
         Sequence::Se2D => {
             Se2DParams::write_default(&path_out);
+        }
+        Sequence::OnePulse => {
+            OnePulseParams::write_default(&path_out);
+        }
+        Sequence::RfCal => {
+            RfCalParams::write_default(&path_out);
         }
         _=> panic!("not yet implemented")
     }

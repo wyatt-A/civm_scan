@@ -171,8 +171,13 @@ pub trait Build {
         let rf_param_path = path.join(config.rf_param_filename());
         let mut rf_seq_file = File::create(rf_param_path).expect("cannot create file");
         rf_seq_file.write_all(&SeqFrame::format_as_bytes(&rf_params.unwrap())).expect("trouble writing to file");
-        let mut grad_seq_file = File::create(grad_param_path).expect("cannot create file");
-        grad_seq_file.write_all(&SeqFrame::format_as_bytes(&grad_params.unwrap())).expect("trouble writing to file");
+        match grad_params {
+            Some(params) => {
+                let mut grad_seq_file = File::create(grad_param_path).expect("cannot create file");
+                grad_seq_file.write_all(&SeqFrame::format_as_bytes(&params)).expect("trouble writing to file");
+            }
+            None => {}
+        }
     }
     fn ppl_export(&mut self,filepath:&Path,ppr_name:&str,sim_mode:bool,build:bool) {
         let name = Path::new(ppr_name).with_extension("ppl");

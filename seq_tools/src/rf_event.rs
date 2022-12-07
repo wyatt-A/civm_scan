@@ -34,6 +34,10 @@ impl<RF> RfEvent<RF> where RF:RfFrame {
             uid,
         }
     }
+    pub fn set_rf_phase(&mut self,rf_phase:RfStateType) {
+        let power = self.rf_state.power();
+        self.rf_state = RfState::new(&self.label,power,rf_phase);
+    }
     pub fn pulse_duration_us(&self) -> i32 {
         _utils::sec_to_us(self.rf_frame.duration())
     }
