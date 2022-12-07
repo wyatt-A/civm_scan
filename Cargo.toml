@@ -13,6 +13,7 @@ members = [
     "headfile",
     "utils",
     "review",
+    "seq_sim"
 ]
 
 # this determines which package is the entry point for cargo run (if multiple binaries exist)

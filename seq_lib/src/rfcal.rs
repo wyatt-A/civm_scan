@@ -306,5 +306,13 @@ impl RfCal {
 fn rf_cal_test(){
     let params = RfCalParams::default();
     let mut b = params.instantiate();
-    b.ppl_export(Path::new("."),"rf_cal",false,false);
+    //b.ppl_export(Path::new("."),"rf_cal",false,false);
+    let q = b.place_events();
+
+    let g = q.graphs_dynamic(2,0);
+
+
+
+    println!("{:?}",g);
+
 }

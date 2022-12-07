@@ -14,20 +14,22 @@ use crate::acq_event::SpectralWidth;
 
 // this is where execution blocks inherit an absolute time relative to one another
 pub struct Event {
-    pub(crate) execution:Box<dyn ExecutionBlock>,
+    pub execution:Box<dyn ExecutionBlock>,
     center:i32,
     is_origin:bool,
     label:String,
     unique_label:String, // unique label in case duplicate execution block is run
     post_delay:i32
 }
-#[derive(Debug,Serialize)]
+
+#[derive(Debug,Serialize,Clone)]
 pub struct EventGraph {
     pub label:String,// derived from the execution block
     pub block_interval:(f32,f32),
     pub waveform_start:f32,
     pub wave_data:WaveformData
 }
+
 
 impl Event {
     pub fn new(exec_block:Box<dyn ExecutionBlock>,placement:EventPlacementType) -> Rc<RefCell<Self>> {

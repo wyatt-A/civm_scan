@@ -49,6 +49,13 @@ impl PlotTrace {
             y
         }
     }
+    pub fn f64_pair(&self,x_offset:f64) -> Vec<[f64;2]> {
+        let mut out = Vec::<[f64;2]>::with_capacity(self.x.len());
+        for i in 0..self.x.len() {
+            out.push([self.x[i] as f64 + x_offset,self.y[i] as f64])
+        }
+        out
+    }
 }
 
 pub struct BlockExecution {
