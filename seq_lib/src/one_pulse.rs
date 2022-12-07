@@ -98,14 +98,14 @@ impl Build for OnePulse {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OnePulseParams {
-    name: String,
-    samples: u16,
-    sample_discards: u16,
-    spectral_width: SpectralWidth,
-    rf_duration: f32,
-    echo_time: f32,
-    rep_time: f32,
-    n_repetitions: u32,
+    pub name: String,
+    pub samples: u16,
+    pub sample_discards: u16,
+    pub spectral_width: SpectralWidth,
+    pub rf_duration: f32,
+    pub echo_time: f32,
+    pub rep_time: f32,
+    pub n_repetitions: u32,
     pub obs_freq_offset: f64,
 }
 

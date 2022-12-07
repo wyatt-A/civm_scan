@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use seq_lib::pulse_sequence::{AcqDims, MrdFormat, MrdToKspaceParams};
-use acquire::build::acq_dims;
+//use acquire::build::acq_dims;
 use cs_table::cs_table::CSTable;
 use byteorder::{LittleEndian,ByteOrder};
 use ndarray::{s, Array3, Array4, Array6, Order, Dim, ArrayD, IxDyn, concatenate, Ix, Array2, Ix6};
@@ -78,6 +78,7 @@ fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params
         cfl::write_cfl_vol(&vol,&cfl);
     }
 }
+
 
 fn format_fse_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize) -> Array2::<Complex<f32>> {
     let mrd = MRData::new(mrd);
@@ -183,35 +184,36 @@ impl MRData {
         header
     }
 
-    fn n_read(&self) -> i32 {
+    pub fn n_read(&self) -> i32 {
         self.dimensions().n_read.clone()
     }
 
-    fn n_phase1(&self) -> i32 {
+    pub fn n_phase1(&self) -> i32 {
         self.dimensions().n_phase1.clone()
     }
 
-    fn n_phase2(&self) -> i32 {self.dimensions().n_phase2.clone()}
+    pub fn n_phase2(&self) -> i32 {self.dimensions().n_phase2.clone()}
 
-    fn n_slice(&self) -> i32 {
+    pub fn n_slice(&self) -> i32 {
         self.dimensions().n_slices.clone()
     }
 
-    fn n_views(&self) -> i32 {
+    pub fn n_views(&self) -> i32 {
         self.n_phase1()*self.n_phase2()
     }
 
-    fn n_echos(&self) -> i32 {
+    pub fn n_echos(&self) -> i32 {
         self.dimensions().n_echos.clone()
     }
 
-    fn n_experiments(&self) -> i32 {
+    pub fn n_experiments(&self) -> i32 {
         self.dimensions().n_experiments.clone()
     }
 
-    fn n_samples(&self) -> i32 {
+    pub fn n_samples(&self) -> i32 {
         self.n_read()*self.n_views()*self.n_echos()*self.n_experiments()
     }
+
 
     fn dimensions(&self) -> AcqDims {
         let h = self.header();
@@ -225,7 +227,7 @@ impl MRData {
         }
     }
 
-    fn char_dim_array(&self) -> [usize;7] {
+    pub fn char_dim_array(&self) -> [usize;7] {
         let dims = self.dimensions();
         match self.is_complex(){
             true => {
@@ -241,6 +243,13 @@ impl MRData {
         }
     }
 
+    pub fn complex_dims(&self) -> [usize;6] {
+        let dims = self.dimensions();
+        [dims.n_read as usize,dims.n_phase1 as usize,
+        dims.n_phase2 as usize,dims.n_slices as usize,
+        dims.n_echos as usize,dims.n_experiments as usize]
+    }
+
     pub fn byte_stream(&self) -> Vec<u8> {
         let mut f = File::open(&self.file_path).expect("cannot open file");
         let mut reader = BufReader::new(&mut f);
@@ -248,6 +257,21 @@ impl MRData {
         let mut raw:Vec<u8> = vec![0;self.n_data_bytes()];
         reader.read_exact(&mut raw).expect("a problem occurred reading mrd data");
         raw
+    }
+
+    pub fn complex_stream(&self) -> Vec<Complex<f32>> {
+        let f = self.float_stream();
+        let mut c = Vec::<Complex<f32>>::with_capacity(f.len()/2);
+        for i in 0..f.len()/2 {
+            c.push(Complex::<f32>::new(f[2*i],f[2*i+1]));
+        }
+        c
+    }
+
+    pub fn complex_array(&self) -> Array6<Complex<f32>> {
+        let mut dims = self.complex_dims();
+        dims.reverse();
+        Array6::<Complex<f32>>::from_shape_vec(dims, self.complex_stream()).expect("unexpected number of samples")
     }
 
     pub fn float_stream(&self) -> Vec<f32> {

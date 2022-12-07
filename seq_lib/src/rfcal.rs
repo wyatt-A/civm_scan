@@ -116,22 +116,22 @@ impl Build for RfCal {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RfCalParams {
-    name: String,
-    start_rf_dac: i16,
-    end_rf_dac: i16,
-    samples: u16,
-    sample_discards: u16,
-    spectral_width: SpectralWidth,
-    rf_duration: f32,
-    slice_thickness: f32,
-    echo_time: f32,
-    stabilize_time: f32,
-    filling_time: f32,
-    rep_time: f32,
-    ramp_time: f32,
-    n_repetitions: u32,
+    pub name: String,
+    pub start_rf_dac: i16,
+    pub end_rf_dac: i16,
+    pub samples: u16,
+    pub sample_discards: u16,
+    pub spectral_width: SpectralWidth,
+    pub rf_duration: f32,
+    pub slice_thickness: f32,
+    pub echo_time: f32,
+    pub stabilize_time: f32,
+    pub filling_time: f32,
+    pub rep_time: f32,
+    pub ramp_time: f32,
+    pub n_repetitions: u32,
     pub obs_freq_offset: f32,
-    setup_mode: bool,
+    pub setup_mode: bool,
 }
 
 #[derive(Clone)]

@@ -182,6 +182,46 @@ pub fn abs(x:&Vec<f32>) -> Vec<f32> {
     x.iter().map(|val| val.abs()).collect()
 }
 
+pub fn complex_abs(x:&Vec<Complex<f32>>) -> Vec<f32> {
+    x.iter().map(|c| c.norm()).collect()
+}
+
+pub fn arg_max(x:&Vec<f32>) -> usize {
+    let mut max_temp = 0.0;
+    let mut max_ind = 0;
+    for i in 0..x.len(){
+        if x[i] > max_temp {
+            max_temp = x[i];
+            max_ind = i;
+        }
+    }
+    max_ind
+}
+
+pub fn max(x:&Vec<f32>) -> f32 {
+    let mut max_temp = 0.0;
+    for i in 0..x.len(){
+        if x[i] > max_temp {
+            max_temp = x[i];
+        }
+    }
+    max_temp
+}
+
+pub fn arg_min(x:&Vec<f32>) -> usize {
+    let mut min_temp = f32::MAX;
+    let mut min_ind = 0;
+    for i in 0..x.len(){
+        if x[i] < min_temp {
+            min_temp = x[i];
+            min_ind = i;
+        }
+    }
+    min_ind
+}
+
+
+
 // bandwidth of a finite time domain signal (used for slice thickness calculations)
 // result is in hertz
 pub fn bandwidth(time_domain_signal:&Vec<Complex<f32>>,dt:f32) -> f32 {

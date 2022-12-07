@@ -34,9 +34,9 @@ impl EventGraph {
     pub fn waveform_start(&self) -> f32 {
         self.waveform_start
     }
-    pub fn waveform_end(&self) -> f32 {
-        self.waveform_start + self.wave_data.waveform_duration()
-    }
+    // pub fn waveform_end(&self) -> f32 {
+    //     self.waveform_start + self.wave_data.waveform_duration()
+    // }
 }
 
 

@@ -29,6 +29,8 @@ dependencies = [
  "encoding",
  "glob",
  "headfile",
+ "mr_data",
+ "ndarray",
  "regex",
  "seq_lib",
  "seq_tools",
@@ -1216,7 +1218,6 @@ dependencies = [
 name = "mr_data"
 version = "0.1.0"
 dependencies = [
- "acquire",
  "byteorder",
  "cs_table",
  "ndarray",
