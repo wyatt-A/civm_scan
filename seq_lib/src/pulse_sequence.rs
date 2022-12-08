@@ -76,6 +76,7 @@ CompressedSense+Simulate+AcqDimensions+DynClone+MrdToKspace+Setup+AcqHeadfile {
 }
 
 pub trait AdjustmentParameters {
+    fn set_freq_offset(&mut self,offset_hertz:f32);
     fn name(&self) -> String;
     fn write(&self,params_file:&Path);
     fn instantiate(&self) -> Box<dyn Build>;

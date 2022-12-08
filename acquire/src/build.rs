@@ -22,8 +22,8 @@ use seq_lib::se_dti::SeDtiParams;
 use seq_tools::ppl::Orientation;
 use utils;
 
-const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
-//const SEQUENCE_LIB:&str = "/home/wyatt/projects/test_data/build_test";
+//const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
+const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
 //const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
 pub const HEADFILE_NAME:&str = "meta";
@@ -106,7 +106,7 @@ fn load_params(cfg_file:&Path) -> Box<dyn SequenceParameters> {
     }
 }
 
-fn load_adj_params(cfg_file:&Path) -> Box<dyn AdjustmentParameters> {
+pub fn load_adj_params(cfg_file:&Path) -> Box<dyn AdjustmentParameters> {
     let cfg_str = read_to_string(cfg_file);
     match find_seq_name_from_config(&cfg_str) {
         Sequence::OnePulse => {
@@ -120,7 +120,7 @@ fn load_adj_params(cfg_file:&Path) -> Box<dyn AdjustmentParameters> {
 }
 
 
-fn load_scout_params(cfg_file:&Path) -> Box<dyn ScoutConfig> {
+pub fn load_scout_params(cfg_file:&Path) -> Box<dyn ScoutConfig> {
     let cfg_str = read_to_string(cfg_file);
     match find_seq_name_from_config(&cfg_str) {
         Sequence::Scout => {
@@ -131,7 +131,7 @@ fn load_scout_params(cfg_file:&Path) -> Box<dyn ScoutConfig> {
 }
 
 
-fn load_dw_params(cfg_file:&Path) -> Box<dyn DWSequenceParameters> {
+pub fn load_dw_params(cfg_file:&Path) -> Box<dyn DWSequenceParameters> {
     let cfg_str = read_to_string(cfg_file);
     match find_seq_name_from_config(&cfg_str) {
         Sequence::FseDti => {

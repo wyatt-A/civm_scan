@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 eframe = "0.19.0"
-build_sequence = {path="../build_sequence"}
+build_sequence = { path="../build_sequence" }
+acquire = {path = "../acquire"}

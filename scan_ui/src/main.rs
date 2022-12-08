@@ -6,6 +6,8 @@ use eframe::egui;
 use eframe::egui::Color32;
 
 use build_sequence::build_directory::build_directory;
+use crate::egui::plot::{Line, Plot, PlotPoints};
+use acquire::adjustment;
 
 fn main() {
     let options = eframe::NativeOptions::default();
@@ -49,11 +51,27 @@ impl eframe::App for MyApp {
 
 
             egui::Window::new("Scout View").collapsible(false).show(ctx, |ui| {
-                ui.label("Hello World!");
+                ui.label("How'd you do?");
+
+
+
             });
 
             egui::Window::new("Adjustments").show(ctx, |ui| {
-                ui.label("Hello World!");
+                ui.label("FID spectrum");
+                Plot::new("frequency_plot").show_axes([true,true]).view_aspect(1.0).show(ui, |plot_ui| {
+                    let adj_data = adjustment::AdjustmentResults::from_file(Path::new("/Users/Wyatt/adj_data/adjustments/results.json"));
+                    let line = Line::new(PlotPoints::new(adj_data.freq_spectrum.clone())).color(Color32::from_rgb(255,255,255));
+                    plot_ui.line(line);
+                });
+
+                ui.label("Spin Echo vs Stimulated Echo");
+                Plot::new("diff_plot").show_axes([true,true]).view_aspect(1.0).show(ui, |plot_ui| {
+                    let adj_data = adjustment::AdjustmentResults::from_file(Path::new("/Users/Wyatt/adj_data/adjustments/results.json"));
+                    let line = Line::new(PlotPoints::new(adj_data.rf_cal_spin_vs_stim.clone())).color(Color32::from_rgb(255,255,255));
+                    plot_ui.line(line);
+                });
+
             });
 
 

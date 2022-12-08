@@ -76,7 +76,9 @@ impl Initialize for RfCalParams {
 
 
 impl AdjustmentParameters for RfCalParams {
-
+    fn set_freq_offset(&mut self, offset_hertz: f32) {
+        self.obs_freq_offset = offset_hertz;
+    }
     fn name(&self) -> String {
         String::from("rf_cal")
     }

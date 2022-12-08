@@ -58,6 +58,9 @@ impl Initialize for OnePulseParams {
 
 
 impl AdjustmentParameters for OnePulseParams {
+    fn set_freq_offset(&mut self, offset_hertz: f32) {
+        self.obs_freq_offset = offset_hertz as f64;
+    }
 
     fn name(&self) -> String {
         String::from("one_pulse")

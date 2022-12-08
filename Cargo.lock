@@ -32,6 +32,7 @@ dependencies = [
  "mr_data",
  "ndarray",
  "regex",
+ "scan_control",
  "seq_lib",
  "seq_tools",
  "serde",
@@ -1814,6 +1815,7 @@ dependencies = [
 name = "scan_ui"
 version = "0.1.0"
 dependencies = [
+ "acquire",
  "build_sequence",
  "eframe",
 ]
