@@ -45,25 +45,17 @@ impl eframe::App for MyApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
 
-            egui::CollapsingHeader::new("Header").default_open(true).show(ui,|ui|{
-                ui.label("Hello");
-            });
-
-            let texture: &egui::TextureHandle = self.texture.get_or_insert_with(|| {
-                // Load the texture only once.
-                let p = Color32::from_gray(255).to_srgba_unmultiplied();
-                let mut img = egui::ColorImage::from_rgba_unmultiplied([1,1],&p);
-                img.size = [1,1];
-                ui.ctx().load_texture(
-                    "my-image",
-                    img,
-                    egui::TextureFilter::Linear
-                )
-            });
-
-
-
             ui.heading("Civm Scan");
+
+
+            egui::Window::new("Scout View").collapsible(false).show(ctx, |ui| {
+                ui.label("Hello World!");
+            });
+
+            egui::Window::new("Adjustments").show(ctx, |ui| {
+                ui.label("Hello World!");
+            });
+
 
             ui.label("Working Directory");
             ui.horizontal(|ui| {
@@ -91,7 +83,6 @@ impl eframe::App for MyApp {
             if ui.button("compile sequence").clicked() {
                 build_directory(Path::new("d:/dev/221011"));
             }
-            ui.image(texture, texture.size_vec2());
         });
     }
 }
