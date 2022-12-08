@@ -42,13 +42,18 @@ impl eframe::App for MyApp {
 
 
 
+
         egui::CentralPanel::default().show(ctx, |ui| {
+
+            egui::CollapsingHeader::new("Header").default_open(true).show(ui,|ui|{
+                ui.label("Hello");
+            });
 
             let texture: &egui::TextureHandle = self.texture.get_or_insert_with(|| {
                 // Load the texture only once.
                 let p = Color32::from_gray(255).to_srgba_unmultiplied();
                 let mut img = egui::ColorImage::from_rgba_unmultiplied([1,1],&p);
-                img.size = [2,2];
+                img.size = [1,1];
                 ui.ctx().load_texture(
                     "my-image",
                     img,
@@ -57,7 +62,9 @@ impl eframe::App for MyApp {
             });
 
 
+
             ui.heading("Civm Scan");
+
             ui.label("Working Directory");
             ui.horizontal(|ui| {
                 if ui.text_edit_singleline(&mut self.work_dir_buff).ctx.input().key_pressed(egui::Key::Enter) {
