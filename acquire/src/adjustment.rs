@@ -200,19 +200,3 @@ impl Adjustment {
 
     }
 }
-
-
-#[test]
-fn adj_test(){
-    let adj = Adjustment {
-        rf_cal_config:Path::new("/Users/Wyatt/sequence_library/rf_cal.json").to_owned(),
-        freq_cal_config: Path::new("/Users/Wyatt/sequence_library/1p.json").to_owned(),
-        rf_cal_dir: Path::new("/Users/Wyatt/adj_data/adj_01/rfadjustments").to_owned(),
-        freq_cal_dir: Path::new("/Users/Wyatt/adj_data/adj_01/adjustments").to_owned(),
-        results_file: Path::new("/Users/Wyatt/adj_data/adjustments/results.json").to_owned()
-    };
-
-    adj.run();
-
-
-}

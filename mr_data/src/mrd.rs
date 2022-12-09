@@ -47,6 +47,8 @@ pub fn cs_mrd_to_kspace(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKsp
     }
 }
 
+//pub fn mrd_to_2d_image(mrd:&Path,params:&MrdToKspaceParams)
+
 
 pub fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKspaceParams) {
     let vol = fse_raw_to_vol(mrd,cs_table,params);
