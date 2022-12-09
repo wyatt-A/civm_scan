@@ -21,6 +21,7 @@ use seq_lib::se_2d::Se2DParams;
 use seq_lib::se_dti::SeDtiParams;
 use seq_tools::ppl::Orientation;
 use utils;
+use crate::scout::ScoutViewSettings;
 
 //const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
 const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
@@ -221,7 +222,7 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
 pub fn new_scout_experiment(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
     let params = load_scout_params(&cfg_file);
-    build_scout_experiment(params, &args.destination, BUILD);
+    build_scout_experiment(params,&ScoutViewSettings::default(),&args.destination, BUILD);
 }
 
 pub fn apply_setup(args:&ApplySetupArgs) {
@@ -423,12 +424,12 @@ pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,bu
     }
 }
 
-pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>, work_dir:&Path, build:bool) {
+pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>, view_settings:&ScoutViewSettings,work_dir:&Path, build:bool) {
     let mut s = clone_box(&*sequence_params);
-    let orientations = vec![Orientation::Scout0,Orientation::Scout1,Orientation::Scout2];
 
-    let fovs = vec![(12.0,12.0),(19.7,12.0),(19.7,12.0)];
-    let samps = vec![(128,128),(210,128),(210,128)];
+    let orientations = &view_settings.orientations;
+    let fovs = &view_settings.fields_of_view;
+    let samps = &view_settings.samples;
 
     orientations.iter().enumerate().for_each(|(index,orient)|{
         s.set_orientation(orient);

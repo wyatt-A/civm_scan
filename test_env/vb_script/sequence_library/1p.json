@@ -1,0 +1,11 @@
+{
+  "name": "one_pulse",
+  "samples": 4096,
+  "sample_discards": 0,
+  "spectral_width": "SW100kH",
+  "rf_duration": 0.00014,
+  "echo_time": 0.0003,
+  "rep_time": 1.0,
+  "n_repetitions": 128,
+  "obs_freq_offset": 0.0
+}

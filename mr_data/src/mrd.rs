@@ -47,7 +47,12 @@ pub fn cs_mrd_to_kspace(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKsp
     }
 }
 
-//pub fn mrd_to_2d_image(mrd:&Path,params:&MrdToKspaceParams)
+pub fn mrd_to_2d_image(mrd:&Path) -> Array2<f32> {
+    let raw = MRData::new(mrd);
+    let arr = raw.complex_array();
+    let s = arr.slice(s![0,0,0,0,..,..]);
+    cfl::kspace2d_to_image(&s.to_owned())
+}
 
 
 pub fn fse_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKspaceParams) {

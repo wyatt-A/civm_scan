@@ -14,6 +14,8 @@ use crate::build;
 use crate::args::NewAdjArgs;
 use scan_control;
 
+
+
 pub struct Adjustment {
     rf_cal_config:PathBuf,
     freq_cal_config:PathBuf,
@@ -27,14 +29,12 @@ impl Adjustment {
         Self {
             rf_cal_config: rf_cal_config.to_owned(),
             freq_cal_config: freq_cal_config.to_owned(),
-            rf_cal_dir: results_dir.join("rfcal"),
-            freq_cal_dir: results_dir.join("freqcal"),
+            rf_cal_dir: results_dir.join("rf"),
+            freq_cal_dir: results_dir.join("freq"),
             results_file: results_dir.join("adjustment_results"),
         }
     }
 }
-
-
 
 #[derive(Serialize,Deserialize)]
 pub struct AdjustmentResults {
@@ -200,3 +200,26 @@ impl Adjustment {
 
     }
 }
+
+
+#[test]
+fn test(){
+    Adjustment::new(
+        Path::new("../test_env/sequence_library/1p.json"),
+        Path::new("../test_env/sequence_library/rf_cal.json"),
+        Path::new("../test_data/adj_data")
+    ).run();
+
+}
+
+
+
+
+
+
+
+
+
+
+
+

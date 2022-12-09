@@ -4,7 +4,7 @@ use std::fs::{create_dir_all, File};
 use std::io::{Read,Write};
 use std::process::Command;
 use byteorder::{ByteOrder,BigEndian,LittleEndian};
-use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate, Ix, ArrayViewMut, OwnedRepr, Ix3, ArrayBase, AssignElem};
+use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate, Ix, ArrayViewMut, OwnedRepr, Ix3, ArrayBase, AssignElem, Array2};
 use ndarray::{Array, ArrayView, array, Axis};
 use ndarray::iter::Axes;
 use ndarray::Order::RowMajor;
@@ -191,6 +191,14 @@ pub fn complex_vol_to_magnitude(vol:&Array3<Complex<f32>>) -> Array3<f32> {
     Array3::<f32>::from_shape_vec((shape[0],shape[1],shape[2]),mag).expect("cannot create array")
 }
 
+pub fn complex_slice_to_magnitude(slice:&Array2<Complex<f32>>) -> Array2<f32> {
+    let shape = slice.shape();
+    let slice = slice.to_shape((slice.len(),Order::RowMajor)).unwrap().to_vec();
+    let mag:Vec<f32> = slice.iter().map(|complex_number| complex_number.norm()).collect();
+    Array2::<f32>::from_shape_vec((shape[0],shape[1]),mag).expect("cannot create array")
+}
+
+
 pub fn from_complex_volume(vol:&Array3<Complex<f32>>,cfl_base:&Path) {
     let flat = complex_vol_to_vec(vol);
     let shape = vol.shape();
@@ -254,6 +262,33 @@ pub fn fft3_axis(vol:Array3<Complex<f32>>, axis:usize,fftshift:bool) -> Array3<C
     // permute axes back to be consistent with input
     let vol = vol.permuted_axes(process_order.1);
     return vol;
+}
+
+pub fn fft2(slice:&Array2<Complex<f32>>,fftshift:bool) -> Array2<Complex<f32>> {
+    let mut slice = slice.clone();
+    let mut shape = slice.shape().to_owned();
+    shape.reverse();
+    let mut fft_planner = FftPlanner::<f32>::new();
+    for axis in 0..2 {
+        let fft = fft_planner.plan_fft_forward(shape[axis]);
+        for mut line in slice.axis_iter_mut(Axis(axis)){
+            let mut temp = line.to_vec();
+            let n = temp.len();
+            fft.process(&mut temp);
+            // normalize the result
+            temp.iter_mut().for_each(|e| *e /= (n as f32).sqrt());
+            if fftshift {
+                temp.rotate_right(n/2);
+            }
+            // assign temp back to line
+            line.assign(&Array::from_vec(temp));
+        }
+    }
+    slice
+}
+
+pub fn kspace2d_to_image(slice:&Array2<Complex<f32>>) -> Array2<f32> {
+    complex_slice_to_magnitude(&fft2(slice,true))
 }
 
 pub fn fermi_filter_image(cfl_base_in:&Path,cfl_base_out:&Path,w1:f32,w2:f32) {

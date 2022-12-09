@@ -2,7 +2,7 @@
 DSP_ROUTINE "dsp";
 RECEIVER_MASK 1,65535,1,rec_sel;
 GRADIENT_STRENGTH grad_var;
-OBSERVE_FREQUENCY "9.4T 1H",-40000000,40000000,-830,MHz, kHz, Hz, rx1MHz;
+OBSERVE_FREQUENCY "9.4T 1H",-40000000,40000000,-830.0781,MHz, kHz, Hz, rx1MHz;
 SPECTRAL_WIDTH 200000,200000,200000,sample_period;
 NO_VIEWS 1,500000,17,no_views;
 NO_ECHOES 1,64,2,1,no_echoes;
@@ -11,8 +11,8 @@ NO_SAMPLES 8,65535,788,no_samples;
 DISCARD 0,64,0,no_discard;
 END
 */
-#use GRAD "D:\dev\rfadjustments\civm_grad.seq" civm_grad
-#use RF1 "D:\dev\rfadjustments\civm_rf.seq" civm_rf
+#use GRAD "" civm_grad
+#use RF1 "" civm_rf
 
 #include "stdfn_15.pph"
 #include "C:\workstation\SequenceTools\CivmSequenceTools_v1.0\civm_var_20_long.PPH"

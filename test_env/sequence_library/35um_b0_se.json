@@ -1,0 +1,38 @@
+{
+  "name": "se_dti",
+  "cs_table": "C:\\workstation\\data\\petableCS_stream\\other\\stream_CS360_8x_pa18_pb54",
+  "b_value": 0.0,
+  "b_vec": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "fov": [
+    20.65,
+    12.6,
+    12.6
+  ],
+  "samples": [
+    590,
+    360,
+    360
+  ],
+  "sample_discards": 0,
+  "spectral_width": "SW200kH",
+  "rf_90_duration": 0.00014,
+  "rf_180_duration": 0.00028,
+  "diff_pulse_duration": 0.0035,
+  "diff_pulse_separation": 0.005,
+  "spoil_duration": 0.0006,
+  "ramp_time": 0.00014,
+  "read_extension": 0.0,
+  "phase_encode_time": 0.00055,
+  "echo_time": 0.01398,
+  "obs_freq_offset": 0.0,
+  "rep_time": 0.08,
+  "n_averages": 1,
+  "n_repetitions": 2000,
+  "view_acceleration": 1,
+  "setup_mode": false,
+  "grad_off": false
+}

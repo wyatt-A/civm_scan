@@ -1,0 +1,9 @@
+{
+  "seq_template_dir": "c:/workstation/data/seq_file",
+  "grad_template": "civm_grad_template.seq",
+  "rf_template": "civm_rf_template.seq",
+  "rf_seq": "civm_rf.seq",
+  "grad_seq": "civm_grad.seq",
+  "rf_params": "civm_rf_params.txt",
+  "grad_params": "civm_grad_params.txt"
+}

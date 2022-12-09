@@ -8,4 +8,8 @@ edition = "2021"
 [dependencies]
 eframe = "0.19.0"
 build_sequence = { path="../build_sequence" }
+mr_data = { path = "../mr_data" }
 acquire = {path = "../acquire"}
+ndarray = "0.15.4"
+ndarray-stats = "0.5.1"
+utils = {path = "../utils"}

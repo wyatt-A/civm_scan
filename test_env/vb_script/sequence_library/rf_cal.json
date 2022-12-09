@@ -5,7 +5,7 @@
   "samples": 788,
   "sample_discards": 0,
   "spectral_width": "SW200kH",
-  "rf_duration": 0.0001,
+  "rf_duration": 0.00010,
   "slice_thickness": 10.0,
   "echo_time": 0.013,
   "stabilize_time": 0.001,
@@ -13,6 +13,6 @@
   "rep_time": 0.08,
   "ramp_time": 0.0001,
   "n_repetitions": 17,
-  "obs_freq_offset": -830.0781,
+  "obs_freq_offset": -830.0,
   "setup_mode": false
 }

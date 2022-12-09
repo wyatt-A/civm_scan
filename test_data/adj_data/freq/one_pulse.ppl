@@ -12,8 +12,8 @@ DISCARD 0,64,0,no_discard;
 SCROLLBAR "excitation dac percent","%","%.2f",0,2047,100,20.47,excitation_power_adj;
 END
 */
-#use GRAD "D:\dev\adjustments\civm_grad.seq" civm_grad
-#use RF1 "D:\dev\adjustments\civm_rf.seq" civm_rf
+#use GRAD "" civm_grad
+#use RF1 "" civm_rf
 
 #include "stdfn_15.pph"
 #include "C:\workstation\SequenceTools\CivmSequenceTools_v1.0\civm_var_20_long.PPH"
