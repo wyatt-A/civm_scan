@@ -1,0 +1,6 @@
+280	1	0	slice_sel_slice	1	70,ramp(0,32767);140,32767;70,ramp(32767,0);
+210	1	0	slice_ref_slice	1	70,ramp(0,32767);70,32767;70,ramp(32767,0);
+415	1	0	phase_encode1_read	1	70,ramp(0,32767);275,32767;70,ramp(32767,0);
+415	1	0	phase_encode1_phase	1	70,ramp(0,32767);275,32767;70,ramp(32767,0);
+780	1	0	readout_read	1	70,ramp(0,32767);640,32767;70,ramp(32767,0);
+415	1	0	rewind_phase	1	70,ramp(0,32767);275,32767;70,ramp(32767,0);

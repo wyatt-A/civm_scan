@@ -1,0 +1,11 @@
+ne=1
+dim_Y=128
+tr=50000
+dim_X=210
+dim_Z=1
+fovx=19.7
+te=5
+S_PSDname=scout
+fovz=1
+bw=50000
+fovy=12

@@ -1,0 +1,2 @@
+72	20	0	excitation	1	1,0;70,2047;1,0;
+72	20	1	excitation	1	72P,0;

@@ -1,0 +1,217 @@
+/* PARAMLIST
+DSP_ROUTINE "dsp";
+RECEIVER_MASK 1,65535,1,rec_sel;
+GRADIENT_STRENGTH grad_var;
+OBSERVE_FREQUENCY "9.4T 1H",-40000000,40000000,0,MHz, kHz, Hz, rx1MHz;
+SPECTRAL_WIDTH 100000,100000,100000,sample_period;
+NO_VIEWS 1,500000,128,no_views;
+NO_ECHOES 1,64,1,1,no_echoes;
+NO_AVERAGES 1,65535,1,no_averages;
+NO_SAMPLES 8,65535,210,no_samples;
+DISCARD 0,64,0,no_discard;
+SCROLLBAR "excitation dac percent","%","%.2f",0,2047,100,20.47,excitation_power_adj;
+EDITTEXT "c_pe_mat1","dac","%.2f",-20000,20000,0,1,c_pe_mat1_read_adj;
+END
+*/
+#use GRAD "D:\dev\221125\scout\m1\civm_grad.seq" civm_grad
+#use RF1 "D:\dev\221125\scout\m1\civm_rf.seq" civm_rf
+
+#include "stdfn_15.pph"
+#include "C:\workstation\SequenceTools\CivmSequenceTools_v1.0\civm_var_20_long.PPH"
+#include "m3031_15.pph"
+#include "m3040_20.pph"
+#use RF1 "c:\smis\seqlib\RFstd.seq" pf1
+#use GRAD "c:\smis\seqlib\g3040_15.seq" grad
+void systemout(int);
+void delay32(long);
+main(){
+const c_calc_mat 1;
+const slice_sel_mat 5;
+const slice_ref_mat 6;
+const c_pe_mat1 3;
+const read_mat 2;
+const c_re_mat 4;
+int slice_sel_slice;
+int slice_sel_mat_read;
+int slice_sel_mat_phase;
+int slice_sel_mat_slice;
+common int excitation_power_adj;
+int excitation_power;
+int excitation_phase;
+int slice_ref_slice;
+int slice_ref_mat_read;
+int slice_ref_mat_phase;
+int slice_ref_mat_slice;
+int phase_encode1_read;
+int phase_encode1_phase;
+int c_pe_mat1_read;
+int c_pe_mat1_phase;
+int c_pe_mat1_slice;
+common int c_pe_mat1_read_adj;
+int readout_read;
+int read_mat_read;
+int read_mat_phase;
+int read_mat_slice;
+int acquire_phase;
+int rewind_phase;
+int c_re_mat_read;
+int c_re_mat_phase;
+int c_re_mat_slice;
+int lut_tempval_1;
+int lut_tempval_2;
+long tempval_long;
+long lut_index;
+common int pts_mask;
+long no_completed_views;
+int no_completed_averages;
+#include "C:\smis\include\lututils.pph"
+int is16bit;
+is16bit = 1;
+MR3040_SelectMatrix( c_calc_mat );
+BASEMATRIX_LONG1(-900,0,0)
+delay( 100, us);
+MR3040_DEGLITCH
+MR3040_Clock(20);
+discard(no_discard);
+frequency_buffer(0);
+frequency(MHz, kHz, Hz, rx1MHz);
+reset_frequency();
+phase_increment(1);
+slice_sel_slice = MR3040_InitList();
+MR3040_Output(NOLOOP,civm_grad.address."slice_sel_slice",civm_grad.size."slice_sel_slice",civm_grad.waits."slice_sel_slice");
+excitation_phase = 0;
+excitation_power = 0;
+NEWSHAPE_MAC(1,civm_rf,"excitation",140,70)
+slice_ref_slice = MR3040_InitList();
+MR3040_Output(NOLOOP,civm_grad.address."slice_ref_slice",civm_grad.size."slice_ref_slice",civm_grad.waits."slice_ref_slice");
+phase_encode1_read = MR3040_InitList();
+MR3040_Output(NOLOOP,civm_grad.address."phase_encode1_read",civm_grad.size."phase_encode1_read",civm_grad.waits."phase_encode1_read");
+phase_encode1_phase = MR3040_InitList();
+MR3040_Output(NOLOOP,civm_grad.address."phase_encode1_phase",civm_grad.size."phase_encode1_phase",civm_grad.waits."phase_encode1_phase");
+readout_read = MR3040_InitList();
+MR3040_Output(NOLOOP,civm_grad.address."readout_read",civm_grad.size."readout_read",civm_grad.waits."readout_read");
+acquire_phase = 0;
+rewind_phase = MR3040_InitList();
+MR3040_Output(NOLOOP,civm_grad.address."rewind_phase",civm_grad.size."rewind_phase",civm_grad.waits."rewind_phase");
+sync();
+starttimer();
+no_completed_views = 0;
+views_loop:
+no_completed_averages = 0;
+averages_loop:
+waittimer(500);
+starttimer();
+hostrequest();
+systemout(pts_mask);
+slice_sel_mat_read = 0;
+slice_sel_mat_phase = 0;
+slice_sel_mat_slice = 6328;
+CREATE_MATRIX(slice_sel_mat,slice_sel_mat_slice,slice_sel_mat_phase,slice_sel_mat_read)
+delay(100,us);
+excitation_phase = 0;
+excitation_power = excitation_power_adj;
+tempval_long=slice_sel_mat_read;
+tempval_long=(tempval_long*100L)/100L + 0L;
+slice_ref_mat_read=tempval_long;
+tempval_long=slice_sel_mat_phase;
+tempval_long=(tempval_long*100L)/100L + 0L;
+slice_ref_mat_phase=tempval_long;
+tempval_long=slice_sel_mat_slice;
+tempval_long=(tempval_long*-100L)/100L + 0L;
+slice_ref_mat_slice=tempval_long;
+CREATE_MATRIX(slice_ref_mat,slice_ref_mat_slice,slice_ref_mat_phase,slice_ref_mat_read)
+delay(100,us);
+c_pe_mat1_phase=no_completed_views - 64;
+tempval_long=c_pe_mat1_phase;
+tempval_long=(tempval_long*4200L)/100L + 0L;
+c_pe_mat1_phase=tempval_long;
+c_pe_mat1_read = -2920;
+tempval_long=c_pe_mat1_read;
+tempval_long=(tempval_long*100L)/100L + 0L;
+c_pe_mat1_read=tempval_long;
+c_pe_mat1_slice = 0;
+tempval_long=c_pe_mat1_slice;
+tempval_long=(tempval_long*100L)/100L + 0L;
+c_pe_mat1_slice=tempval_long;
+CREATE_MATRIX(c_pe_mat1,c_pe_mat1_slice,c_pe_mat1_phase,c_pe_mat1_read+c_pe_mat1_read_adj)
+delay(100,us);
+read_mat_read = 1799;
+read_mat_phase = 0;
+read_mat_slice = 0;
+CREATE_MATRIX(read_mat,read_mat_slice,read_mat_phase,read_mat_read)
+delay(100,us);
+acquire_phase = 0;
+tempval_long=c_pe_mat1_read;
+tempval_long=(tempval_long*100L)/100L + 0L;
+c_re_mat_read=tempval_long;
+tempval_long=c_pe_mat1_phase;
+tempval_long=(tempval_long*-100L)/100L + 0L;
+c_re_mat_phase=tempval_long;
+tempval_long=c_pe_mat1_slice;
+tempval_long=(tempval_long*100L)/100L + 0L;
+c_re_mat_slice=tempval_long;
+CREATE_MATRIX(c_re_mat,c_re_mat_slice,c_re_mat_phase,c_re_mat_read)
+delay(100,us);
+waittimer(30000);
+starttimer();
+MR3040_SelectMatrix(slice_sel_mat);
+MR3040_SetList(slice_sel_slice,0x0200);
+waittimer(300);
+starttimer();
+MR3040_Start(0x0200);
+waittimer(300);
+delay32(598L);
+starttimer();
+resync();
+phase(excitation_phase);
+waittimer(400);
+MR3031_RFSTART(1,140,excitation_power,60,4)
+delay32(5664L);
+starttimer();
+MR3040_SelectMatrix(slice_ref_mat);
+MR3040_SetList(slice_ref_slice,0x0200);
+waittimer(300);
+starttimer();
+MR3040_Start(0x0200);
+waittimer(300);
+delay32(21852L);
+starttimer();
+MR3040_SelectMatrix(c_pe_mat1);
+MR3040_SetList(phase_encode1_read,0x0002);
+MR3040_SetList(phase_encode1_phase,0x0020);
+waittimer(300);
+starttimer();
+MR3040_Start(0x0022);
+waittimer(300);
+delay32(8194L);
+starttimer();
+MR3040_SelectMatrix(read_mat);
+MR3040_SetList(readout_read,0x0002);
+waittimer(300);
+starttimer();
+MR3040_Start(0x0002);
+waittimer(300);
+delay32(477L);
+starttimer();
+resync();
+rphase(acquire_phase);
+waittimer(500);
+acquire(sample_period,no_samples);
+delay32(64L);
+starttimer();
+MR3040_SelectMatrix(c_re_mat);
+MR3040_SetList(rewind_phase,0x0020);
+waittimer(300);
+starttimer();
+MR3040_Start(0x0020);
+waittimer(300);
+delay32(401850L);
+starttimer();
+no_completed_averages = no_completed_averages + 1;
+if (no_completed_averages < 1*no_averages)
+goto averages_loop;
+no_completed_views = no_completed_views + 1;
+if (no_completed_views < 1*no_views)
+goto views_loop;
+end:
+}

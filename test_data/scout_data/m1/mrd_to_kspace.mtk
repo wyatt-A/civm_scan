@@ -1,0 +1,10 @@
+{
+  "mrd_format": "StandardSlice",
+  "n_read": 210,
+  "n_phase1": 128,
+  "n_phase2": 1,
+  "n_views": 128,
+  "view_acceleration": 1,
+  "dummy_excitations": 0,
+  "n_objects": 1
+}

@@ -1,0 +1,24 @@
+{
+  "name": "scout",
+  "fov": [
+    12.0,
+    12.0
+  ],
+  "samples": [
+    128,
+    128
+  ],
+  "slice_thickness": 1.0,
+  "sample_discards": 0,
+  "orientation": "Scout0",
+  "spectral_width": "SW100kH",
+  "rf_duration": 0.00014,
+  "ramp_time": 0.00014,
+  "phase_encode_time": 0.00055,
+  "echo_time": 0.005,
+  "rep_time": 0.05,
+  "n_averages": 1,
+  "n_repetitions": 128,
+  "grad_off": false,
+  "obs_freq_offset": 0.0
+}

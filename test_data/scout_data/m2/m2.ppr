@@ -1,0 +1,13 @@
+:PPL D:\dev\221125\scout\m2\m2.ppl
+:DSP_ROUTINE dsp
+:RECEIVER_MASK rec_sel, 1
+:GRADIENT_STRENGTH grad_var, 4, 92456, 101857, 92456, 112634
+:OBSERVE_FREQUENCY "9.4T 1H", 30171576.0, MHz, kHz, Hz, rx1MHz
+:SAMPLE_PERIOD sample_period, 100, 23, "100  KHz  10 µs"
+:NO_VIEWS no_views, 128
+:NO_ECHOES no_echoes, 1
+:NO_AVERAGES no_averages, 1
+:NO_SAMPLES no_samples, 210
+:DISCARD no_discard, 0
+:VAR excitation_power_adj, 100
+:VAR c_pe_mat1_read_adj, 0

@@ -1,0 +1,126 @@
+/* PARAMLIST
+DSP_ROUTINE "dsp";
+RECEIVER_MASK 1,65535,1,rec_sel;
+GRADIENT_STRENGTH grad_var;
+OBSERVE_FREQUENCY "9.4T 1H",-40000000,40000000,-830,MHz, kHz, Hz, rx1MHz;
+SPECTRAL_WIDTH 200000,200000,200000,sample_period;
+NO_VIEWS 1,500000,17,no_views;
+NO_ECHOES 1,64,2,1,no_echoes;
+NO_AVERAGES 1,65535,1,no_averages;
+NO_SAMPLES 8,65535,788,no_samples;
+DISCARD 0,64,0,no_discard;
+END
+*/
+#use GRAD "D:\dev\rfadjustments\civm_grad.seq" civm_grad
+#use RF1 "D:\dev\rfadjustments\civm_rf.seq" civm_rf
+
+#include "stdfn_15.pph"
+#include "C:\workstation\SequenceTools\CivmSequenceTools_v1.0\civm_var_20_long.PPH"
+#include "m3031_15.pph"
+#include "m3040_20.pph"
+#use RF1 "c:\smis\seqlib\RFstd.seq" pf1
+#use GRAD "c:\smis\seqlib\g3040_15.seq" grad
+void systemout(int);
+void delay32(long);
+main(){
+const c_calc_mat 1;
+const c_slice_select_mat 2;
+int slice_select_slice;
+int c_slice_select_mat_read;
+int c_slice_select_mat_phase;
+int c_slice_select_mat_slice;
+int excitation_power;
+int excitation_phase;
+int acquire_phase;
+int lut_tempval_1;
+int lut_tempval_2;
+long tempval_long;
+long lut_index;
+common int pts_mask;
+long no_completed_views;
+int no_completed_averages;
+#include "C:\smis\include\lututils.pph"
+int is16bit;
+is16bit = 1;
+MR3040_SelectMatrix( c_calc_mat );
+BASEMATRIX_LONG1(-900,0,0)
+delay( 100, us);
+MR3040_DEGLITCH
+MR3040_Clock(20);
+discard(no_discard);
+frequency_buffer(0);
+frequency(MHz, kHz, Hz, rx1MHz);
+reset_frequency();
+phase_increment(1);
+slice_select_slice = MR3040_InitList();
+MR3040_Output(NOLOOP,civm_grad.address."slice_select_slice",civm_grad.size."slice_select_slice",civm_grad.waits."slice_select_slice");
+excitation_phase = 0;
+excitation_power = 0;
+NEWSHAPE_MAC(1,civm_rf,"excitation",100,50)
+acquire_phase = 0;
+sync();
+starttimer();
+no_completed_views = 0;
+views_loop:
+no_completed_averages = 0;
+averages_loop:
+waittimer(500);
+starttimer();
+hostrequest();
+systemout(pts_mask);
+c_slice_select_mat_read = 0;
+c_slice_select_mat_phase = 0;
+c_slice_select_mat_slice = 427;
+CREATE_MATRIX(c_slice_select_mat,c_slice_select_mat_slice,c_slice_select_mat_phase,c_slice_select_mat_read)
+delay(100,us);
+excitation_phase = 0;
+excitation_power = no_completed_views*50 + 0;
+acquire_phase = 0;
+waittimer(30000);
+starttimer();
+MR3040_SelectMatrix(c_slice_select_mat);
+MR3040_SetList(slice_select_slice,0x0200);
+waittimer(300);
+starttimer();
+MR3040_Start(0x0200);
+waittimer(300);
+delay32(9298L);
+starttimer();
+resync();
+phase(excitation_phase);
+waittimer(400);
+MR3031_RFSTART(1,100,excitation_power,60,4)
+delay32(62914L);
+starttimer();
+resync();
+phase(excitation_phase);
+waittimer(400);
+MR3031_RFSTART(1,100,excitation_power,60,4)
+delay32(43993L);
+starttimer();
+resync();
+rphase(acquire_phase);
+waittimer(500);
+acquire(sample_period,no_samples);
+delay32(40216L);
+starttimer();
+resync();
+phase(excitation_phase);
+waittimer(400);
+MR3031_RFSTART(1,100,excitation_power,60,4)
+delay32(43993L);
+starttimer();
+resync();
+rphase(acquire_phase);
+waittimer(500);
+acquire(sample_period,no_samples);
+delay32(474816L);
+starttimer();
+no_completed_averages = no_completed_averages + 1;
+if (no_completed_averages < 1*no_averages)
+goto averages_loop;
+no_completed_views = no_completed_views + 1;
+if (no_completed_views < 1*no_views)
+goto views_loop;
+end:
+}
