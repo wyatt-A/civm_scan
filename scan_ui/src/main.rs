@@ -9,6 +9,7 @@ use mr_data;
 use build_sequence::build_directory::build_directory;
 use crate::egui::plot::{Line, Plot, PlotPoints};
 use acquire::adjustment;
+use acquire::adjustment::Adjustment;
 use scan_ui::image_utilities;
 use utils;
 
@@ -170,6 +171,14 @@ impl eframe::App for MyApp {
             ui.button("start scan").clicked();
             if ui.button("compile sequence").clicked() {
                 build_directory(Path::new("d:/dev/221011"));
+            }
+
+            if ui.button("run adjustment").clicked(){
+                Adjustment::new(
+                    Path::new("./test_env/sequence_library/1p.json"),
+                    Path::new("./test_env/sequence_library/rf_cal.json"),
+                    Path::new("./test_data/adj_data")
+                ).run();
             }
         });
     }

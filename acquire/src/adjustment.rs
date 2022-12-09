@@ -169,11 +169,11 @@ impl Adjustment {
         let params = build::load_adj_params(&self.freq_cal_config);
         build::build_adj(params,&self.freq_cal_dir,false);
 
-        // scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
-        //     path: fcal_dir.clone(),
-        //     cs_table: None,
-        //     depth_to_search: Some(0)
-        // });
+        scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
+            path: self.freq_cal_dir.clone(),
+            cs_table: None,
+            depth_to_search: Some(0)
+        });
 
         // analyze the results
         let (freq_spec,freq_offset) = self.calc_freq_offset();
@@ -183,11 +183,11 @@ impl Adjustment {
         params.set_freq_offset(freq_offset);
         build::build_adj(params,&self.rf_cal_dir,false);
 
-        // scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
-        //     path: rfcal_dir.clone(),
-        //     cs_table: None,
-        //     depth_to_search: Some(0)
-        // });
+        scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
+            path: self.rf_cal_dir.clone(),
+            cs_table: None,
+            depth_to_search: Some(0)
+        });
 
         let (signal_difference,rf_dac_secs) = self.calc_rf_dac_seconds();
 
