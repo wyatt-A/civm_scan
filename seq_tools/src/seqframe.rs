@@ -120,6 +120,22 @@ impl SeqFrameExpression for Function {
                     text: format!("{}*sinc(PI*{}*((Ñ-({}/2))/({}/2)))", dac, lobe_val, p.n_samples, p.n_samples)
                 }
             }
+            Function::RampUpFrom(from_val,p) => {
+                let dac_upper = ((dac_scale as f32)*p.max_value) as i16;
+                let dac_lower = ((dac_scale as f32)*from_val) as i16;
+                Expression {
+                    n_samples:p.n_samples,
+                    text: format!("ramp({},{})",dac_lower,dac_upper)
+                }
+            }
+            Function::RampDownTo(to_val,p) => {
+                let dac_upper = ((dac_scale as f32)*p.max_value) as i16;
+                let dac_lower = ((dac_scale as f32)*to_val) as i16;
+                Expression {
+                    n_samples:p.n_samples,
+                    text: format!("ramp({},{})",dac_upper,dac_lower)
+                }
+            }
         }
     }
 }

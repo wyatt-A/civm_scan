@@ -14,12 +14,15 @@ impl FunctionParams{
     }
 }
 
+#[derive(Clone)]
 pub enum Function {
     RampUp(FunctionParams),
     RampDown(FunctionParams),
     HalfSin(FunctionParams),
     Plateau(FunctionParams),
-    Sinc(u16,FunctionParams)
+    Sinc(u16,FunctionParams),
+    RampDownTo(f32,FunctionParams),
+    RampUpFrom(f32,FunctionParams)
 }
 
 impl Function {
@@ -40,6 +43,8 @@ impl Function {
             Function::Sinc(n_lobes,p) => {
                 sinc(p.max_value, *n_lobes, p.n_samples)
             }
+            Function::RampDownTo(intermediate,p) => ramp(p.max_value,*intermediate,p.n_samples),
+            Function::RampUpFrom(intermediate,p) => ramp(*intermediate,p.max_value,p.n_samples),
         }
     }
     pub fn n_samples(&self) -> usize {

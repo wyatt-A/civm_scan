@@ -5,6 +5,10 @@
 
  All pulses are normalized to have a maximum unit magnitude. This allows for the calculation of
  normalized power to calculate things like flip angle and k-space traversal.
+
+ All pulses should default to have a max amplitude of 1.0 except for some special cases. This is
+ important because these pulses get scaled later to get run on hardware.
+
  */
 
 use std::f32::consts::PI;
@@ -13,14 +17,8 @@ use crate::pulse_function::{Function, FunctionParams};
 use crate::_utils;
 use utils;
 
-
 pub trait Pulse {
     fn duration(&self) -> f32;
-    // fn slice_thickness(&self,grad_strength_hzpmm:f32,time_step_us:usize) -> f32{
-    //     let w = self.render(time_step_us);
-    //     // take fourier transform of w and find full-width half-max
-    //
-    // }
     fn function(&self,time_step_us:usize) -> Vec<Function>;
     fn n_samples(&self,time_step:usize) -> usize {
         self.function(time_step).iter().map(|f| f.n_samples()).sum()
@@ -60,6 +58,11 @@ pub trait SliceSelective:Pulse {
         self.bandwidth()/slice_thickness_mm
     }
 }
+
+
+/*
+    Basic trapezoid pulse typically for gradient activity
+ */
 
 #[derive(Clone,Copy)]
 pub struct Trapezoid {
@@ -101,6 +104,12 @@ impl Pulse for Trapezoid {
     }
 }
 
+
+/*
+    Half-Sin pulse representing sin(x) for 0 < x < pi.
+    This is commonly used for our diffusion gradient lobes
+ */
+
 #[derive(Clone,Copy)]
 pub struct HalfSin {
     pub duration:f32,
@@ -132,6 +141,9 @@ impl Pulse for HalfSin {
     }
 }
 
+/*
+    Basic rectangular pulse used for full-volume RF excitation
+ */
 
 #[derive(Clone,Copy)]
 pub struct Hardpulse {
@@ -152,12 +164,6 @@ impl Pulse for Hardpulse {
     fn duration(&self) -> f32 {
         self.duration
     }
-    fn power_net(&self,magnitude:f32) -> f32 {
-        magnitude*self.duration
-    }
-    fn power_abs(&self,magnitude:f32) -> f32 {
-        self.power_net(magnitude).abs()
-    }
     fn function(&self,time_step_us:usize) -> Vec<Function>{
         let n_central_samples = _utils::sec_to_us(self.duration()) as usize/time_step_us;
         let central_pulse = FunctionParams::new(n_central_samples,1.0);
@@ -168,10 +174,22 @@ impl Pulse for Hardpulse {
             Function::Plateau(end_point)
         ]
     }
+    fn power_net(&self,magnitude:f32) -> f32 {
+        magnitude*self.duration
+    }
     fn magnitude_net(&self, power_net: f32) -> f32 {
         power_net/self.duration
     }
+    fn power_abs(&self,magnitude:f32) -> f32 {
+        self.power_net(magnitude).abs()
+    }
 }
+
+
+/*
+    Composite hard pulse exclusively used for 180 degree flip angles
+    This is implemented as a hard pulse with phase divisions
+ */
 
 #[derive(Clone)]
 pub struct CompositeHardpulse {
@@ -186,21 +204,12 @@ impl CompositeHardpulse {
             phase_divisions:vec![0.0,90.0,90.0,0.0]
         }
     }
-    pub fn bandwidth_hz(&self) -> f32 {
-        1.0/(4.0*self.duration)
-    }
 }
 
 impl SliceSelective for CompositeHardpulse{}
 impl Pulse for CompositeHardpulse {
     fn duration(&self) -> f32 {
         self.duration
-    }
-    fn power_net(&self,magnitude:f32) -> f32 {
-        magnitude*self.duration
-    }
-    fn power_abs(&self,magnitude:f32) -> f32 {
-        self.power_net(magnitude).abs()
     }
     fn function(&self,time_step_us:usize) -> Vec<Function>{
         let n_central_samples = _utils::sec_to_us(self.duration()) as usize/time_step_us;
@@ -212,10 +221,21 @@ impl Pulse for CompositeHardpulse {
             Function::Plateau(end_point)
         ]
     }
+    fn power_net(&self,magnitude:f32) -> f32 {
+        magnitude*self.duration
+    }
     fn magnitude_net(&self, power_net: f32) -> f32 {
         power_net/self.duration
     }
+    fn power_abs(&self,magnitude:f32) -> f32 {
+        self.power_net(magnitude).abs()
+    }
 }
+
+
+/*
+    Generic sinc pulse for slice-selective rf excitation and refocusing
+ */
 
 pub struct SincPulse {
     duration:f32,
@@ -256,6 +276,86 @@ impl Pulse for SincPulse {
         let a = utils::abs(&self.render(2));
         let p = utils::trapz(&a,Some(2.0E-6));
         power_net/p
+    }
+
+    fn power_abs(&self, magnitude: f32) -> f32 {
+        self.power_net(magnitude)
+    }
+}
+
+
+
+/*
+    A special gradient pulse shape the simplifies 2-d slice selective refocusing.
+    There is a crusher built-in to either side of a slice-select gradient.
+    The crush ratio is the relative amplitude of the first and last lobe to the central plateau
+           ____             ____
+          /    \           /    \
+         /      \_________/      \
+        /                         \
+    ___/                           \___
+ */
+
+pub struct SliceSelectiveCrusher {
+    crush_ratio:f32,
+    selection_duration:f32,
+    crush_duration:f32,
+    ramp_time:f32,
+}
+
+impl SliceSelectiveCrusher {
+    pub fn new(slice_select_duration:f32,crush_duration:f32,ramp_time:f32) -> Self {
+        Self {
+            crush_ratio: 2.0,
+            selection_duration: slice_select_duration,
+            crush_duration,
+            ramp_time,
+        }
+    }
+
+    fn normalized_power(&self) -> f32 {
+        let trapezoid_1 = self.crush_ratio*(self.ramp_time + 2.0*self.crush_duration + self.selection_duration);
+        let trapezoid_2 = (self.crush_ratio - 1.0)*(self.crush_duration + self.ramp_time);
+        trapezoid_1 - trapezoid_2
+    }
+}
+
+impl Pulse for SliceSelectiveCrusher {
+    fn duration(&self) -> f32 {
+        self.selection_duration + 2.0*self.crush_duration + 4.0*self.ramp_time
+    }
+
+    fn function(&self, time_step_us: usize) -> Vec<Function> {
+        let n_ramp_samples = _utils::sec_to_samples(self.ramp_time, time_step_us);
+        let n_crush_plateau_samples = _utils::sec_to_samples(self.crush_duration, time_step_us);
+        let n_select_plateau_samples = _utils::sec_to_samples(self.selection_duration, time_step_us);
+
+        let ramp_up1 = Function::RampUp(FunctionParams::new(n_ramp_samples,self.crush_ratio));
+        let ramp_up2 = Function::RampUpFrom(1.0,FunctionParams::new(n_ramp_samples,self.crush_ratio));
+
+        let ramp_down1 = Function::RampDownTo(1.0,FunctionParams::new(n_ramp_samples,self.crush_ratio));
+        let ramp_down2 = Function::RampDown(FunctionParams::new(n_ramp_samples,self.crush_ratio));
+
+        let crush_plat = Function::Plateau(FunctionParams::new(n_crush_plateau_samples,self.crush_ratio));
+        let select_plat = Function::Plateau(FunctionParams::new(n_select_plateau_samples,1.0));
+
+        vec![
+            ramp_up1,
+            crush_plat.clone(),
+            ramp_down1,
+            select_plat,
+            ramp_up2,
+            crush_plat,
+            ramp_down2
+        ]
+    }
+
+    fn power_net(&self, magnitude: f32) -> f32 {
+        magnitude*self.normalized_power()
+    }
+
+    fn magnitude_net(&self, power_net: f32) -> f32 {
+        power_net/self.normalized_power()
     }
 
     fn power_abs(&self, magnitude: f32) -> f32 {
