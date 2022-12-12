@@ -23,8 +23,8 @@ use seq_tools::ppl::Orientation;
 use utils;
 use crate::scout::ScoutViewSettings;
 
-//const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
-const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
+const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
+//const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
 //const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
 pub const HEADFILE_NAME:&str = "meta";

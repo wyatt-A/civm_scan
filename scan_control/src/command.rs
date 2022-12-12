@@ -2,11 +2,12 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::{thread,time};
+use std::{fs, thread, time};
 use std::time::SystemTime;
 use regex::Regex;
 use glob::glob;
 use chrono::{DateTime,Local};
+use utils;
 
 use crate::args::*;
 
@@ -133,13 +134,14 @@ pub fn run_directory(args:RunDirectoryArgs){
 
 //196095
 pub fn upload_table(path_to_table:&Path){
+    let path_to_table = utils::absolute_path(path_to_table);
     let script = Path::new(DIR).join(UPLOAD_VBS);
     let mut cmd = Command::new("cscript");
     if !path_to_table.exists(){
         panic!("cannot find table: {:?}",path_to_table);
     }
     let mut table_string = String::new();
-    let mut f = File::open(path_to_table).expect("cannot open table");
+    let mut f = File::open(&path_to_table).expect("cannot open table");
     f.read_to_string(&mut table_string).expect("cannot read table");
     let lines = table_string.lines();
     let v:Vec<i32> = lines.flat_map(|line| line.parse()).collect();
@@ -161,25 +163,33 @@ pub fn upload_table(path_to_table:&Path){
 }
 
 pub fn set_ppr(path:&Path) -> bool {
+
+    let full_path = utils::absolute_path(path);
+
+    println!("path = {:?}",full_path);
+
     let script = Path::new(DIR).join(SET_PPR_VBS);
     let mut cmd = Command::new("cscript");
-    if !path.exists(){
-        println!("cannot find ppr file: {:?}",path);
+    if !full_path.exists(){
+        println!("cannot find ppr file: {:?}",full_path);
         return false
     }
-    let out = cmd.args(vec![
+    cmd.args(vec![
         script,
-        path.to_owned()
-    ]).output().expect("failed to launch cscript");
+        full_path.to_owned()
+    ]);
+    println!("{:?}",cmd);
+    cmd.output().expect("failed to launch cscript");
     true
 }
 
 pub fn set_mrd(path:&Path) -> bool {
+    let full_path = utils::absolute_path(path);
     let script = Path::new(DIR).join(SET_MRD_VBS);
     let mut cmd = Command::new("cscript");
     let out = cmd.args(vec![
         script,
-        path.to_owned()
+        full_path.to_owned()
     ]).output().expect("failed to launch cscript");
     true
 }

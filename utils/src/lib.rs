@@ -5,6 +5,7 @@ use glob::glob;
 use walkdir::WalkDir;
 use rustfft::{FftPlanner};
 use num_complex::Complex;
+use path_clean::PathClean;
 
 pub fn m_number_formatter(n_elements:usize) -> Vec<String>{
     let w = ((n_elements-1) as f32).log10().floor() as usize + 1;
@@ -253,4 +254,14 @@ pub fn trapz(x:&Vec<f32>,dt:Option<f32>) -> f32 {
         s = s + x[i] + x[i+1];
     }
     dt.unwrap_or(1.0)*s/2.0
+}
+
+
+pub fn absolute_path(path:&Path) -> PathBuf {
+    let absolute_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().expect("cannot find current dir!").join(path)
+    }.clean();
+    absolute_path
 }

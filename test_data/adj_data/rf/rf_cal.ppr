@@ -1,4 +1,4 @@
-:PPL ../test_data/adj_data\rf\rf_cal.ppl
+:PPL ./test_data/adj_data\rf\rf_cal.ppl
 :DSP_ROUTINE dsp
 :RECEIVER_MASK rec_sel, 1
 :GRADIENT_STRENGTH grad_var, 4, 92456, 101857, 92456, 112634
