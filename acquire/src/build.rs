@@ -4,7 +4,7 @@ use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use cs_table::cs_table::CSTable;
-use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims, ScoutConfig, AdjustmentParameters};
+use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims, ScoutConfig, AdjustmentParameters, SequenceLoadError};
 use headfile::headfile::Headfile;
 use dyn_clone::clone_box;
 use encoding::all::ISO_8859_1;
@@ -84,70 +84,103 @@ impl Sequence {
 }
 
 
-pub fn acq_dims(cfg_file:&Path) -> AcqDims {
-    load_params(cfg_file).acq_dims()
+pub fn acq_dims(cfg_file:&Path) -> Result<AcqDims,SequenceLoadError> {
+    Ok(load_params(cfg_file)?.acq_dims())
 }
 
-fn load_params(cfg_file:&Path) -> Box<dyn SequenceParameters> {
+fn load_params(cfg_file:&Path) -> Result<Box<dyn SequenceParameters>,SequenceLoadError> {
     let cfg_str = read_to_string(cfg_file);
-    match find_seq_name_from_config(&cfg_str) {
+    Ok(match find_seq_name_from_config(&cfg_str) {
         Sequence::FseDti => {
-            Box::new(FseDtiParams::load(&cfg_file))
+            Box::new(FseDtiParams::load(&cfg_file)?)
         },
         Sequence::SeDti => {
-            Box::new(SeDtiParams::load(&cfg_file))
+            Box::new(SeDtiParams::load(&cfg_file)?)
         },
         Sequence::Scout => {
-            Box::new(ScoutParams::load(&cfg_file))
+            Box::new(ScoutParams::load(&cfg_file)?)
         }
         Sequence::Se2D => {
-            Box::new(Se2DParams::load(&cfg_file))
+            Box::new(Se2DParams::load(&cfg_file)?)
         }
         _=> panic!("not yet implemented")
-    }
-}
-
-pub fn load_adj_params(cfg_file:&Path) -> Box<dyn AdjustmentParameters> {
-    let cfg_str = read_to_string(cfg_file);
-    match find_seq_name_from_config(&cfg_str) {
-        Sequence::OnePulse => {
-            Box::new(OnePulseParams::load(&cfg_file))
-        },
-        Sequence::RfCal => {
-            Box::new(RfCalParams::load(&cfg_file))
-        },
-        _ => panic!("not yet implemented")
-    }
+    })
 }
 
 
-pub fn load_scout_params(cfg_file:&Path) -> Box<dyn ScoutConfig> {
+pub fn load_build_params(cfg_file:&Path) -> Result<Box<dyn Build>,SequenceLoadError> {
     let cfg_str = read_to_string(cfg_file);
-    match find_seq_name_from_config(&cfg_str) {
-        Sequence::Scout => {
-            Box::new(ScoutParams::load(&cfg_file))
-        }
-        _=> panic!("not yet implemented")
-    }
-}
-
-
-pub fn load_dw_params(cfg_file:&Path) -> Box<dyn DWSequenceParameters> {
-    let cfg_str = read_to_string(cfg_file);
-    match find_seq_name_from_config(&cfg_str) {
+    Ok(match find_seq_name_from_config(&cfg_str) {
         Sequence::FseDti => {
-            Box::new(FseDtiParams::load(&cfg_file))
+            FseDtiParams::load(&cfg_file)?.instantiate()
         },
         Sequence::SeDti => {
-            Box::new(SeDtiParams::load(&cfg_file))
+            SeDtiParams::load(&cfg_file)?.instantiate()
+        },
+        Sequence::Scout => {
+            ScoutParams::load(&cfg_file)?.instantiate()
+        }
+        Sequence::Se2D => {
+            Se2DParams::load(&cfg_file)?.instantiate()
+        }
+        Sequence::OnePulse => {
+            OnePulseParams::load(&cfg_file)?.instantiate()
+        },
+        Sequence::RfCal => {
+            RfCalParams::load(&cfg_file)?.instantiate()
+        },
+        _=> panic!("sequence not registered")
+    })
+}
+
+
+pub fn load_adj_params(cfg_file:&Path) -> Result<Box<dyn AdjustmentParameters>,SequenceLoadError> {
+    let cfg_str = read_to_string(cfg_file);
+    Ok(match find_seq_name_from_config(&cfg_str) {
+        Sequence::OnePulse => {
+            Box::new(OnePulseParams::load(&cfg_file)?)
+        },
+        Sequence::RfCal => {
+            Box::new(RfCalParams::load(&cfg_file)?)
+        },
+        _ => panic!("not yet implemented")
+    })
+}
+
+
+pub fn load_scout_params(cfg_file:&Path) -> Result<Box<dyn ScoutConfig>,SequenceLoadError> {
+    let cfg_str = read_to_string(cfg_file);
+    Ok(match find_seq_name_from_config(&cfg_str) {
+        Sequence::Scout => {
+            Box::new(ScoutParams::load(&cfg_file)?)
+        }
+        _=> panic!("not yet implemented")
+    })
+}
+
+pub fn validate(cfg_file:&Path) -> (bool,Option<String>) {
+    match load_build_params(cfg_file){
+        Err(_) => (false,Some(String::from("invalid sequence config file! Is the syntax correct?"))),
+        Ok(build) => build.is_valid()
+    }
+}
+
+pub fn load_dw_params(cfg_file:&Path) -> Result<Box<dyn DWSequenceParameters>,SequenceLoadError> {
+    let cfg_str = read_to_string(cfg_file);
+    Ok(match find_seq_name_from_config(&cfg_str) {
+        Sequence::FseDti => {
+            Box::new(FseDtiParams::load(&cfg_file)?)
+        },
+        Sequence::SeDti => {
+            Box::new(SeDtiParams::load(&cfg_file)?)
         },
         _=> panic!("not yet implemented")
-    }
+    })
 }
 
 pub fn new_simulation(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let mut params = load_params(&cfg_file);
+    let mut params = load_params(&cfg_file).expect("cannot load parameters");
     params.configure_simulation();
     build_simulation(params,&args.destination,BUILD);
 }
@@ -155,7 +188,7 @@ pub fn new_simulation(args:&NewArgs) {
 
 pub fn new(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_params(&cfg_file);
+    let params = load_params(&cfg_file).expect("cannot load parameters");;
     if !args.destination.exists() {
         create_dir_all(&args.destination).expect(&format!("unable to create directory: {:?}",args.destination));
     }
@@ -164,13 +197,13 @@ pub fn new(args:&NewArgs) {
 
 pub fn new_setup(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_params(&cfg_file);
+    let params = load_params(&cfg_file).expect("cannot load parameters");;
     build_setup(params,&args.destination,BUILD);
 }
 
 pub fn new_adjustment(args:&NewAdjArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_adj_params(&cfg_file);
+    let params = load_adj_params(&cfg_file).expect("cannot load parameters");;
     build_adj(params,&args.destination,BUILD);
 }
 
@@ -211,7 +244,7 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
         println!("cannot find specified b-table {:?}",b_table);
         return
     }
-    let params = load_dw_params(&cfg_file);
+    let params = load_dw_params(&cfg_file).expect("cannot load parameters");;
 
     if !args.destination.exists() {
         create_dir_all(&args.destination).expect(&format!("unable to create directory: {:?}",args.destination));
@@ -221,7 +254,7 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
 
 pub fn new_scout_experiment(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_scout_params(&cfg_file);
+    let params = load_scout_params(&cfg_file).expect("cannot load parameters");;
     build_scout_experiment(params,&ScoutViewSettings::default(),&args.destination, BUILD);
 }
 
@@ -379,7 +412,7 @@ pub fn build_simulation(sequence_params:Box<dyn SequenceParameters>,work_dir:&Pa
     let mut to_build = params.instantiate();
     create_dir_all(work_dir).expect("trouble building directory");
     let label = format!("{}_simulation",params.name());
-    to_build.ppl_export(work_dir,&label,true,build);
+    to_build.ppl_export(work_dir,&label,true,build).expect("invalid event queue!");
 }
 
 pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
@@ -394,7 +427,7 @@ pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bo
     }
     let mut to_build = params.instantiate();
     create_dir_all(work_dir).expect("trouble building directory");
-    to_build.ppl_export(work_dir,&params.name(),false,build);
+    to_build.ppl_export(work_dir,&params.name(),false,build).expect("invalid event queue!");
     params.mrd_to_kspace_params().to_file(&work_dir.join("mrd_to_kspace"));
     let h = Headfile::new(&work_dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
     h.append(&params.acq_params().to_hash());
@@ -404,7 +437,7 @@ pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bo
 pub fn build_adj(adj_params:Box<dyn AdjustmentParameters>,work_dir:&Path,build:bool){
     let mut to_build = adj_params.instantiate();
     create_dir_all(work_dir).expect("trouble building directory");
-    to_build.ppl_export(work_dir,&adj_params.name(),false,build);
+    to_build.ppl_export(work_dir,&adj_params.name(),false,build).expect("invalid event queue!");
     to_build.param_export(&work_dir);
 }
 
@@ -414,7 +447,7 @@ pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,bu
     let mut to_build = setup_params.instantiate();
     create_dir_all(work_dir).expect("trouble building directory");
     let label = format!("{}_setup",setup_params.name());
-    to_build.ppl_export(work_dir,&label,false,build);
+    to_build.ppl_export(work_dir,&label,false,build).expect("invalid event queue!");
     match setup_params.is_cs(){
         true =>{
             let table = &setup_params.cs_table().unwrap();
@@ -442,7 +475,7 @@ pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>, view_setting
         s.mrd_to_kspace_params().to_file(&dir.join("mrd_to_kspace"));
         let h = Headfile::new(&dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
         h.append(&s.acq_params().to_hash());
-        to_build.ppl_export(&dir,&label,false,build);
+        to_build.ppl_export(&dir,&label,false,build).expect("invalid event queue!");
         to_build.param_export(&dir);
     });
 }
@@ -468,7 +501,7 @@ pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>,
         let h = Headfile::new(&dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
         h.append(&s.acq_params().to_hash());
         h.append(&s.diffusion_params().to_hash());
-        to_build.ppl_export(&dir,&label,false,build);
+        to_build.ppl_export(&dir,&label,false,build).expect("invalid event queue!");
         to_build.param_export(&dir);
         match s.is_cs() {
             true => {

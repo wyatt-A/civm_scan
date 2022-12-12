@@ -8,7 +8,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use crate::command_string::CommandString;
 use crate::acq_event::SpectralWidth;
-use crate::event_block::EventQueue;
+use crate::event_block::{EventQueue, EventQueueError};
 use crate::ppl_function;
 use crate::_utils;
 use crate::rf_frame::RF_MAX_DAC;
@@ -390,14 +390,14 @@ impl PPL {
         phase_unit:PhaseUnit,
         acceleration:u16,
         simulate:bool
-    ) -> Self {
+    ) -> Result<Self,EventQueueError> {
         // the simulator cannot handle orientations that are not (0,0,0) for the base matrix
         let orientation = match simulate {
             true => Orientation::Simulation,
             false => orientation
         };
-        let acq = event_queue.ppl_acquisition();
-        Self {
+        let acq = event_queue.ppl_acquisition()?;
+        Ok(Self {
             header:Header {
             dsp_routine:DspRoutine::Dsp,
             receiver_mask:1,
@@ -418,7 +418,7 @@ impl PPL {
             setup:Setup{grad_clock,orientation,phase_unit},
             loop_structure:event_queue.flat_loop_structure(repetitions,averages,rep_time,acceleration),
             simulate
-        }
+        })
     }
     pub fn print(&self) -> String {
         vec![

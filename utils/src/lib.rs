@@ -26,10 +26,11 @@ pub fn read_to_string(filepath:&Path,extension:&str) -> String {
     s
 }
 
-pub fn write_to_file(filepath:&Path,extension:&str,string:&str){
+pub fn write_to_file(filepath:&Path,extension:&str,string:&str) -> PathBuf{
     let p = filepath.with_extension(extension);
-    let mut f = File::create(p).expect("failed to create file");
+    let mut f = File::create(&p).expect("failed to create file");
     f.write_all(string.as_bytes()).expect("trouble writing to file");
+    p.to_owned()
 }
 
 pub fn vec_to_string<T>(vec:&Vec<T>) -> String

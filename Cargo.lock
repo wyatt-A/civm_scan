@@ -1861,6 +1861,9 @@ dependencies = [
  "mr_data",
  "ndarray",
  "ndarray-stats",
+ "seq_tools",
+ "serde",
+ "serde_json",
  "utils",
 ]
 

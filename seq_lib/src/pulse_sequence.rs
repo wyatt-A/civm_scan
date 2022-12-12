@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use seq_tools::event_block::EventQueue;
+use seq_tools::event_block::{EventQueue, EventQueueError};
 use seq_tools::seqframe::SeqFrame;
 use build_sequence::build_directory::{Config,build_directory};
 use seq_tools::ppl::{BaseFrequency, GradClock, Orientation, PhaseUnit, PPL};
@@ -61,9 +61,15 @@ impl PPLBaseParams {
     }
 }
 
+#[derive(Debug)]
+pub enum SequenceLoadError {
+    InvalidFormat
+}
+
+
 pub trait Initialize {
     fn default() -> Self;
-    fn load(params_file:&Path) -> Self;
+    fn load(params_file:&Path) -> Result<Self,SequenceLoadError> where Self: Sized;
     fn write_default(params_file: &Path);
 }
 
@@ -163,6 +169,37 @@ pub trait AcqDimensions {
 pub trait Build {
     fn place_events(&self) -> EventQueue;
     fn base_params(&self) -> PPLBaseParams;
+
+    fn ppl(&self,ppl_file_path:&Path,sim_mode:bool,build:bool) -> Result<PPL,EventQueueError> {
+        let seq_path_strs = self.seq_path_strs(ppl_file_path,build);
+        let base_params = self.base_params();
+        match PPL::new(
+            &mut self.place_events(),
+            base_params.n_repetitions,
+            base_params.n_averages,
+            base_params.rep_time,
+            base_params.base_frequency.clone(),
+            &seq_path_strs.0,
+            &seq_path_strs.1,
+            base_params.orientation.clone(),
+            base_params.grad_clock.clone(),
+            base_params.phase_unit.clone(),
+            base_params.view_acceleration,
+            sim_mode
+        ) {
+            Err(e) => Err(e),
+            Ok(ppl) => Ok(ppl)
+        }
+    }
+
+    fn is_valid(&self) -> (bool,Option<String>) {
+        match self.ppl(Path::new("dummy_path"),false,false) {
+            Ok(ppl) => (true,None),
+            Err(e) => {
+                (false,Some(format!("event queue error! {:?}",e)))
+            }
+        }
+    }
     fn seq_file_export(&self,sample_period_us:usize,filepath:&str) {
         let q = self.place_events();
         let (grad_params,rf_params) = q.ppl_seq_params(sample_period_us);
@@ -180,17 +217,18 @@ pub trait Build {
             None => {}
         }
     }
-    fn ppl_export(&mut self,filepath:&Path,ppr_name:&str,sim_mode:bool,build:bool) {
-        let name = Path::new(ppr_name).with_extension("ppl");
+
+
+    fn seq_path_strs(&self,ppl_filepath:&Path,build:bool) -> (String,String){
         let base_params = self.base_params();
         let seq_path_strs = match build {
             true => {
                 let config = Config::load();
-                let grad_seq_path = Path::new(filepath).join(config.grad_seq()).to_owned();
+                let grad_seq_path = Path::new(ppl_filepath).join(config.grad_seq()).to_owned();
                 let grad_path_str = grad_seq_path.into_os_string().to_str().unwrap().to_owned();
-                let rf_seq_path = Path::new(filepath).join(config.rf_seq()).to_owned();
+                let rf_seq_path = Path::new(ppl_filepath).join(config.rf_seq()).to_owned();
                 let rf_path_str = rf_seq_path.into_os_string().to_str().unwrap().to_owned();
-                self.seq_file_export(base_params.waveform_sample_period_us, filepath.as_os_str().to_str().unwrap());
+                self.seq_file_export(base_params.waveform_sample_period_us, ppl_filepath.as_os_str().to_str().unwrap());
                 (
                     grad_path_str,
                     rf_path_str
@@ -200,20 +238,31 @@ pub trait Build {
                 (String::from(""),String::from(""))
             }
         };
-        let ppl = PPL::new(
-            &mut self.place_events(),
-            base_params.n_repetitions,
-            base_params.n_averages,
-            base_params.rep_time,
-            base_params.base_frequency.clone(),
-            &seq_path_strs.0,
-            &seq_path_strs.1,
-            base_params.orientation.clone(),
-            base_params.grad_clock.clone(),
-            base_params.phase_unit.clone(),
-            base_params.view_acceleration,
-            sim_mode
-        );
+        seq_path_strs
+    }
+
+    fn ppl_export(&mut self,filepath:&Path,ppr_name:&str,sim_mode:bool,build:bool) -> Result<(),EventQueueError> {
+        let name = Path::new(ppr_name).with_extension("ppl");
+        //let base_params = self.base_params();
+        //let seq_path_strs = self.seq_path_strs(filepath);
+
+
+        let ppl = self.ppl(filepath,sim_mode,build)?;
+
+        // let ppl = PPL::new(
+        //     &mut self.place_events(),
+        //     base_params.n_repetitions,
+        //     base_params.n_averages,
+        //     base_params.rep_time,
+        //     base_params.base_frequency.clone(),
+        //     &seq_path_strs.0,
+        //     &seq_path_strs.1,
+        //     base_params.orientation.clone(),
+        //     base_params.grad_clock.clone(),
+        //     base_params.phase_unit.clone(),
+        //     base_params.view_acceleration,
+        //     sim_mode
+        // )?;
         let filename = filepath.join(name);
         let ppr_filename = filepath.join(ppr_name).with_extension("ppr");
         let ppr_str = ppl.print_ppr(&filename);
@@ -224,6 +273,7 @@ pub trait Build {
         if build {
             build_directory(filepath);
         }
+        Ok(())
     }
     fn param_export(&self,filepath:&Path);
 }

@@ -68,7 +68,7 @@ impl Adjustment {
         let mrd = utils::get_first_match(&self.freq_cal_dir, "one_pulse.mrd").expect("mrd file not found!");
 
         // load up parameter file for some meta data
-        let params = OnePulseParams::load(&cfg);
+        let params = OnePulseParams::load(&cfg).expect("cannot load parameters");
 
         // load
         let raw = MRData::new(&mrd);
@@ -109,7 +109,7 @@ impl Adjustment {
         // load up the mrd file
         let mrd = utils::get_first_match(&self.rf_cal_dir, "rf_cal.mrd").expect("mrd file not found!");
         // load up parameter file for some meta data
-        let params = RfCalParams::load(&cfg);
+        let params = RfCalParams::load(&cfg).expect("cannot load parameters");
 
         let hardpulse_length = params.rf_duration;
 
@@ -166,7 +166,7 @@ impl Adjustment {
 
         // run the frequency calibration routine
 
-        let params = build::load_adj_params(&self.freq_cal_config);
+        let params = build::load_adj_params(&self.freq_cal_config).expect("cannot load parameters");
         build::build_adj(params,&self.freq_cal_dir,false);
 
         scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
@@ -179,7 +179,7 @@ impl Adjustment {
         let (freq_spec,freq_offset) = self.calc_freq_offset();
 
         // run rf calibration with the found frequency offset
-        let mut params = build::load_adj_params(&self.rf_cal_config);
+        let mut params = build::load_adj_params(&self.rf_cal_config).expect("cannot load parameters");
         params.set_freq_offset(freq_offset);
         build::build_adj(params,&self.rf_cal_dir,false);
 

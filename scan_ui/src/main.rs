@@ -10,8 +10,12 @@ use build_sequence::build_directory::build_directory;
 use crate::egui::plot::{Line, Plot, PlotPoints};
 use acquire::adjustment;
 use acquire::adjustment::Adjustment;
+use scan_ui::basic_adjustment::{basic_adjustemnt, BasicAdjustmentPanel};
 use scan_ui::image_utilities;
 use utils;
+use scan_ui::sequence_editor::{sequence_editor, SequenceEditor};
+use scan_ui::scout_viewer::{scout_viewer,ScoutViewPort};
+use scan_ui::sequence_viewer::{sequence_viewer, SequenceViewer};
 
 fn main() {
     let options = eframe::NativeOptions::default();
@@ -29,6 +33,9 @@ struct MyApp {
     work_dir:Option<PathBuf>,
     texture: Option<egui::TextureHandle>,
     scout_view_port:ScoutViewPort,
+    sequence_editor:SequenceEditor,
+    adjustment_panel:BasicAdjustmentPanel,
+    sequence_viwer:SequenceViewer,
 }
 
 impl Default for MyApp {
@@ -39,67 +46,11 @@ impl Default for MyApp {
             work_dir_buff: "dummy_path".to_string(),
             work_dir:None,
             texture:None,
-
-            scout_view_port:ScoutViewPort::default()
+            scout_view_port:ScoutViewPort::default(),
+            sequence_editor:SequenceEditor::default(),
+            adjustment_panel:BasicAdjustmentPanel::default(),
+            sequence_viwer:SequenceViewer::default(),
         }
-    }
-}
-
-
-
-struct ScoutViewPort {
-    image_textures:Option<[TextureHandle;3]>,
-}
-
-impl ScoutViewPort {
-    pub fn default() -> Self {
-        Self {
-            image_textures:None,
-        }
-    }
-
-    pub fn find_raw_data(&mut self,scout_data_dir:&Path) -> Option<[PathBuf;3]>{
-        let raw_files = utils::find_files(scout_data_dir,".mrd");
-        match raw_files {
-            Some(files) => {
-                if files.len() >= 3 {
-                    Some([files[0].clone(), files[1].clone(), files[2].clone()])
-                }
-                else {
-                    None
-                }
-            }
-            _ => None
-        }
-    }
-
-    pub fn clear_textures(&mut self){
-        self.image_textures = None;
-    }
-
-    pub fn textures(&mut self, ui: &mut Ui) -> &[TextureHandle;3] {
-
-        self.image_textures.get_or_insert_with(||{
-            let image_data = mr_data::mrd::mrd_to_2d_image(Path::new("./test_data/scout_data/m0/m0.mrd"));
-            let texture1:TextureHandle = ui.ctx().load_texture(
-                "view-0",
-                image_utilities::array_to_image(&image_data),
-                egui::TextureFilter::Linear
-            );
-            let image_data = mr_data::mrd::mrd_to_2d_image(Path::new("./test_data/scout_data/m1/m1.mrd"));
-            let texture2:TextureHandle = ui.ctx().load_texture(
-                "view-1",
-                image_utilities::array_to_image(&image_data),
-                egui::TextureFilter::Linear
-            );
-            let image_data = mr_data::mrd::mrd_to_2d_image(Path::new("./test_data/scout_data/m2/m2.mrd"));
-            let texture3:TextureHandle = ui.ctx().load_texture(
-                "view-2",
-                image_utilities::array_to_image(&image_data),
-                egui::TextureFilter::Linear
-            );
-            [texture1,texture2,texture3]
-        })
     }
 }
 
@@ -107,43 +58,32 @@ impl ScoutViewPort {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
+        egui::SidePanel::left("my_left_panel").show(ctx, |ui| {
+            ui.label("Window Selector");
+            egui::CollapsingHeader::new("Basic Adjustment Panel").show(ui, |ui| {
+                basic_adjustemnt(ctx,ui,&mut self.adjustment_panel);
+            });
+
+            egui::CollapsingHeader::new("Sequence Selector").show(ui, |ui| {
+                sequence_editor(ctx,ui,&mut self.sequence_editor);
+            });
+
+            egui::CollapsingHeader::new("Scout Viewer").show(ui, |ui| {
+                scout_viewer(ctx,ui,&mut self.scout_view_port);
+            });
+
+            egui::CollapsingHeader::new("Sequence Viewer").show(ui, |ui| {
+                sequence_viewer(ctx,ui,&mut self.sequence_viwer);
+            });
+
+
+
+        });
 
 
         egui::CentralPanel::default().show(ctx, |ui| {
 
             ui.heading("Civm Scan");
-
-
-            egui::Window::new("Scout View").collapsible(true).show(ctx, |ui| {
-
-                let textures = self.scout_view_port.textures(ui);
-                ui.label("How'd you do?");
-                ui.horizontal(|ui|{
-                    ui.image(&textures[0],textures[0].size_vec2());
-                    ui.image(&textures[1],textures[1].size_vec2());
-                    ui.image(&textures[2],textures[2].size_vec2());
-                });
-                if ui.button("reload").clicked(){
-                    self.scout_view_port.clear_textures();
-                }
-            });
-
-            egui::Window::new("Adjustments").show(ctx, |ui| {
-                ui.label("FID spectrum");
-                Plot::new("frequency_plot").show_axes([true,true]).view_aspect(1.0).show(ui, |plot_ui| {
-                    let adj_data = adjustment::AdjustmentResults::from_file(Path::new("./test_data/adj_data/adjustment_results.json"));
-                    let line = Line::new(PlotPoints::new(adj_data.freq_spectrum.clone())).color(Color32::from_rgb(255,255,255));
-                    plot_ui.line(line);
-                });
-
-                ui.label("Spin Echo vs Stimulated Echo");
-                Plot::new("diff_plot").show_axes([true,true]).view_aspect(1.0).show(ui, |plot_ui| {
-                    let adj_data = adjustment::AdjustmentResults::from_file(Path::new("./test_data/adj_data/adjustment_results.json"));
-                    let line = Line::new(PlotPoints::new(adj_data.rf_cal_spin_vs_stim.clone())).color(Color32::from_rgb(255,255,255));
-                    plot_ui.line(line);
-                });
-
-            });
 
 
             ui.label("Working Directory");

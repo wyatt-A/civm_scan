@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod build;
 pub mod args;
 pub mod adjustment;

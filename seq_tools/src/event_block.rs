@@ -118,6 +118,15 @@ pub struct EventQueue {
     events:Vec<Rc<RefCell<Event>>>
 }
 
+#[derive(Debug)]
+pub enum EventQueueError {
+    Error,
+    RepTimeTooShort(f32),
+    EventCollison(String),
+    MissingAcquisition,
+    InconsistentSampleCount,
+}
+
 impl EventQueue {
     /** Take an unordered vector of event refs and turn them into a valid event queue
      for execution */
@@ -180,7 +189,7 @@ impl EventQueue {
         self.unique().iter().flat_map(|event| event.borrow().execution.block_calculation()).collect()
     }
     /** Calculates the required delay for the last event to ensure desired rep time is accurate */
-    fn set_tr_makeup(&mut self,rep_time:f32,loop_time:i32,calc_time:i32) {
+    fn set_tr_makeup(&mut self,rep_time:f32,loop_time:i32,calc_time:i32) -> Result<(),EventQueueError> {
         // set the last event post delay such that tr is accurate
         let first_event_start = self.events[0].borrow().block_start();
         let last_event_idx = self.events.len()-1;
@@ -189,9 +198,11 @@ impl EventQueue {
         let makeup = tr + first_event_start - last_event_end - loop_time - calc_time;
         if makeup < 0 {
             let adj = rep_time - _utils::clock_to_sec(makeup);
-            panic!("rep time is too short. It needs to be at least {} seconds for loop execution",adj)
+            println!("rep time is too short. It needs to be at least {} seconds for loop execution",adj);
+            return Err(EventQueueError::RepTimeTooShort(adj));
         }
         self.events[last_event_idx].as_ref().borrow_mut().set_post_delay(makeup);
+        Ok(())
     }
     /** Sets the rep time and all other event post-delay properties */
     pub fn set_rep_time(&mut self,rep_time:f32,loop_time:i32,calc_time:i32){
@@ -199,7 +210,7 @@ impl EventQueue {
         self.set_tr_makeup(rep_time,loop_time,calc_time);
     }
     /** Sets the post-delays for every event except the last, which needs special attention */
-    fn set_post_delay(&mut self) {
+    fn set_post_delay(&mut self) -> Result<(),EventQueueError> {
         for i in 0..self.events.len()-1 {
             let this_end = self.events[i].borrow().block_end();
             let this_label = self.events[i].borrow().unique_label.clone();
@@ -207,9 +218,13 @@ impl EventQueue {
             let next_label = self.events[i+1].borrow().unique_label.clone();
             println!("end of {}:{} -> start of {}:{}",this_label,this_end,next_label,next_start);
             let difference = next_start - this_end;
-            if difference < 0 {panic!("there is something wrong with event placement. Has the queue been solved?")}
+            if difference < 0 {
+                return Err(EventQueueError::EventCollison(format!("end of {}:{} -> start of {}:{}",this_label,this_end,next_label,next_start)));
+                println!("there is something wrong with event placement. Has the queue been solved?");
+            }
             self.events[i].as_ref().borrow_mut().set_post_delay(difference);
         }
+        Ok(())
     }
     fn unique(&self) -> Vec<Rc<RefCell<Event>>> {
         let mut visited = HashSet::<String>::new();
@@ -270,7 +285,7 @@ impl EventQueue {
         );
         cmds
     }
-    pub fn ppl_acquisition(&self) -> AcquisitionParams {
+    pub fn ppl_acquisition(&self) -> Result<AcquisitionParams,EventQueueError> {
         // get number of acquires for reporting echos
         let mut acq_events = Vec::<(SpectralWidth,u16,u16)>::new();
         self.events.iter().for_each(|event| {
@@ -281,19 +296,31 @@ impl EventQueue {
                 _=> {}
             }
         });
-        if acq_events.len() < 1 {panic!("there must be at least 1 acquisition event for the event queue to be valid")}
+        if acq_events.len() < 1 {
+            println!("there must be at least 1 acquisition event for the event queue to be valid");
+            return Err(EventQueueError::MissingAcquisition);
+        }
         // do a consistency check
         for i in 0..acq_events.len()-1 {
-            if acq_events[i].0 != acq_events[i+1].0 {panic!("different sample rates detected in single event queue! Only one sample rate is allowed.")}
-            if acq_events[i].1 != acq_events[i+1].1 {panic!("different number of samples detected in single event queue! Only one sample count is allowed.")}
-            if acq_events[i].2 != acq_events[i+1].2 {panic!("different number of discards detected in single event queue! Only one number of discards is allowed.")}
+            if acq_events[i].0 != acq_events[i+1].0 {
+                println!("different sample rates detected in single event queue! Only one sample rate is allowed.");
+                return Err(EventQueueError::InconsistentSampleCount);
+            }
+            if acq_events[i].1 != acq_events[i+1].1 {
+                println!("different number of samples detected in single event queue! Only one sample count is allowed.");
+                return Err(EventQueueError::InconsistentSampleCount);
+            }
+            if acq_events[i].2 != acq_events[i+1].2 {
+                println!("different number of discards detected in single event queue! Only one number of discards is allowed.");
+                return Err(EventQueueError::InconsistentSampleCount);
+            }
         }
-        AcquisitionParams{
+        Ok(AcquisitionParams{
             n_samples:acq_events[0].1.clone(),
             sample_rate:acq_events[0].0.clone(),
             n_discards:acq_events[0].2.clone(),
             n_echos:acq_events.len() as u16
-        }
+        })
     }
     pub fn ppl_seq_params(&self,sample_period_us:usize) -> (Option<String>,Option<String>) {
         let mut grad_out_str = Vec::<String>::new();

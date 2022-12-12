@@ -14,7 +14,7 @@ use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, SliceSelec
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
 use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, AdjustmentParameters};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, AdjustmentParameters, SequenceLoadError};
 use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
@@ -60,11 +60,14 @@ impl Initialize for RfCalParams {
             setup_mode: false,
         }
     }
-    fn load(params_file: &Path) -> Self {
+    fn load(params_file: &Path) -> Result<Self,SequenceLoadError> {
         let mut f = File::open(params_file).expect("cannot open file");
         let mut json_str = String::new();
         f.read_to_string(&mut json_str).expect("trouble reading file");
-        serde_json::from_str(&json_str).expect("cannot deserialize string")
+        match serde_json::from_str(&json_str) {
+            Ok(params) => Ok(params),
+            Err(_) => Err(SequenceLoadError::InvalidFormat)
+        }
     }
     fn write_default(params_file: &Path){
         let params = Self::default();

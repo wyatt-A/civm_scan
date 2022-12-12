@@ -13,3 +13,6 @@ acquire = {path = "../acquire"}
 ndarray = "0.15.4"
 ndarray-stats = "0.5.1"
 utils = {path = "../utils"}
+serde_json = "1.0.87"
+serde = { version = "1.0.144", features = ["derive"] }
+seq_tools = {path = "../seq_tools"}

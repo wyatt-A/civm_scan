@@ -50,7 +50,7 @@ impl Scout {
     }
     pub fn run(&self){
         &self.view_settings.to_file(&self.result_dir.join("view_settings"));
-        let params = build::load_scout_params(&self.scout_config);
+        let params = build::load_scout_params(&self.scout_config).expect("cannot load parameters");
         build::build_scout_experiment(params,&self.view_settings,&self.result_dir, false);
         scan_control::command::run_directory(RunDirectoryArgs{
             path: self.result_dir.clone(),
