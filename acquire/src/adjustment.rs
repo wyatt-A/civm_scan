@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 use mr_data::mrd::MRData;
 use seq_lib::one_pulse::OnePulseParams;
-use seq_lib::pulse_sequence::Initialize;
+use seq_lib::pulse_sequence::{AdjustmentResults, Initialize};
 use utils;
 use ndarray::{s,Array6,Order};
 use seq_lib::rfcal::RfCalParams;
@@ -33,25 +33,6 @@ impl Adjustment {
             freq_cal_dir: results_dir.join("freq"),
             results_file: results_dir.join("adjustment_results"),
         }
-    }
-}
-
-#[derive(Serialize,Deserialize)]
-pub struct AdjustmentResults {
-    pub obs_freq_offset:f32,
-    pub rf_dac_seconds:f32,
-    pub freq_spectrum:Vec<[f64;2]>,
-    pub rf_cal_spin_vs_stim:Vec<[f64;2]>,
-}
-
-impl AdjustmentResults {
-    pub fn to_file(&self,filename:&Path) {
-        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
-        utils::write_to_file(filename,"json",&s);
-    }
-    pub fn from_file(file_path:&Path) -> Self {
-        let s = utils::read_to_string(file_path,"json");
-        serde_json::from_str(&s).expect("unable to parse json")
     }
 }
 

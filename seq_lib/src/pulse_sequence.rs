@@ -12,7 +12,27 @@ use serde::{Serialize,Deserialize};
 use seq_tools::grad_cal::{GAMMA, tesla_per_mm_to_dac};
 use dyn_clone::DynClone;
 use headfile::headfile::{AcqHeadfile, DWHeadfile};
+use seq_tools::pulse::{Pulse, SliceSelective};
+use utils;
 
+#[derive(Serialize,Deserialize)]
+pub struct AdjustmentResults {
+    pub obs_freq_offset:f32,
+    pub rf_dac_seconds:f32,
+    pub freq_spectrum:Vec<[f64;2]>,
+    pub rf_cal_spin_vs_stim:Vec<[f64;2]>,
+}
+
+impl AdjustmentResults {
+    pub fn to_file(&self,filename:&Path) {
+        let s = serde_json::to_string_pretty(&self).expect("cannot serialize struct");
+        utils::write_to_file(filename,"json",&s);
+    }
+    pub fn from_file(file_path:&Path) -> Self {
+        let s = utils::read_to_string(file_path,"json");
+        serde_json::from_str(&s).expect("unable to parse json")
+    }
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct PPLBaseParams {
@@ -75,10 +95,37 @@ pub trait Initialize {
 
 pub trait DWSequenceParameters:SequenceParameters + DiffusionWeighted + DynClone + DWHeadfile {}
 pub trait SequenceParameters:
-CompressedSense+Simulate+AcqDimensions+DynClone+MrdToKspace+Setup+AcqHeadfile {
+CompressedSense+Simulate+AcqDimensions+DynClone+MrdToKspace+Setup+AcqHeadfile+UseAdjustments {
     fn name(&self) -> String;
     fn write(&self,params_file:&Path);
     fn instantiate(&self) -> Box<dyn Build>;
+}
+
+pub trait UseAdjustments {
+    fn set_adjustment_file(&mut self,adj_file:&Path);
+
+    fn adjustment_file(&self) -> Option<PathBuf>;
+
+    fn obs_freq_offset(&self) -> Option<f32> {
+        match self.adjustment_file() {
+            Some(file) => {
+                let results = AdjustmentResults::from_file(&file);
+                Some(results.obs_freq_offset)
+            }
+            None => None
+        }
+    }
+
+    fn rf_dac(&self,flip_angle_degrees:f32,pulse:Box<dyn Pulse>) -> Option<i16> {
+        let flip_multiplier = flip_angle_degrees/90.0;
+        match self.adjustment_file() {
+            Some(file) => {
+                let results = AdjustmentResults::from_file(&file);
+                Some(flip_multiplier*(results.rf_dac_seconds/pulse.power_net(1.0)) as i16)
+            }
+            None => None
+        }
+    }
 }
 
 pub trait AdjustmentParameters {
@@ -166,10 +213,10 @@ pub trait AcqDimensions {
     fn acq_dims(&self) -> AcqDims;
 }
 
+
 pub trait Build {
     fn place_events(&self) -> EventQueue;
     fn base_params(&self) -> PPLBaseParams;
-
     fn ppl(&self,ppl_file_path:&Path,sim_mode:bool,build:bool) -> Result<PPL,EventQueueError> {
         let seq_path_strs = self.seq_path_strs(ppl_file_path,build);
         let base_params = self.base_params();

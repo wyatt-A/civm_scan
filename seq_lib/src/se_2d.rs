@@ -11,11 +11,11 @@ use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
 use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
-use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid};
+use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, SliceSelective, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError, UseAdjustments};
 use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
@@ -71,6 +71,8 @@ impl Initialize for Se2DParams {
             orientation: Orientation::CivmStandard,
             spectral_width: SpectralWidth::SW100kH,
             rf_duration: 140E-6,
+            excite_flip_angle: 90.0,
+            refocus_flip_angle: 180.0,
             rf_180_duration: 280E-6,
             ramp_time: 140E-6,
             phase_encode_time: 550E-6,
@@ -79,7 +81,8 @@ impl Initialize for Se2DParams {
             rep_time: 50E-3,
             n_averages: 1,
             n_repetitions: 128,
-            grad_off: false
+            grad_off: false,
+            adjustment_file:None,
         }
     }
     fn load(params_file: &Path) -> Result<Self,SequenceLoadError> {
@@ -151,6 +154,16 @@ impl SequenceParameters for Se2DParams {
     }
 }
 
+impl UseAdjustments for Se2DParams {
+    fn set_adjustment_file(&mut self, adj_file: &Path) {
+        self.adjustment_file = Some(adj_file.to_owned());
+    }
+
+    fn adjustment_file(&self) -> Option<PathBuf> {
+        self.adjustment_file.clone()
+    }
+}
+
 impl Build for Se2D {
     fn place_events(&self) -> EventQueue {
         self.place_events()
@@ -160,7 +173,7 @@ impl Build for Se2D {
             n_averages: self.params.n_averages,
             n_repetitions: self.params.samples.1 as u32,
             rep_time: self.params.rep_time,
-            base_frequency: BaseFrequency::civm9p4t(0.0),
+            base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset().unwrap_or(0.0)),
             orientation: self.params.orientation.clone(),
             grad_clock: GradClock::CPS20,
             phase_unit: PhaseUnit::Min,
@@ -168,6 +181,7 @@ impl Build for Se2D {
             waveform_sample_period_us: 2
         }
     }
+
     fn param_export(&self, filepath: &Path) {
         let params = self.params.clone();
         let name = params.name.clone();
@@ -185,6 +199,8 @@ pub struct Se2DParams {
     orientation:Orientation,
     spectral_width: SpectralWidth,
     rf_duration: f32,
+    excite_flip_angle:f32,
+    refocus_flip_angle:f32,
     rf_180_duration: f32,
     ramp_time: f32,
     phase_encode_time: f32,
@@ -194,6 +210,7 @@ pub struct Se2DParams {
     n_repetitions: u32,
     grad_off: bool,
     pub obs_freq_offset: f64,
+    adjustment_file:Option<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -300,11 +317,12 @@ impl Se2D {
         let re_trans = LinTransform::new((None, Some(-1.0), None), (None, None, None));
         let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),false,&mat_count);
 
+        let grad = waveforms.excitation.grad_strength_hzpmm(params.slice_thickness);
 
-        let grad = 10.0*waveforms.excitation.bandwidth_hz()/params.slice_thickness;
         let slice_dac = grad_cal::grad_to_dac(grad);
 
-        let grad = 10.0*waveforms.refocus.bandwidth_hz()/params.slice_thickness;
+        let grad = waveforms.refocus.grad_strength_hzpmm(params.slice_thickness);
+
         let ref_dac = grad_cal::grad_to_dac(grad);
 
         let slice_sel = Matrix::new_static(
@@ -360,14 +378,19 @@ impl Se2D {
             "ref_slice_sel"
         );
 
+
+
+        let excite_dac = params.rf_dac(params.excite_flip_angle,Box::new(&w.excitation)).unwrap_or(400);
         let excitation = RfEvent::new(
             "excitation",
             1,
             w.excitation,
-            RfStateType::Adjustable(400, None),
+            RfStateType::Adjustable(excite_dac, None),
             RfStateType::Static(0)
         );
 
+
+        let refocus_dac = params.rf_dac(params.refocus_flip_angle,Box::new(&w.refocus.clone())).unwrap_or(400);
         let refocus = RfEvent::new(
             "refocus",
             2,

@@ -480,7 +480,7 @@ pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>, view_setting
     });
 }
 
-pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>, work_dir:&Path, b_table:&Path, build:bool) {
+pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>, work_dir:&Path, b_table:&Path,adjustment_file:&Path, build:bool) {
     let mut s = clone_box(&*sequence_params);
     let b_val = s.b_value();
     let b_table = read_b_table(b_table);
@@ -493,6 +493,7 @@ pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>,
         s.set_b_value(b_val*scale);
         s.set_b_vec(direction);
         s.set_cs_table();
+        s.set_adjustment_file(adjustment_file);
         let label = formatter(index);
         let dir = work_dir.join(&label);
         create_dir_all(&dir).expect("trouble building directory");

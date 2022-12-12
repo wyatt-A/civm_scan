@@ -24,13 +24,15 @@ pub enum Action {
 pub struct NewDiffusionExperimentArgs {
     pub alias:String,
     pub destination:PathBuf,
-    pub b_table:PathBuf
+    pub b_table:PathBuf,
+    pub adjustment_file:Option<PathBuf>
 }
 
 #[derive(clap::Args,Debug)]
 pub struct NewArgs {
     pub alias:String,
-    pub destination:PathBuf
+    pub destination:PathBuf,
+    pub adjustment_file:Option<PathBuf>
 }
 
 #[derive(clap::Args,Debug)]
