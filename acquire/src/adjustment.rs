@@ -14,6 +14,9 @@ use crate::build;
 use scan_control;
 use crate::build::ContextParams;
 
+pub const RF_CAL_DIRNAME:&str = "rf";
+pub const FREQ_CAL_DIRNAME:&str = "freq";
+pub const ADJ_FILE_NAME:&str = "adjustment_results";
 
 pub struct Adjustment {
     rf_cal_config:PathBuf,
@@ -24,18 +27,17 @@ pub struct Adjustment {
 }
 
 impl Adjustment {
+
     pub fn new(freq_cal_config:&Path,rf_cal_config:&Path,results_dir:&Path) -> Self {
         Self {
             rf_cal_config: rf_cal_config.to_owned(),
             freq_cal_config: freq_cal_config.to_owned(),
-            rf_cal_dir: results_dir.join("rf"),
-            freq_cal_dir: results_dir.join("freq"),
-            results_file: results_dir.join("adjustment_results"),
+            rf_cal_dir: results_dir.join(RF_CAL_DIRNAME),
+            freq_cal_dir: results_dir.join(FREQ_CAL_DIRNAME),
+            results_file: results_dir.join(ADJ_FILE_NAME),
         }
     }
-}
 
-impl Adjustment {
     pub fn calc_freq_offset(&self) -> (Vec<[f64;2]>,f32) {
         // first, load up adjustment params
         let cfg = utils::get_first_match(&self.freq_cal_dir, "one_pulse.json").expect("one pulse file not found!");

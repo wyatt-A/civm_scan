@@ -1,10 +1,24 @@
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{Write, Read};
+use std::time::SystemTime;
 use glob::glob;
 use walkdir::WalkDir;
 use rustfft::{FftPlanner};
 use num_complex::Complex;
+use chrono::{DateTime,Local};
+
+
+pub fn date_stamp() -> String {
+    let datetime: DateTime<Local> = SystemTime::now().into();
+    format!("{}",datetime.format("%Y%m%d"))
+}
+
+pub fn time_stamp() -> String {
+    let datetime: DateTime<Local> = SystemTime::now().into();
+    format!("{}",datetime.format("%Y%m%d:%T"))
+}
+
 
 pub fn m_number_formatter(n_elements:usize) -> Vec<String>{
     let w = ((n_elements-1) as f32).log10().floor() as usize + 1;

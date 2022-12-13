@@ -16,6 +16,7 @@ use utils;
 use scan_ui::sequence_editor::{sequence_editor, SequenceEditor};
 use scan_ui::scout_viewer::{scout_viewer,ScoutViewPort};
 use scan_ui::sequence_viewer::{sequence_viewer, SequenceViewer};
+use scan_ui::study_panel::{study_panel,StudyPanel};
 
 fn main() {
     let options = eframe::NativeOptions::default();
@@ -36,6 +37,7 @@ struct MyApp {
     sequence_editor:SequenceEditor,
     adjustment_panel:BasicAdjustmentPanel,
     sequence_viwer:SequenceViewer,
+    study_panel:StudyPanel,
 }
 
 impl Default for MyApp {
@@ -50,6 +52,7 @@ impl Default for MyApp {
             sequence_editor:SequenceEditor::default(),
             adjustment_panel:BasicAdjustmentPanel::default(),
             sequence_viwer:SequenceViewer::default(),
+            study_panel:StudyPanel::default(),
         }
     }
 }
@@ -60,8 +63,13 @@ impl eframe::App for MyApp {
 
         egui::SidePanel::left("my_left_panel").show(ctx, |ui| {
             ui.label("Window Selector");
+
+            egui::CollapsingHeader::new("Study Panel").show(ui, |ui| {
+                study_panel(ctx,ui,&mut self.study_panel);
+            });
+
             egui::CollapsingHeader::new("Basic Adjustment Panel").show(ui, |ui| {
-                basic_adjustemnt(ctx,ui,&mut self.adjustment_panel);
+                basic_adjustemnt(ctx,ui,&mut self.adjustment_panel,&self.study_panel);
             });
 
             egui::CollapsingHeader::new("Sequence Selector").show(ui, |ui| {
@@ -69,14 +77,12 @@ impl eframe::App for MyApp {
             });
 
             egui::CollapsingHeader::new("Scout Viewer").show(ui, |ui| {
-                scout_viewer(ctx,ui,&mut self.scout_view_port);
+                scout_viewer(ctx,ui,&mut self.scout_view_port,&self.adjustment_panel,&self.study_panel);
             });
 
             egui::CollapsingHeader::new("Sequence Viewer").show(ui, |ui| {
                 sequence_viewer(ctx,ui,&mut self.sequence_viwer);
             });
-
-
 
         });
 

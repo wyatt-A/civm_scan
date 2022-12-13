@@ -1861,6 +1861,7 @@ dependencies = [
  "mr_data",
  "ndarray",
  "ndarray-stats",
+ "seq_lib",
  "seq_tools",
  "serde",
  "serde_json",
@@ -2239,6 +2240,7 @@ dependencies = [
 name = "utils"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "glob",
  "num-complex",
  "rustfft",
