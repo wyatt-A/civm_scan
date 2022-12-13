@@ -7,3 +7,4 @@ pub mod scout;
 pub mod se_2d;
 pub mod one_pulse;
 pub mod rfcal;
+pub mod multi_echo_2d;

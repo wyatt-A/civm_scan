@@ -91,7 +91,6 @@ impl eframe::App for MyApp {
 
             ui.heading("Civm Scan");
 
-
             ui.label("Working Directory");
             ui.horizontal(|ui| {
                 if ui.text_edit_singleline(&mut self.work_dir_buff).ctx.input().key_pressed(egui::Key::Enter) {

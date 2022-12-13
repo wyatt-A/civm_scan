@@ -362,3 +362,86 @@ impl Pulse for SliceSelectiveCrusher {
         self.power_net(magnitude)
     }
 }
+
+
+
+
+
+/*
+      ____                  ____
+     /    \                /    \
+    /      \              /      \
+___/        \            /        \___
+             \__________/
+ */
+
+pub struct SliceSelectiveSpoiler {
+    selection_duration:f32,
+    spoil_duration:f32,
+    ramp_time:f32,
+}
+
+impl SliceSelectiveSpoiler {
+    pub fn new(slice_select_duration:f32, spoiler_duration:f32, ramp_time:f32) -> Self {
+        Self {
+            selection_duration: slice_select_duration,
+            spoil_duration: spoiler_duration,
+            ramp_time,
+        }
+    }
+
+    pub fn spoil_magntude(&self) -> f32 {
+        let norm = 2.0*(self.ramp_time + self.spoil_duration);
+        (self.ramp_time + self.selection_duration)/norm
+    }
+
+}
+
+impl Pulse for SliceSelectiveSpoiler {
+    fn duration(&self) -> f32 {
+        2.0*self.spoil_duration + 4.0*self.ramp_time + self.selection_duration
+    }
+
+    fn function(&self, time_step_us: usize) -> Vec<Function> {
+
+        let spoil_mag = self.spoil_magntude();
+
+        let n_ramp_samples = _utils::sec_to_samples(self.ramp_time, time_step_us);
+        let n_crush_plateau_samples = _utils::sec_to_samples(self.spoil_duration, time_step_us);
+        let n_select_plateau_samples = _utils::sec_to_samples(self.selection_duration, time_step_us);
+
+        let ramp_up1 = Function::RampUp(FunctionParams::new(n_ramp_samples,-spoil_mag));
+        let plat1 = Function::Plateau(FunctionParams::new(n_crush_plateau_samples,-spoil_mag));
+        let ramp_down1 =
+
+        let ramp_up2 = Function::RampUpFrom(1.0,FunctionParams::new(n_ramp_samples,self.crush_ratio));
+
+        let ramp_down1 = Function::RampDownTo(1.0,FunctionParams::new(n_ramp_samples,self.crush_ratio));
+        let ramp_down2 = Function::RampDown(FunctionParams::new(n_ramp_samples,self.crush_ratio));
+
+
+        let select_plat = Function::Plateau(FunctionParams::new(n_select_plateau_samples,1.0));
+
+        vec![
+            ramp_up1,
+            crush_plat.clone(),
+            ramp_down1,
+            select_plat,
+            ramp_up2,
+            crush_plat,
+            ramp_down2
+        ]
+    }
+
+    fn power_net(&self, magnitude: f32) -> f32 {
+        todo!()
+    }
+
+    fn magnitude_net(&self, power_net: f32) -> f32 {
+        todo!()
+    }
+
+    fn power_abs(&self, magnitude: f32) -> f32 {
+        todo!()
+    }
+}

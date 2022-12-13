@@ -61,9 +61,14 @@ pub trait DiffusionWeighted {
 }
 
 pub trait CompressedSense{
-    fn is_cs(&self) -> bool;
-    fn set_cs_table(&mut self);
-    fn cs_table(&self) -> Option<PathBuf>;
+    fn is_cs(&self) -> bool {
+        false
+    }
+    fn set_cs_table(&mut self){
+    }
+    fn cs_table(&self) -> Option<PathBuf> {
+        None
+    }
 }
 
 impl PPLBaseParams {
