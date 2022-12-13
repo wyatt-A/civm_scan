@@ -4,12 +4,13 @@ use crate::build;
 use crate::args;
 use serde::{Serialize,Deserialize};
 use scan_control::args::RunDirectoryArgs;
+use crate::build::ContextParams;
 
 
 pub struct Scout {
     scout_config:PathBuf,
-    result_dir:PathBuf,
-    view_settings:ScoutViewSettings
+    context:ContextParams,
+    view_settings:ScoutViewSettings,
 }
 
 
@@ -41,25 +42,23 @@ impl ScoutViewSettings {
 
 
 impl Scout {
-    pub fn new(scout_config:&Path,result_dir:&Path) -> Self {
+    pub fn new(scout_config:&Path,ctx:&ContextParams) -> Self {
         Self {
             scout_config:scout_config.to_owned(),
-            result_dir:result_dir.to_owned(),
+            context:ctx.clone(),
             view_settings:ScoutViewSettings::default()
         }
     }
     pub fn run(&self){
-        &self.view_settings.to_file(&self.result_dir.join("view_settings"));
+        &self.view_settings.to_file(&self.context.export_dir.join("view_settings"));
         let params = build::load_scout_params(&self.scout_config).expect("cannot load parameters");
-        build::build_scout_experiment(params,&self.view_settings,&self.result_dir, false);
+
+        build::build_scout_experiment(params,&self.context,&self.view_settings);
         scan_control::command::run_directory(RunDirectoryArgs{
-            path: self.result_dir.clone(),
+            path: self.context.export_dir.clone(),
             cs_table: None,
             depth_to_search: Some(1),
         });
     }
-
-    //pub fn view(&self) ->
-
 
 }

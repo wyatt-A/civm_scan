@@ -14,7 +14,7 @@ use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid}
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, SequenceLoadError};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, SequenceLoadError, UseAdjustments};
 use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
@@ -94,10 +94,8 @@ impl Initialize for FseDtiParams {
     fn default() -> Self {
         FseDtiParams {
             name: "fse_dti".to_string(),
-            //cs_table: Path::new(r"C:\workstation\data\petableCS_stream\fse\stream_CS480_8x_pa18_pb54").to_owned(),
             cs_table: Path::new(r"/Users/Wyatt/IdeaProjects/test_data/data/petableCS_stream/fse/stream_CS480_8x_pa18_pb54").to_owned(),
-            //b_value: 3000.0,
-            b_value: 1000.0,
+            b_value: 3000.0,
             b_vec: (1.0, 0.0, 0.0),
             fov: (19.7, 12.0, 12.0),
             samples: (788, 480, 480),
@@ -106,7 +104,6 @@ impl Initialize for FseDtiParams {
             rf_90_duration: 140E-6,
             rf_180_duration: 280E-6,
             diff_pulse_duration: 3.5E-3,
-            //diff_pulse_separation: 4E-3,
             diff_pulse_separation: 5E-3,
             spoil_duration: 600E-6,
             ramp_time: 140E-6,
@@ -114,13 +111,13 @@ impl Initialize for FseDtiParams {
             phase_encode_time: 550E-6,
             echo_time: 13.98E-3,
             echo_spacing: 7.2E-3,
-            obs_freq_offset: 0.0,
             rep_time: 80E-3,
             n_averages: 1,
             n_repetitions: 2000,
             view_acceleration : 2,
             setup_mode: false,
-            grad_off: false
+            grad_off: false,
+            adjustment_file: None,
         }
     }
     fn load(params_file: &Path) -> Result<Self,SequenceLoadError> {
@@ -190,6 +187,16 @@ impl MrdToKspace for FseDtiParams {
     }
 }
 
+impl UseAdjustments for FseDtiParams {
+    fn set_adjustment_file(&mut self, adj_file: &Path) {
+        self.adjustment_file = Some(adj_file.to_owned());
+    }
+
+    fn adjustment_file(&self) -> Option<PathBuf> {
+        self.adjustment_file.clone()
+    }
+}
+
 impl SequenceParameters for FseDtiParams {
     fn name(&self) -> String {
         String::from("fse_dti")
@@ -214,9 +221,8 @@ impl Build for FseDti {
             n_averages: self.params.n_averages,
             n_repetitions: self.params.n_repetitions,
             rep_time: self.params.rep_time,
-            base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset),
+            base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset().unwrap_or(0.0)),
             orientation: Orientation::CivmStandard,
-            //orientation: Orientation::Ortho2,
             grad_clock: GradClock::CPS20,
             phase_unit: PhaseUnit::Min,
             view_acceleration: self.params.view_acceleration,
@@ -250,13 +256,13 @@ pub struct FseDtiParams {
         phase_encode_time: f32,
         echo_time: f32,
         echo_spacing: f32,
-        obs_freq_offset: f32,
         rep_time: f32,
         n_averages: u16,
         n_repetitions: u32,
         view_acceleration : u16,
         setup_mode: bool,
         grad_off: bool,
+        adjustment_file:Option<PathBuf>,
     }
 
 #[derive(Clone)]
@@ -464,11 +470,14 @@ impl FseDti {
             let w = Self::waveforms(params);
             let m = Self::gradient_matrices(params);
 
+            let excitation_dac = params.rf_dac(90.0,Box::new(w.excitation.clone())).unwrap_or(400);
+            let refocus_dac = params.rf_dac(180.0,Box::new(w.refocus.clone())).unwrap_or(800);
+
             let excitation = RfEvent::new(
                 "excitation",
                 1,
                 w.excitation,
-                RfStateType::Adjustable(400, None),
+                RfStateType::Adjustable(excitation_dac, None),
                 RfStateType::Static(0)
             );
 
@@ -476,8 +485,8 @@ impl FseDti {
                 "refocus1",
                 2,
                 w.refocus.clone(),
-                RfStateType::Adjustable(800, None),
-                RfStateType::Adjustable(400, Some(PhaseCycleStrategy::CycleCPMG(2))),
+                RfStateType::Adjustable(refocus_dac, None),
+                RfStateType::Adjustable(0, Some(PhaseCycleStrategy::CycleCPMG(2))),
                 //RfStateType::Driven(RfDriver::new(DriverVar::Repetition,RfDriverType::PhaseCycle3D(PhaseCycleStrategy::CycleCPMG(1)),None)),
             );
 
@@ -485,8 +494,8 @@ impl FseDti {
                 "refocus2",
                 3,
                 w.refocus.clone(),
-                RfStateType::Adjustable(800, None),
-                RfStateType::Adjustable(120, None),
+                RfStateType::Adjustable(refocus_dac, None),
+                RfStateType::Adjustable(0, None),
                 //RfStateType::Driven(RfDriver::new(DriverVar::Repetition,RfDriverType::PhaseCycle3D(PhaseCycleStrategy::CycleCPMG(1)),None)),
             );
 
@@ -494,8 +503,8 @@ impl FseDti {
                 "refocus3",
                 4,
                 w.refocus.clone(),
-                RfStateType::Adjustable(800, None),
-                RfStateType::Adjustable(80, None),
+                RfStateType::Adjustable(refocus_dac, None),
+                RfStateType::Adjustable(0, None),
                 //RfStateType::Driven(RfDriver::new(DriverVar::Repetition,RfDriverType::PhaseCycle3D(PhaseCycleStrategy::CycleCPMG(1)),None)),
             );
 

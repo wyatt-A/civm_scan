@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -11,8 +10,8 @@ use serde_json;
 use serde::{Serialize,Deserialize};
 use seq_tools::grad_cal::{GAMMA, tesla_per_mm_to_dac};
 use dyn_clone::DynClone;
-use headfile::headfile::{AcqHeadfile, DWHeadfile};
-use seq_tools::pulse::{Pulse, SliceSelective};
+use headfile::headfile::{AcqHeadfile,DWHeadfile};
+use seq_tools::pulse::Pulse;
 use utils;
 
 #[derive(Serialize,Deserialize)]
@@ -121,7 +120,7 @@ pub trait UseAdjustments {
         match self.adjustment_file() {
             Some(file) => {
                 let results = AdjustmentResults::from_file(&file);
-                Some(flip_multiplier*(results.rf_dac_seconds/pulse.power_net(1.0)) as i16)
+                Some((flip_multiplier*results.rf_dac_seconds/pulse.power_net(1.0)) as i16)
             }
             None => None
         }

@@ -380,7 +380,7 @@ impl Se2D {
 
 
 
-        let excite_dac = params.rf_dac(params.excite_flip_angle,Box::new(&w.excitation)).unwrap_or(400);
+        let excite_dac = params.rf_dac(params.excite_flip_angle,Box::new(w.excitation.clone())).unwrap_or(400);
         let excitation = RfEvent::new(
             "excitation",
             1,
@@ -390,13 +390,13 @@ impl Se2D {
         );
 
 
-        let refocus_dac = params.rf_dac(params.refocus_flip_angle,Box::new(&w.refocus.clone())).unwrap_or(400);
+        let refocus_dac = params.rf_dac(params.refocus_flip_angle,Box::new(w.refocus.clone())).unwrap_or(400);
         let refocus = RfEvent::new(
             "refocus",
             2,
             w.refocus,
-            RfStateType::Adjustable(800, None),
-            RfStateType::Adjustable(400,None)
+            RfStateType::Adjustable(refocus_dac, None),
+            RfStateType::Adjustable(0,None)
         );
 
 

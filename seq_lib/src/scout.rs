@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::fs::{File};
 use std::io::{Read, Write};
@@ -14,10 +13,9 @@ use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid}
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError, UseAdjustments};
 use serde_json;
 use serde::{Serialize,Deserialize};
-use cs_table::cs_table::CSTable;
 use headfile::headfile::{DWHeadfile, DWHeadfileParams, AcqHeadfile, AcqHeadfileParams};
 use crate::pulse_sequence;
 
@@ -70,6 +68,7 @@ impl Initialize for ScoutParams {
             orientation: Orientation::Scout1,
             spectral_width: SpectralWidth::SW100kH,
             rf_duration: 140E-6,
+            excitation_flip_angle: 40.0,
             ramp_time: 140E-6,
             phase_encode_time: 550E-6,
             echo_time: 5E-3,
@@ -77,7 +76,8 @@ impl Initialize for ScoutParams {
             rep_time: 50E-3,
             n_averages: 1,
             n_repetitions: 128,
-            grad_off: false
+            grad_off: false,
+            adjustment_file: None
         }
     }
     fn load(params_file: &Path) -> Result<Self,SequenceLoadError> {
@@ -147,6 +147,15 @@ impl Setup for ScoutParams {
     }
 }
 
+impl UseAdjustments for ScoutParams {
+    fn set_adjustment_file(&mut self, adj_file: &Path) {
+        self.adjustment_file = Some(adj_file.to_owned());
+    }
+    fn adjustment_file(&self) -> Option<PathBuf> {
+        self.adjustment_file.clone()
+    }
+}
+
 impl SequenceParameters for ScoutParams {
 
     fn name(&self) -> String {
@@ -196,6 +205,7 @@ pub struct ScoutParams {
     orientation:Orientation,
     spectral_width: SpectralWidth,
     rf_duration: f32,
+    excitation_flip_angle:f32,
     ramp_time: f32,
     phase_encode_time: f32,
     echo_time: f32,
@@ -204,6 +214,7 @@ pub struct ScoutParams {
     n_repetitions: u32,
     grad_off: bool,
     pub obs_freq_offset: f64,
+    adjustment_file:Option<PathBuf>
 }
 
 #[derive(Clone)]
@@ -342,12 +353,12 @@ impl Scout {
             "slice_sel"
         );
 
-
+        let excitation_dac = params.rf_dac(params.excitation_flip_angle,Box::new(w.excitation.clone())).unwrap_or(100);
         let excitation = RfEvent::new(
             "excitation",
             1,
             w.excitation,
-            RfStateType::Adjustable(100, None),
+            RfStateType::Adjustable(excitation_dac, None),
             RfStateType::Static(0)
         );
 

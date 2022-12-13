@@ -83,6 +83,33 @@ impl Sequence {
     }
 }
 
+#[derive(Clone)]
+pub struct ContextParams {
+    pub export_dir:PathBuf,
+    pub adjustment:Option<PathBuf>,
+    pub build:bool,
+}
+
+impl ContextParams {
+    pub fn from_adjustments(adjustment_file:&Path,export_dir:&Path,to_build:bool) -> Self {
+        Self {
+            export_dir: export_dir.to_owned(),
+            adjustment: Some(adjustment_file.to_owned()),
+            build:to_build
+        }
+    }
+
+    pub fn without_adjustments(export_dir:&Path,to_build:bool) -> Self {
+        Self {
+            export_dir: export_dir.to_owned(),
+            adjustment: None,
+            build: to_build
+        }
+    }
+}
+
+
+
 
 pub fn acq_dims(cfg_file:&Path) -> Result<AcqDims,SequenceLoadError> {
     Ok(load_params(cfg_file)?.acq_dims())
@@ -182,29 +209,28 @@ pub fn new_simulation(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
     let mut params = load_params(&cfg_file).expect("cannot load parameters");
     params.configure_simulation();
-    build_simulation(params,&args.destination,BUILD);
+    build_simulation(params,&args.context_params());
 }
-
 
 pub fn new(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_params(&cfg_file).expect("cannot load parameters");;
+    let params = load_params(&cfg_file).expect("cannot load parameters");
     if !args.destination.exists() {
         create_dir_all(&args.destination).expect(&format!("unable to create directory: {:?}",args.destination));
     }
-    build(params,&args.destination,BUILD);
+    build(params,&args.context_params());
 }
 
 pub fn new_setup(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
     let params = load_params(&cfg_file).expect("cannot load parameters");;
-    build_setup(params,&args.destination,BUILD);
+    build_setup(params,&args.context_params());
 }
 
 pub fn new_adjustment(args:&NewAdjArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
     let params = load_adj_params(&cfg_file).expect("cannot load parameters");;
-    build_adj(params,&args.destination,BUILD);
+    build_adj(params,&args.context_params());
 }
 
 pub fn new_config(args:&NewConfigArgs){
@@ -249,13 +275,13 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
     if !args.destination.exists() {
         create_dir_all(&args.destination).expect(&format!("unable to create directory: {:?}",args.destination));
     }
-    build_diffusion_experiment(params, &args.destination, b_table, BUILD);
+    build_diffusion_experiment(params,&args.context_params(),b_table);
 }
 
 pub fn new_scout_experiment(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
     let params = load_scout_params(&cfg_file).expect("cannot load parameters");;
-    build_scout_experiment(params,&ScoutViewSettings::default(),&args.destination, BUILD);
+    build_scout_experiment(params,&args.context_params(),&ScoutViewSettings::default());
 }
 
 pub fn apply_setup(args:&ApplySetupArgs) {
@@ -407,57 +433,63 @@ fn update_ppr_freq_line(line:&str, new_line:&str) -> Option<String> {
 }
 
 
-pub fn build_simulation(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
+pub fn build_simulation(sequence_params:Box<dyn SequenceParameters>,ctx:&ContextParams) {
     let params = clone_box(&*sequence_params);
     let mut to_build = params.instantiate();
-    create_dir_all(work_dir).expect("trouble building directory");
+    create_dir_all(&ctx.export_dir).expect("trouble building directory");
     let label = format!("{}_simulation",params.name());
-    to_build.ppl_export(work_dir,&label,true,build).expect("invalid event queue!");
+    to_build.ppl_export(&ctx.export_dir,&label,true,ctx.build).expect("invalid event queue!");
 }
 
-pub fn build(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
+pub fn build(sequence_params:Box<dyn SequenceParameters>,ctx:&ContextParams) {
     let mut params = clone_box(&*sequence_params);
+    if ctx.adjustment.is_some(){
+        params.set_adjustment_file(&ctx.adjustment.clone().unwrap());
+    }
     match params.is_cs(){
         true =>{
             params.set_cs_table();
             let table = &params.cs_table().unwrap();
-            copy(table,work_dir.join("cs_table")).expect("unable to copy cs table to destination");
+            copy(table,ctx.export_dir.join("cs_table")).expect("unable to copy cs table to destination");
         }
         _=> {}
     }
     let mut to_build = params.instantiate();
-    create_dir_all(work_dir).expect("trouble building directory");
-    to_build.ppl_export(work_dir,&params.name(),false,build).expect("invalid event queue!");
-    params.mrd_to_kspace_params().to_file(&work_dir.join("mrd_to_kspace"));
-    let h = Headfile::new(&work_dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
+    create_dir_all(&ctx.export_dir).expect("trouble building directory");
+    to_build.ppl_export(&ctx.export_dir,&params.name(),false,ctx.build).expect("invalid event queue!");
+    params.mrd_to_kspace_params().to_file(&ctx.export_dir.join("mrd_to_kspace"));
+    let h = Headfile::new(&ctx.export_dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
     h.append(&params.acq_params().to_hash());
-    to_build.param_export(&work_dir);
+    to_build.param_export(&ctx.export_dir);
 }
 
-pub fn build_adj(adj_params:Box<dyn AdjustmentParameters>,work_dir:&Path,build:bool){
+pub fn build_adj(adj_params:Box<dyn AdjustmentParameters>,ctx:&ContextParams){
     let mut to_build = adj_params.instantiate();
-    create_dir_all(work_dir).expect("trouble building directory");
-    to_build.ppl_export(work_dir,&adj_params.name(),false,build).expect("invalid event queue!");
-    to_build.param_export(&work_dir);
+    create_dir_all(&ctx.export_dir).expect("trouble building directory");
+    to_build.ppl_export(&ctx.export_dir,&adj_params.name(),false,ctx.build).expect("invalid event queue!");
+    to_build.param_export(&ctx.export_dir);
 }
 
-pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,work_dir:&Path,build:bool) {
+pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,ctx:&ContextParams) {
     let mut setup_params = clone_box(&*sequence_params);
     setup_params.configure_setup();
+    if ctx.adjustment.is_some(){
+        setup_params.set_adjustment_file(&ctx.adjustment.clone().unwrap());
+    }
     let mut to_build = setup_params.instantiate();
-    create_dir_all(work_dir).expect("trouble building directory");
+    create_dir_all(&ctx.export_dir).expect("trouble building directory");
     let label = format!("{}_setup",setup_params.name());
-    to_build.ppl_export(work_dir,&label,false,build).expect("invalid event queue!");
+    to_build.ppl_export(&ctx.export_dir,&label,false,ctx.build).expect("invalid event queue!");
     match setup_params.is_cs(){
         true =>{
             let table = &setup_params.cs_table().unwrap();
-            copy(table,work_dir.join("cs_table")).expect("unable to copy cs table to destination");
+            copy(table,ctx.export_dir.join("cs_table")).expect("unable to copy cs table to destination");
         }
         _=> {}
     }
 }
 
-pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>, view_settings:&ScoutViewSettings,work_dir:&Path, build:bool) {
+pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>,ctx:&ContextParams,view_settings:&ScoutViewSettings) {
     let mut s = clone_box(&*sequence_params);
 
     let orientations = &view_settings.orientations;
@@ -469,18 +501,21 @@ pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>, view_setting
         s.set_samples(samps[index].clone());
         s.set_fov(fovs[index].clone());
         let label = utils::m_number(index,3);
-        let dir = work_dir.join(&label);
+        let dir = ctx.export_dir.join(&label);
         create_dir_all(&dir).expect("trouble building directory");
         let mut to_build = s.instantiate();
         s.mrd_to_kspace_params().to_file(&dir.join("mrd_to_kspace"));
+        if ctx.adjustment.is_some(){
+            s.set_adjustment_file(&ctx.adjustment.clone().unwrap());
+        }
         let h = Headfile::new(&dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
         h.append(&s.acq_params().to_hash());
-        to_build.ppl_export(&dir,&label,false,build).expect("invalid event queue!");
+        to_build.ppl_export(&dir,&label,false,ctx.build).expect("invalid event queue!");
         to_build.param_export(&dir);
     });
 }
 
-pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>, work_dir:&Path, b_table:&Path,adjustment_file:&Path, build:bool) {
+pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>,ctx:&ContextParams,b_table:&Path) {
     let mut s = clone_box(&*sequence_params);
     let b_val = s.b_value();
     let b_table = read_b_table(b_table);
@@ -493,16 +528,18 @@ pub fn build_diffusion_experiment(sequence_params:Box<dyn DWSequenceParameters>,
         s.set_b_value(b_val*scale);
         s.set_b_vec(direction);
         s.set_cs_table();
-        s.set_adjustment_file(adjustment_file);
+        if ctx.adjustment.is_some(){
+            s.set_adjustment_file(&ctx.adjustment.clone().unwrap());
+        }
         let label = formatter(index);
-        let dir = work_dir.join(&label);
+        let dir = ctx.export_dir.join(&label);
         create_dir_all(&dir).expect("trouble building directory");
         let mut to_build = s.instantiate();
         s.mrd_to_kspace_params().to_file(&dir.join("mrd_to_kspace"));
         let h = Headfile::new(&dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
         h.append(&s.acq_params().to_hash());
         h.append(&s.diffusion_params().to_hash());
-        to_build.ppl_export(&dir,&label,false,build).expect("invalid event queue!");
+        to_build.ppl_export(&dir,&label,false,ctx.build).expect("invalid event queue!");
         to_build.param_export(&dir);
         match s.is_cs() {
             true => {

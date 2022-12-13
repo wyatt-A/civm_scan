@@ -11,9 +11,8 @@ use ndarray::{s,Array6,Order};
 use seq_lib::rfcal::RfCalParams;
 use serde::{Serialize,Deserialize};
 use crate::build;
-use crate::args::NewAdjArgs;
 use scan_control;
-
+use crate::build::ContextParams;
 
 
 pub struct Adjustment {
@@ -35,7 +34,6 @@ impl Adjustment {
         }
     }
 }
-
 
 impl Adjustment {
     pub fn calc_freq_offset(&self) -> (Vec<[f64;2]>,f32) {
@@ -134,21 +132,13 @@ impl Adjustment {
         let dac_vs_signal_difference = diff.iter().enumerate().map(|(idx,d)|{
             [(idx as f64)*(dacs_per_rep as f64) + dac_offset as f64,*d as f64]
         }).collect();
-
         (dac_vs_signal_difference,dac_seconds)
     }
-
-
-    /// this will run a frequency and rf_calibration adjustment
     pub fn run(&self) {
-
-
         // proper rf calibration depends on a frequency calibration being performed
-
         // run the frequency calibration routine
-
         let params = build::load_adj_params(&self.freq_cal_config).expect("cannot load parameters");
-        build::build_adj(params,&self.freq_cal_dir,false);
+        build::build_adj(params,&ContextParams::without_adjustments(&self.freq_cal_dir,true));
 
         scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
             path: self.freq_cal_dir.clone(),
@@ -162,7 +152,7 @@ impl Adjustment {
         // run rf calibration with the found frequency offset
         let mut params = build::load_adj_params(&self.rf_cal_config).expect("cannot load parameters");
         params.set_freq_offset(freq_offset);
-        build::build_adj(params,&self.rf_cal_dir,false);
+        build::build_adj(params,&&ContextParams::without_adjustments(&self.rf_cal_dir,true));
 
         scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
             path: self.rf_cal_dir.clone(),
@@ -181,26 +171,3 @@ impl Adjustment {
 
     }
 }
-
-
-#[test]
-fn test(){
-    Adjustment::new(
-        Path::new("../test_env/sequence_library/1p.json"),
-        Path::new("../test_env/sequence_library/rf_cal.json"),
-        Path::new("../test_data/adj_data")
-    ).run();
-
-}
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,5 +1,6 @@
 use clap;
 use std::path::PathBuf;
+use crate::build::ContextParams;
 
 #[derive(clap::Parser,Debug)]
 pub struct SeqLibArgs {
@@ -28,11 +29,31 @@ pub struct NewDiffusionExperimentArgs {
     pub adjustment_file:Option<PathBuf>
 }
 
+impl NewDiffusionExperimentArgs {
+    pub fn context_params(&self) -> ContextParams {
+        ContextParams {
+            export_dir: self.destination.clone(),
+            adjustment: self.adjustment_file.clone(),
+            build: true
+        }
+    }
+}
+
 #[derive(clap::Args,Debug)]
 pub struct NewArgs {
     pub alias:String,
     pub destination:PathBuf,
     pub adjustment_file:Option<PathBuf>
+}
+
+impl NewArgs {
+    pub fn context_params(&self) -> ContextParams {
+        ContextParams {
+            export_dir: self.destination.clone(),
+            adjustment: self.adjustment_file.clone(),
+            build: true
+        }
+    }
 }
 
 #[derive(clap::Args,Debug)]
@@ -53,4 +74,14 @@ pub struct ApplySetupArgs {
 pub struct NewAdjArgs {
     pub alias:String,
     pub destination:PathBuf,
+}
+
+impl NewAdjArgs {
+    pub fn context_params(&self) -> ContextParams {
+        ContextParams {
+            export_dir: self.destination.clone(),
+            adjustment: None,
+            build: true
+        }
+    }
 }

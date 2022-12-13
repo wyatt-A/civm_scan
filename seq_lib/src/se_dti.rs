@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::fs::{File};
 use std::io::{Read, Write};
@@ -14,7 +13,7 @@ use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid}
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, SequenceLoadError};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, SequenceLoadError, UseAdjustments};
 use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
@@ -138,13 +137,13 @@ impl Initialize for SeDtiParams {
             read_extension: 0.0,
             phase_encode_time: 550E-6,
             echo_time: 13.98E-3,
-            obs_freq_offset: 0.0,
             rep_time: 80E-3,
             n_averages: 1,
             n_repetitions: 2000,
             view_acceleration : 1,
             setup_mode: false,
-            grad_off: false
+            grad_off: false,
+            adjustment_file: None,
         }
     }
     fn load(params_file: &Path) -> Result<Self,SequenceLoadError> {
@@ -183,6 +182,15 @@ impl MrdToKspace for SeDtiParams {
     }
 }
 
+impl UseAdjustments for SeDtiParams {
+    fn set_adjustment_file(&mut self, adj_file: &Path) {
+        self.adjustment_file = Some(adj_file.to_owned());
+    }
+    fn adjustment_file(&self) -> Option<PathBuf> {
+        self.adjustment_file.clone()
+    }
+}
+
 impl SequenceParameters for SeDtiParams {
 
     fn name(&self) -> String {
@@ -208,7 +216,7 @@ impl Build for SeDti {
             n_averages: self.params.n_averages,
             n_repetitions: self.params.n_repetitions,
             rep_time: self.params.rep_time,
-            base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset),
+            base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset().unwrap_or(0.0)),
             orientation: Orientation::CivmStandard,
             grad_clock: GradClock::CPS20,
             phase_unit: PhaseUnit::Min,
@@ -242,13 +250,13 @@ pub struct SeDtiParams {
     read_extension: f32,
     phase_encode_time: f32,
     echo_time: f32,
-    obs_freq_offset: f32,
     rep_time: f32,
     n_averages: u16,
     n_repetitions: u32,
     view_acceleration : u16,
     setup_mode: bool,
     grad_off: bool,
+    adjustment_file:Option<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -395,20 +403,22 @@ impl SeDti {
         let w = Self::waveforms(params);
         let m = Self::gradient_matrices(params);
 
+        let excitation_dac = params.rf_dac(90.0,Box::new(w.excitation.clone())).unwrap_or(400);
         let excitation = RfEvent::new(
             "excitation",
             1,
             w.excitation,
-            RfStateType::Adjustable(400, None),
+            RfStateType::Adjustable(excitation_dac, None),
             RfStateType::Static(0)
         );
 
+        let refocus_dac = params.rf_dac(180.0,Box::new(w.refocus.clone())).unwrap_or(800);
         let refocus1 = RfEvent::new(
             "refocus1",
             2,
             w.refocus.clone(),
-            RfStateType::Adjustable(800, None),
-            RfStateType::Adjustable(400, Some(PhaseCycleStrategy::CycleCPMG(2))),
+            RfStateType::Adjustable(refocus_dac, None),
+            RfStateType::Adjustable(0, Some(PhaseCycleStrategy::CycleCPMG(2))),
             //RfStateType::Driven(RfDriver::new(DriverVar::Repetition,RfDriverType::PhaseCycle3D(PhaseCycleStrategy::CycleCPMG(1)),None)),
         );
 
