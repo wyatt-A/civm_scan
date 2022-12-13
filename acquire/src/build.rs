@@ -503,11 +503,11 @@ pub fn build_scout_experiment(sequence_params:Box<dyn ScoutConfig>,ctx:&ContextP
         let label = utils::m_number(index,3);
         let dir = ctx.export_dir.join(&label);
         create_dir_all(&dir).expect("trouble building directory");
-        let mut to_build = s.instantiate();
         s.mrd_to_kspace_params().to_file(&dir.join("mrd_to_kspace"));
         if ctx.adjustment.is_some(){
             s.set_adjustment_file(&ctx.adjustment.clone().unwrap());
         }
+        let mut to_build = s.instantiate();
         let h = Headfile::new(&dir.join(HEADFILE_NAME).with_extension(HEADFILE_EXT));
         h.append(&s.acq_params().to_hash());
         to_build.ppl_export(&dir,&label,false,ctx.build).expect("invalid event queue!");

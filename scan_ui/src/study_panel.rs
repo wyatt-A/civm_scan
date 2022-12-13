@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 use eframe::egui;
 use eframe::egui::Ui;
 
-const BASE_STUDY_DIR:&str = "/Users/Wyatt/scratch";
+//const BASE_STUDY_DIR:&str = "/Users/Wyatt/scratch";
+const BASE_STUDY_DIR:&str = "d:/dev/studies";
 const STUDY_PREFIX:&str = "N";
 
 pub struct StudyPanel {

@@ -259,6 +259,7 @@ pub fn scan_status() -> Status {
     let reg = Regex::new(r"status_id:([0-9])").unwrap();
     let mut status = String::new();
     lines.for_each(|line|{
+        //println!("{}",line);
         let caps = reg.captures(line);
         if caps.is_some(){
             let stat:String = caps.unwrap().get(1).map_or("", |m| m.as_str()).to_string();

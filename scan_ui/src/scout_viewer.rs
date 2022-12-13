@@ -31,7 +31,7 @@ impl ScoutViewPort {
     }
 
     pub fn run_scout(&mut self,study_dir:&Path,ba:&BasicAdjustmentPanel) {
-        let scout_params = Path::new("./test_env/sequence_library/scout.json");
+        let scout_params = Path::new(r"C:\workstation\dev\civm_scan\test_env\sequence_library/scout.json");
 
 
         let scout_dir = study_dir.join(SCOUT_DIR_NAME);
@@ -48,9 +48,8 @@ impl ScoutViewPort {
 
     }
 
-
     pub fn find_raw_data(&mut self,scout_data_dir:&Path) -> Option<[PathBuf;3]>{
-        let raw_files = utils::find_files(scout_data_dir,".mrd");
+        let raw_files = utils::find_files(scout_data_dir,"mrd");
         match raw_files {
             Some(files) => {
                 if files.len() >= 3 {
@@ -101,11 +100,12 @@ pub fn scout_viewer(ctx: &egui::Context,ui:&mut Ui,scout_view:&mut ScoutViewPort
         match study_panel.study_dir() {
             Some(dir) => {
                 if ui.button("run scout").clicked() {
-                    scout_view.run_scout(dir,ba)
+                    scout_view.clear_textures();
+                    scout_view.run_scout(dir,ba);
                 }
 
                 // attempt to load up some scout images
-                let textures = match scout_view.find_raw_data(dir) {
+                let textures = match scout_view.find_raw_data(&dir.join(SCOUT_DIR_NAME)) {
                     Some(files) => Some(scout_view.textures(ui,files)),
                     None => None
                 };
@@ -119,7 +119,7 @@ pub fn scout_viewer(ctx: &egui::Context,ui:&mut Ui,scout_view:&mut ScoutViewPort
                             ui.image(&textures[1],textures[1].size_vec2());
                             ui.image(&textures[2],textures[2].size_vec2());
                         });
-                        if ui.button("reload").clicked(){
+                        if ui.button("refresh").clicked(){
                             scout_view.clear_textures();
                         }
                     }

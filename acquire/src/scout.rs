@@ -50,10 +50,15 @@ impl Scout {
         }
     }
     pub fn run(&self){
-        &self.view_settings.to_file(&self.context.export_dir.join("view_settings"));
+
+
+        std::fs::create_dir_all(&self.context.export_dir).expect("unable to create directory!");
+        self.view_settings.to_file(&self.context.export_dir.join("view_settings"));
+
         let params = build::load_scout_params(&self.scout_config).expect("cannot load parameters");
 
         build::build_scout_experiment(params,&self.context,&self.view_settings);
+
         scan_control::command::run_directory(RunDirectoryArgs{
             path: self.context.export_dir.clone(),
             cs_table: None,

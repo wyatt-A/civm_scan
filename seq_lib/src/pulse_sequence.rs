@@ -260,7 +260,10 @@ pub trait Build {
                 let mut grad_seq_file = File::create(grad_param_path).expect("cannot create file");
                 grad_seq_file.write_all(&SeqFrame::format_as_bytes(&params)).expect("trouble writing to file");
             }
-            None => {}
+            None => {
+                // we still need to create the grad seq file,despite it being empty
+                File::create(grad_param_path).expect("cannot create file");
+            }
         }
     }
 

@@ -6,6 +6,6 @@
   "rf_duration": 0.00014,
   "echo_time": 0.0003,
   "rep_time": 1.0,
-  "n_repetitions": 128,
+  "n_repetitions": 4,
   "obs_freq_offset": 0.0
 }

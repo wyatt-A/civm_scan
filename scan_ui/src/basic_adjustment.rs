@@ -78,9 +78,10 @@ impl BasicAdjustmentPanel {
 }
 
 pub fn run_adjustments(study_dir:&Path) {
-    let freq_cal = Path::new("./test_env/sequence_library/1p.json");
-    let rf_cal = Path::new("./test_env/sequence_library/rf_cal.json");
-    acquire::adjustment::Adjustment::new(freq_cal,rf_cal,study_dir).run();
+    let freq_cal = Path::new(r"C:\workstation\dev\civm_scan\test_env\sequence_library/1p.json");
+    let rf_cal = Path::new(r"C:\workstation\dev\civm_scan\test_env\sequence_library\rf_cal.json");
+    let dir = study_dir.join(ADJ_DATA_DIR_NAME);
+    acquire::adjustment::Adjustment::new(freq_cal,rf_cal,&dir).run();
 }
 
 pub fn basic_adjustemnt(ctx: &egui::Context,ui:&mut Ui,ba:&mut BasicAdjustmentPanel,sp:&StudyPanel){
@@ -93,6 +94,7 @@ pub fn basic_adjustemnt(ctx: &egui::Context,ui:&mut Ui,ba:&mut BasicAdjustmentPa
         match &sp.study_dir(){
             Some(dir) => {
                 ba.current_results.get_or_insert((*dir.join(ADJ_DATA_DIR_NAME)).to_owned());
+
                 let adj_data = ba.get_adj_data();
 
                 if adj_data.is_some() {
@@ -132,7 +134,6 @@ pub fn basic_adjustemnt(ctx: &egui::Context,ui:&mut Ui,ba:&mut BasicAdjustmentPa
                                         // should go in a new thread
                                         ba.process_handle = Some(thread::spawn(move || {
                                             println!("spawning new thread");
-                                            println!("{:?}",std::env::current_dir().unwrap());
                                             run_adjustments(&dir_for_thread)
                                         }));
                                     } ,
