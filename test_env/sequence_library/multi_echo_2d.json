@@ -1,0 +1,28 @@
+{
+  "name": "multi_echo_2d",
+  "fov": [
+    19.7,
+    12.0
+  ],
+  "samples": [
+    210,
+    128
+  ],
+  "n_echos": 10,
+  "slice_thickness": 1.0,
+  "sample_discards": 0,
+  "orientation": "CivmStandard",
+  "spectral_width": "SW100kH",
+  "rf_duration": 0.001,
+  "excite_flip_angle": 90.0,
+  "refocus_flip_angle": 180.0,
+  "crush_duration": 0.0005,
+  "ramp_time": 0.00014,
+  "phase_encode_time": 0.00055,
+  "echo_time": 0.01,
+  "rep_time": 0.5,
+  "n_averages": 1,
+  "n_repetitions": 128,
+  "grad_off": false,
+  "adjustment_file": null
+}
