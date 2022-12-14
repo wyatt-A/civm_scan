@@ -482,10 +482,13 @@ impl SeDti {
         let te = self.params.echo_time;
         let tau = self.params.echo_time / 2.0;
 
+        //let acq_adj = 38E-6;
+        let acq_adj = 0.0;
+
         let excitation = Event::new(self.events.excitation.as_reference(), Origin);
         let refocus1 = Event::new(self.events.refocus1.as_reference(), ExactFromOrigin(sec_to_clock(tau)));
         let readout1 = Event::new(self.events.readout.as_reference(), ExactFromOrigin(sec_to_clock(te)));
-        let acquire1 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te - 38E-6)));
+        let acquire1 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te - acq_adj)));
 
         let phase_encode1 = Event::new(self.events.phase_encode1.as_reference(), Before(readout1.clone(), 0));
 

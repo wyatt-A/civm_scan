@@ -8,7 +8,7 @@
     210,
     128
   ],
-  "n_echos": 10,
+  "n_echos": 16,
   "slice_thickness": 1.0,
   "sample_discards": 0,
   "orientation": "CivmStandard",
@@ -16,13 +16,14 @@
   "rf_duration": 0.001,
   "excite_flip_angle": 90.0,
   "refocus_flip_angle": 180.0,
-  "crush_duration": 0.0005,
-  "ramp_time": 0.00014,
+  "crush_duration": 0.0000,
+  "ramp_time": 0.0003,
   "phase_encode_time": 0.00055,
   "echo_time": 0.01,
-  "rep_time": 0.5,
+  "rep_time": 1.0,
   "n_averages": 1,
-  "n_repetitions": 128,
+  "n_repetitions": null,
   "grad_off": false,
+  "setup_mode": false,
   "adjustment_file": null
 }

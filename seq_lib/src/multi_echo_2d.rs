@@ -235,6 +235,7 @@ pub struct Me2DEvents {
     readout: GradEvent<Trapezoid>,
     acquire: AcqEvent,
     rewinder: GradEvent<Trapezoid>,
+    crusher: GradEvent<Trapezoid>,
 }
 
 struct Waveforms {
@@ -245,6 +246,7 @@ struct Waveforms {
     slice_sel: Trapezoid,
     slice_ref: Trapezoid,
     ref_slice_sel: Trapezoid,
+    crusher: Trapezoid,
 }
 
 struct GradMatrices {
@@ -255,6 +257,7 @@ struct GradMatrices {
     slice_sel: Matrix,
     slice_ref: Matrix,
     ref_slice_sel: Matrix,
+    crusher: Matrix,
 }
 
 impl Me2D {
@@ -274,9 +277,10 @@ impl Me2D {
         let refocus = SincPulse::new(params.rf_duration,5);
         let readout = Trapezoid::new(params.ramp_time, read_sample_time_sec);
         let phase_encode = Trapezoid::new(params.ramp_time, params.phase_encode_time);
-        let slice_sel = Trapezoid::new(params.ramp_time,2.0*params.rf_duration);
+        let slice_sel = Trapezoid::new(params.ramp_time,params.rf_duration);
         let slice_ref = Trapezoid::new(params.ramp_time,params.rf_duration);
-        let ref_slice_sel = Trapezoid::new(params.ramp_time,2.0*params.rf_duration + params.crush_duration);
+        let ref_slice_sel = Trapezoid::new(params.ramp_time,params.rf_duration + params.crush_duration);
+        let crusher = Trapezoid::new(params.ramp_time,0.75*params.phase_encode_time);
 
         Waveforms {
             excitation,
@@ -285,7 +289,8 @@ impl Me2D {
             readout,
             slice_sel,
             slice_ref,
-            ref_slice_sel
+            ref_slice_sel,
+            crusher
         }
     }
 
@@ -305,90 +310,134 @@ impl Me2D {
         /* PHASE ENCODING */
         let phase_encode_strategy = EncodeStrategy::FullySampled(Dimension::_2D,params.samples.1 as usize,None);
         let pe_driver1 = MatrixDriver::new(DriverVar::Repetition, MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()), Some(0));
-        let read_pre_phase_dac = waveforms.phase_encode.magnitude_net(0.5 * waveforms.readout.power_net(read_grad_dac as f32)) as i16;
+
+        //let read_pre_phase_dac = waveforms.phase_encode.magnitude_net(0.5 * waveforms.readout.power_net(read_grad_dac as f32)) as i16;
+        let read_pre_phase_dac = waveforms.phase_encode.magnitude_net(0.5 * waveforms.slice_ref.power_net(read_grad_dac as f32)) as i16;
+
+
         let phase_grad_step = waveforms.phase_encode.magnitude_net(1.0 / params.fov.1);
         let phase_multiplier = grad_cal::grad_to_dac(phase_grad_step) as f32;
         let transform = LinTransform::new((None, Some(phase_multiplier), None), (None, None, None));
 
 
-        // disable phase encoding in setup mode
-        let (phase_encode1,phase_encode2) = match params.setup_mode {
+        let phase_encode1 = match params.setup_mode {
             true => {
-                let phase_encode1 = Matrix::new_static(
+                Matrix::new_static(
                     "c_pe_mat1",
-                    DacValues::new(Some(-read_pre_phase_dac), None, None),
-                    (true, false, false),
-                    params.grad_off,
-                    &mat_count
-                );
-                let phase_encode2 = Matrix::new_driven(
-                    "c_pe_mat2",
-                    pe_driver1,
-                    transform,
                     DacValues::new(None, None, None),
-                    (false, false, false),
+                    (true, false, false),
                     true,
                     &mat_count
-                );
-                (phase_encode1,phase_encode2)
+                )
             }
             false => {
-                let phase_encode1 = Matrix::new_driven(
+                Matrix::new_driven(
                     "c_pe_mat1",
                     pe_driver1.clone(),
                     transform,
-                    DacValues::new(Some(-read_pre_phase_dac), None, None),
+                    DacValues::new(None, None, None),
                     (true, false, false),
                     params.grad_off,
                     &mat_count
-                );
-
-                let phase_encode2 = Matrix::new_driven(
-                    "c_pe_mat2",
-                    pe_driver1,
-                    transform,
-                    DacValues::new(None, None, None),
-                    (false, false, false),
-                    params.grad_off,
-                    &mat_count
-                );
-                (phase_encode1,phase_encode2)
+                )
             }
         };
 
-
         let re_trans = LinTransform::new((None, Some(-1.0), None), (None, None, None));
-        let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),false,&mat_count);
+        let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),params.grad_off,&mat_count);
+
+        let phase_encode2 = Matrix::new_driven(
+            "c_pe_mat2",
+            pe_driver1.clone(),
+            transform,
+            DacValues::new(Some(-read_pre_phase_dac), None, None),
+            (true, false, false),
+            params.grad_off,
+            &mat_count
+        );
+
+        let crusher = Matrix::new_static(
+            "c_crush_mat1",
+            DacValues::new(Some(1000), None, None),
+            (true, false, false),
+            params.grad_off,
+            &mat_count
+        );
+
+        // disable phase encoding in setup mode
+        // let (phase_encode1,phase_encode2) = match params.setup_mode {
+        //     true => {
+        //         let phase_encode1 = Matrix::new_static(
+        //             "c_pe_mat1",
+        //             DacValues::new(Some(-read_pre_phase_dac), None, None),
+        //             (true, false, false),
+        //             params.grad_off,
+        //             &mat_count
+        //         );
+        //         let phase_encode2 = Matrix::new_driven(
+        //             "c_pe_mat2",
+        //             pe_driver1,
+        //             transform,
+        //             DacValues::new(None, None, None),
+        //             (false, false, false),
+        //             true,
+        //             &mat_count
+        //         );
+        //         (phase_encode1,phase_encode2)
+        //     }
+        //     false => {
+        //         let phase_encode1 = Matrix::new_driven(
+        //             "c_pe_mat1",
+        //             pe_driver1.clone(),
+        //             transform,
+        //             DacValues::new(Some(-read_pre_phase_dac), None, None),
+        //             (true, false, false),
+        //             params.grad_off,
+        //             &mat_count
+        //         );
+        //
+        //         let phase_encode2 = Matrix::new_driven(
+        //             "c_pe_mat2",
+        //             pe_driver1,
+        //             transform,
+        //             DacValues::new(None, None, None),
+        //             (false, false, false),
+        //             params.grad_off,
+        //             &mat_count
+        //         );
+        //         (phase_encode1,phase_encode2)
+        //     }
+        // };
+
+
+
 
         let grad = waveforms.excitation.grad_strength_hzpmm(params.slice_thickness);
 
         let slice_dac = grad_cal::grad_to_dac(grad);
 
-        let grad = waveforms.refocus.grad_strength_hzpmm(params.slice_thickness);
-
-        let ref_dac = grad_cal::grad_to_dac(grad);
 
         let slice_sel = Matrix::new_static(
             "slice_sel_mat",
             DacValues::new(None,None,Some(slice_dac)),
             (false,false,false),
-            false,
+            params.grad_off,
             &mat_count
         );
 
-        let slice_ref = slice_sel.derive(
+        let slice_ref = Matrix::new_static(
             "slice_ref_mat",
-            LinTransform::new((None,None,Some(-1.0)),(None,None,None)),
+            DacValues::new(Some(read_pre_phase_dac),None,Some(-slice_dac/2)),
             (false,false,false),
-            false,
+            params.grad_off,
             &mat_count
         );
 
         let ref_slice_sel = Matrix::new_static(
             "ref_slice_sel_mat",
-            DacValues::new(None,None,Some(ref_dac)),
+            DacValues::new(None,None,Some(slice_dac)),
             (false,false,false),
-            false,
+            params.grad_off,
             &mat_count
         );
 
@@ -399,7 +448,8 @@ impl Me2D {
             rewinder,
             slice_sel,
             slice_ref,
-            ref_slice_sel
+            ref_slice_sel,
+            crusher,
         }
     }
 
@@ -441,7 +491,7 @@ impl Me2D {
         );
 
         let slice_ref = GradEvent::new(
-            (None,None,Some(w.slice_ref)),
+            (Some(w.slice_ref),None,Some(w.slice_ref)),
             &m.slice_ref,
             GradEventType::NonBlocking,
             "slice_ref"
@@ -477,10 +527,17 @@ impl Me2D {
         );
 
         let rewinder = GradEvent::new(
-            (None, Some(w.phase_encode),None),
+            (Some(w.phase_encode), Some(w.phase_encode),None),
             &m.rewinder,
             GradEventType::Blocking,
             "rewind"
+        );
+
+        let crusher = GradEvent::new(
+            (Some(w.crusher), None,None),
+            &m.crusher,
+            GradEventType::Blocking,
+            "crusher"
         );
 
         Me2DEvents {
@@ -493,7 +550,8 @@ impl Me2D {
             acquire,
             rewinder,
             refocus,
-            ref_slice_sel
+            ref_slice_sel,
+            crusher
         }
     }
 
@@ -504,15 +562,19 @@ impl Me2D {
         let tau_clocks = _utils::sec_to_clock(tau);
         let te_clocks = _utils::sec_to_clock(te);
 
-        let sd = _utils::sec_to_clock(2.0*self.params.ramp_time + 2.0*self.params.rf_duration) as i32;
+        let sd = _utils::sec_to_clock(2.0*self.params.ramp_time + 1.1*self.params.rf_duration) as i32;
 
         let mut event_vector = Vec::<Rc<RefCell<Event>>>::new();
 
+
+        let excitation = Event::new(self.events.excitation.as_reference(), Origin);
+        let ss = Event::new(self.events.slice_sel.as_reference(), ExactFromOrigin(0 + 300));
+        let ss_ref = Event::new(self.events.slice_ref.as_reference(), ExactFromOrigin(sd));
         event_vector.extend(
             vec![
-                Event::new(self.events.excitation.as_reference(), Origin),
-                Event::new(self.events.slice_sel.as_reference(), ExactFromOrigin(0 + 300)),
-                Event::new(self.events.slice_ref.as_reference(), ExactFromOrigin(sd))
+                excitation,
+                ss,
+                ss_ref,
             ]
         );
 
@@ -524,19 +586,32 @@ impl Me2D {
             let midpoint2 = (echo*te_clocks + te_clocks - tau_clocks + t_echo)/2;
 
 
-            event_vector.push(Event::new(self.events.readout.as_reference(),ExactFromOrigin(t_echo)));
-            event_vector.push(Event::new(self.events.acquire.as_reference(),ExactFromOrigin(t_echo)));
+            let read =Event::new(self.events.readout.as_reference(),ExactFromOrigin(t_echo));
+            event_vector.push(read.clone());
+            let acq = Event::new(self.events.acquire.as_reference(),ExactFromOrigin(t_echo));
+            event_vector.push(acq.clone());
 
-            event_vector.push(Event::new(self.events.refocus.as_reference(),ExactFromOrigin(t_tau)));
-            event_vector.push(Event::new(self.events.ref_slice_sel.as_reference(),ExactFromOrigin(t_tau)));
-            event_vector.push(Event::new(self.events.refocus.as_reference(),ExactFromOrigin(t_tau)));
+            let pe = Event::new(self.events.phase_encode1.as_reference(),Before(read,200));
+
+            let refoc = Event::new(self.events.refocus.as_reference(),ExactFromOrigin(t_tau));
+            let slice_ref = Event::new(self.events.ref_slice_sel.as_reference(),ExactFromOrigin(t_tau));
+            event_vector.push(refoc.clone());
+
+            event_vector.push(Event::new(self.events.crusher.as_reference(),Before(pe.clone(),100)));
+
+            event_vector.push(Event::new(self.events.crusher.as_reference(),Before(slice_ref.clone(),100)));
+
+            event_vector.push(slice_ref.clone());
 
 
-            if echo == 1{
-                event_vector.push(Event::new(self.events.phase_encode1.as_reference(),ExactFromOrigin(midpoint1)));
-            }else {
-                event_vector.push(Event::new(self.events.phase_encode2.as_reference(),ExactFromOrigin(midpoint1)));
-            }
+
+            event_vector.push(pe.clone());
+
+            // if echo == 1{
+            //     event_vector.push(Event::new(self.events.phase_encode1.as_reference(),ExactFromOrigin(midpoint1)));
+            // }else {
+            //     event_vector.push(Event::new(self.events.phase_encode1.as_reference(),ExactFromOrigin(midpoint1)));
+            // }
 
 
 

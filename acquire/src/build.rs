@@ -28,7 +28,9 @@ use crate::scout::ScoutViewSettings;
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
 //const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
-const SEQUENCE_LIB:&str = r"C:\Users\waust\IdeaProjects\civm_scan\test_env\sequence_library";
+//const SEQUENCE_LIB:&str = r"C:\Users\waust\IdeaProjects\civm_scan\test_env\sequence_library";
+const SEQUENCE_LIB:&str = r"C:\workstation\dev\civm_scan\test_env\sequence_library";
+
 pub const HEADFILE_NAME:&str = "meta";
 pub const HEADFILE_EXT:&str = "txt";
 
@@ -452,6 +454,7 @@ pub fn build_simulation(sequence_params:Box<dyn SequenceParameters>,ctx:&Context
     create_dir_all(&ctx.export_dir).expect("trouble building directory");
     let label = format!("{}_simulation",params.name());
     to_build.ppl_export(&ctx.export_dir,&label,true,ctx.build).expect("invalid event queue!");
+    to_build.param_export(&ctx.export_dir);
 }
 
 pub fn build(sequence_params:Box<dyn SequenceParameters>,ctx:&ContextParams) {
@@ -493,6 +496,7 @@ pub fn build_setup(sequence_params:Box<dyn SequenceParameters>,ctx:&ContextParam
     create_dir_all(&ctx.export_dir).expect("trouble building directory");
     let label = format!("{}_setup",setup_params.name());
     to_build.ppl_export(&ctx.export_dir,&label,false,ctx.build).expect("invalid event queue!");
+    to_build.param_export(&ctx.export_dir);
     match setup_params.is_cs(){
         true =>{
             let table = &setup_params.cs_table().unwrap();

@@ -18,7 +18,8 @@ use crate::seqframe::{GRAD_SEQ_FILE_LABEL, SeqFrame};
 const TIME_BLOCK_1:i32 = 300;
 const TIME_BLOCK_2:i32 = 300;
 
-const SINGLE_CHANNEL_START_DELAY:i32 = 100; // cost of 1 channel start
+//const SINGLE_CHANNEL_START_DELAY:i32 = 100; // cost of 1 channel start
+const SINGLE_CHANNEL_START_DELAY:i32 = 0; // cost of 1 channel start
 const EXTRA_CHANNEL_START_DELAY:i32 = 30; // added cost per 1 channel more (81 + 31 for 2 channels)
 
 const READ_MASK:&str = "0x0002";
@@ -334,6 +335,18 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
         };
         WaveformData::Grad(r,p,s)
     }
+    fn kind(&self) -> EventType {
+        EventType::Grad
+    }
+    fn blocking(&self) -> bool {
+        match self.kind {
+            GradEventType::Blocking => true,
+            GradEventType::NonBlocking => false
+        }
+    }
+    fn seq_params(&self, sample_period_us: usize) -> Option<String> {
+        self.seq_params(sample_period_us)
+    }
     fn render_magnitude(&self,time_step_us:usize,driver_value:u32) -> WaveformData {
         let dac = self.matrix.dac_vals(driver_value);
         let r = match self.read_frame {
@@ -355,18 +368,6 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
             None => None
         };
         WaveformData::Grad(r,p,s)
-    }
-    fn kind(&self) -> EventType {
-        EventType::Grad
-    }
-    fn seq_params(&self, sample_period_us: usize) -> Option<String> {
-        self.seq_params(sample_period_us)
-    }
-    fn blocking(&self) -> bool {
-        match self.kind {
-            GradEventType::Blocking => true,
-            GradEventType::NonBlocking => false
-        }
     }
 }
 

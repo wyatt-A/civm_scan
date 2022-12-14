@@ -17,7 +17,9 @@ use crate::_utils::sec_to_clock;
 // time allocated for setting reciever phase
 const TIME_BLOCK_1:i32 = 500;
 // time required after call to acquire before samples are collected
-const TIME_BLOCK_2:i32 = 221;
+//const TIME_BLOCK_2:i32 = 221;
+//const TIME_BLOCK_2:i32 = 600;
+const TIME_BLOCK_2:i32 = 500;
 
 const NO_SAMPLES_VAR:&str = "no_samples";
 const SAMPLE_PERIOD_VAR:&str = "sample_period";

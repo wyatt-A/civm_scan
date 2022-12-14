@@ -605,19 +605,21 @@ impl FseDti {
             let tau2 = (te + te2 + te) / 2.0;
 
             let adj = 100E-6;
+            //let acq_shift = 38E-6;
+            let acq_shift = 0.0;
 
             let excitation = Event::new(self.events.excitation.as_reference(), Origin);
             let refocus1 = Event::new(self.events.refocus1.as_reference(), ExactFromOrigin(sec_to_clock(tau)));
             let readout1 = Event::new(self.events.readout.as_reference(), ExactFromOrigin(sec_to_clock(te)));
-            let acquire1 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te - 38E-6)));
+            let acquire1 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te - acq_shift)));
 
             let refocus2 = Event::new(self.events.refocus2.as_reference(), ExactFromOrigin(sec_to_clock(tau2 + adj)));
             let readout2 = Event::new(self.events.readout.as_reference(), ExactFromOrigin(sec_to_clock(te + 1.0 * te2)));
-            let acquire2 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te + 1.0 * te2 - 38E-6)));
+            let acquire2 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te + 1.0 * te2 - acq_shift)));
 
             let refocus3 = Event::new(self.events.refocus3.as_reference(), ExactFromOrigin(sec_to_clock(te + 2.0 * te2 - te2 / 2.0 + adj)));
             let readout3 = Event::new(self.events.readout.as_reference(), ExactFromOrigin(sec_to_clock(te + 2.0 * te2)));
-            let acquire3 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te + 2.0 * te2 - 38E-6)));
+            let acquire3 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te + 2.0 * te2 - acq_shift)));
 
             let phase_encode1 = Event::new(self.events.phase_encode1.as_reference(), Before(readout1.clone(), 0));
             let phase_encode2 = Event::new(self.events.phase_encode2.as_reference(), Before(readout2.clone(), 0));
