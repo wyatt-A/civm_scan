@@ -11,7 +11,7 @@ use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
 use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
-use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, SliceSelective, SliceSelectiveCrusher, Trapezoid};
+use seq_tools::pulse::{Pulse, SincPulse, SliceSelective, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::_utils::{sec_to_clock};
@@ -35,7 +35,7 @@ impl AcqDimensions for Me2DParams {
             n_phase1: self.samples.1 as i32,
             n_phase2: 1,
             n_slices: 1,
-            n_echos: 1,
+            n_echos: self.n_echos as i32,
             n_experiments: 1
         }
     }
@@ -54,7 +54,7 @@ impl AcqHeadfile for Me2DParams {
             tr_us: 1E6*self.rep_time,
             alpha: 90.0,
             bw: self.spectral_width.hertz() as f32 /2.0,
-            n_echos: 1,
+            n_echos: self.n_echos as i32,
             S_PSDname: self.name()
         }
     }
@@ -63,7 +63,7 @@ impl AcqHeadfile for Me2DParams {
 impl Initialize for Me2DParams {
     fn default() -> Self {
         Me2DParams {
-            name: "me_2d".to_string(),
+            name: "multi_echo_2d".to_string(),
             fov: (19.7, 12.0),
             samples: (210, 128),
             n_echos: 10,
@@ -71,15 +71,14 @@ impl Initialize for Me2DParams {
             sample_discards: 0,
             orientation: Orientation::CivmStandard,
             spectral_width: SpectralWidth::SW100kH,
-            rf_duration: 140E-6,
+            rf_duration: 1E-3,
             excite_flip_angle: 90.0,
             refocus_flip_angle: 180.0,
-            rf_180_duration: 280E-6,
+            crush_duration: 500E-6,
             ramp_time: 140E-6,
             phase_encode_time: 550E-6,
-            echo_time: 10E-3,
-            obs_freq_offset: 0.0,
-            rep_time: 50E-3,
+            echo_time: 20E-3,
+            rep_time: 500E-3,
             n_averages: 1,
             n_repetitions: 128,
             grad_off: false,
@@ -113,7 +112,7 @@ impl MrdToKspace for Me2DParams {
             n_views: self.samples.1 as usize,
             view_acceleration: 1,
             dummy_excitations: 0,
-            n_objects: 1
+            n_objects: self.n_echos as usize
         }
     }
 }
@@ -137,6 +136,7 @@ impl Setup for Me2DParams {
     }
 
     fn set_repetitions(&mut self) {
+        self.n_repetitions = 2000;
     }
 }
 
@@ -203,7 +203,7 @@ pub struct Me2DParams {
     rf_duration: f32,
     excite_flip_angle:f32,
     refocus_flip_angle:f32,
-    rf_180_duration: f32,
+    crush_duration: f32,
     ramp_time: f32,
     phase_encode_time: f32,
     echo_time: f32,
@@ -211,7 +211,6 @@ pub struct Me2DParams {
     n_averages: u16,
     n_repetitions: u32,
     grad_off: bool,
-    pub obs_freq_offset: f64,
     adjustment_file:Option<PathBuf>,
 }
 
@@ -225,27 +224,29 @@ pub struct Me2D {
 pub struct Me2DEvents {
     slice_sel: GradEvent<Trapezoid>,
     slice_ref: GradEvent<Trapezoid>,
-    excitation: RfEvent<Hardpulse>,
-    refocus: RfEvent<CompositeHardpulse>,
-    ref_slice_sel: GradEvent<SliceSelectiveCrusher>,
-    phase_encode: GradEvent<Trapezoid>,
+    excitation: RfEvent<SincPulse>,
+    refocus: RfEvent<SincPulse>,
+    ref_slice_sel: GradEvent<Trapezoid>,
+    phase_encode1: GradEvent<Trapezoid>,
+    phase_encode2: GradEvent<Trapezoid>,
     readout: GradEvent<Trapezoid>,
     acquire: AcqEvent,
     rewinder: GradEvent<Trapezoid>,
 }
 
 struct Waveforms {
-    excitation: Hardpulse,
-    refocus:CompositeHardpulse,
+    excitation: SincPulse,
+    refocus: SincPulse,
     phase_encode: Trapezoid,
     readout: Trapezoid,
-    slice_sel:Trapezoid,
-    slice_ref:Trapezoid,
-    ref_slice_sel:Trapezoid,
+    slice_sel: Trapezoid,
+    slice_ref: Trapezoid,
+    ref_slice_sel: Trapezoid,
 }
 
 struct GradMatrices {
     phase_encode1: Matrix,
+    phase_encode2: Matrix,
     readout: Matrix,
     rewinder: Matrix,
     slice_sel: Matrix,
@@ -266,13 +267,13 @@ impl Me2D {
     fn waveforms(params: &Me2DParams) -> Waveforms {
         let n_read = params.samples.0;
         let read_sample_time_sec = params.spectral_width.sample_time(n_read + params.sample_discards);
-        let excitation = Hardpulse::new(params.rf_duration);
-        let refocus = CompositeHardpulse::new_180(params.rf_180_duration);
+        let excitation = SincPulse::new(params.rf_duration,5);
+        let refocus = SincPulse::new(params.rf_duration,5);
         let readout = Trapezoid::new(params.ramp_time, read_sample_time_sec);
         let phase_encode = Trapezoid::new(params.ramp_time, params.phase_encode_time);
         let slice_sel = Trapezoid::new(params.ramp_time,2.0*params.rf_duration);
         let slice_ref = Trapezoid::new(params.ramp_time,params.rf_duration);
-        let ref_slice_sel = Trapezoid::new(params.ramp_time,2.0*params.rf_180_duration);
+        let ref_slice_sel = Trapezoid::new(params.ramp_time,2.0*params.rf_duration + params.crush_duration);
 
         Waveforms {
             excitation,
@@ -308,10 +309,20 @@ impl Me2D {
 
         let phase_encode1 = Matrix::new_driven(
             "c_pe_mat1",
-            pe_driver1,
+            pe_driver1.clone(),
             transform,
             DacValues::new(Some(-read_pre_phase_dac), None, None),
             (true, false, false),
+            params.grad_off,
+            &mat_count
+        );
+
+        let phase_encode2 = Matrix::new_driven(
+            "c_pe_mat2",
+            pe_driver1,
+            transform,
+            DacValues::new(None, None, None),
+            (false, false, false),
             params.grad_off,
             &mat_count
         );
@@ -353,6 +364,7 @@ impl Me2D {
 
         GradMatrices {
             phase_encode1,
+            phase_encode2,
             readout,
             rewinder,
             slice_sel,
@@ -389,13 +401,13 @@ impl Me2D {
             RfStateType::Static(0)
         );
 
-        let refocus_dac = params.rf_dac(params.refocus_flip_angle,Box::new(w.refocus.clone())).unwrap_or(400);
+        let refocus_dac = params.rf_dac(params.refocus_flip_angle,Box::new(w.refocus.clone())).unwrap_or(800);
         let refocus = RfEvent::new(
             "refocus",
             2,
             w.refocus,
             RfStateType::Adjustable(refocus_dac, None),
-            RfStateType::Adjustable(0,None)
+            RfStateType::Adjustable(400,None)
         );
 
         let slice_ref = GradEvent::new(
@@ -405,11 +417,18 @@ impl Me2D {
             "slice_ref"
         );
 
-        let phase_encode = GradEvent::new(
+        let phase_encode1 = GradEvent::new(
             (Some(w.phase_encode), Some(w.phase_encode), None),
             &m.phase_encode1,
             GradEventType::Blocking,
             "phase_encode1"
+        );
+
+        let phase_encode2 = GradEvent::new(
+            (None, Some(w.phase_encode), None),
+            &m.phase_encode2,
+            GradEventType::Blocking,
+            "phase_encode2"
         );
 
         let readout = GradEvent::new(
@@ -438,7 +457,8 @@ impl Me2D {
             slice_sel,
             slice_ref,
             excitation,
-            phase_encode,
+            phase_encode1,
+            phase_encode2,
             readout,
             acquire,
             rewinder,
@@ -451,54 +471,50 @@ impl Me2D {
     fn place_events(&self) -> EventQueue {
         let te = self.params.echo_time;
         let tau = te/2.0;
+        let tau_clocks = _utils::sec_to_clock(tau);
+        let te_clocks = _utils::sec_to_clock(te);
 
-        let sd = _utils::sec_to_clock(2.0*self.params.ramp_time + 2.0*self.params.rf_duration) as u32;
+        let sd = _utils::sec_to_clock(2.0*self.params.ramp_time + 2.0*self.params.rf_duration) as i32;
 
-        let excitation = Event::new(self.events.excitation.as_reference(), Origin);
-        let slice_sel = Event::new(self.events.slice_sel.as_reference(),ExactFromOrigin(0 + 300));
-        let slice_ref = Event::new(self.events.slice_ref.as_reference(),After(excitation.clone(),sd));
+        let mut event_vector = Vec::<Rc<RefCell<Event>>>::new();
 
+        event_vector.extend(
+            vec![
+                Event::new(self.events.excitation.as_reference(), Origin),
+                Event::new(self.events.slice_sel.as_reference(), ExactFromOrigin(0 + 300)),
+                Event::new(self.events.slice_ref.as_reference(), ExactFromOrigin(sd))
+            ]
+        );
 
-        let ref_slice_sel = Event::new(self.events.ref_slice_sel.as_reference(),ExactFromOrigin(sec_to_clock(tau)));
-        let refocus = Event::new(self.events.refocus.as_reference(),ExactFromOrigin(sec_to_clock(tau)));
-        let readout = Event::new(self.events.readout.as_reference(), ExactFromOrigin(sec_to_clock(te)));
-        let acquire1 = Event::new(self.events.acquire.as_reference(), ExactFromOrigin(sec_to_clock(te)));
-        let phase_encode1 = Event::new(self.events.phase_encode.as_reference(), Before(readout.clone(), 0));
-        let rewinder = Event::new(self.events.rewinder.as_reference(), After(acquire1.clone(), 0));
+        for echo in 1 as i32..(self.params.n_echos as i32+1) {
 
-        let r_arr:Vec<Rc<RefCell<Event>>> = (0..10).map(|echo|{
-            let t = ((echo+1) as i32)*sec_to_clock(te);
-            Event::new(self.events.readout.as_reference(), ExactFromOrigin(t))
-        }).collect();
-
-        let a_arr:Vec<Rc<RefCell<Event>>> = (0..10).map(|echo|{
-            let t = ((echo+1) as i32)*sec_to_clock(te);
-            Event::new(self.events.acquire.as_reference(), ExactFromOrigin(t))
-        }).collect();
-
-        let ref_arr:Vec<Rc<RefCell<Event>>> = (0..10).map(|echo|{
-            let t = ((echo+1) as i32)*sec_to_clock(te) - sec_to_clock(tau);
-            Event::new(self.events.refocus.as_reference(), ExactFromOrigin(t))
-        }).collect();
-
-        let ref_sel_arr:Vec<Rc<RefCell<Event>>> = (0..10).map(|echo|{
-            let t = ((echo+1) as i32)*sec_to_clock(te) - sec_to_clock(tau);
-            Event::new(self.events.ref_slice_sel.as_reference(), ExactFromOrigin(t+300))
-        }).collect();
+            let t_echo = echo*te_clocks;
+            let t_tau = echo*te_clocks - tau_clocks;
+            let midpoint1 = (t_echo + t_tau)/2;
+            let midpoint2 = (echo*te_clocks + te_clocks - tau_clocks + t_echo)/2;
 
 
-        let mut v = Vec::<Rc<RefCell<Event>>>::new();
+            event_vector.push(Event::new(self.events.readout.as_reference(),ExactFromOrigin(t_echo)));
+            event_vector.push(Event::new(self.events.acquire.as_reference(),ExactFromOrigin(t_echo)));
 
-        v.push(excitation);
-        v.push(slice_sel);
-        v.push(slice_ref);
-        v.extend(r_arr);
-        v.extend(a_arr);
-        v.extend(ref_arr);
-        v.extend(ref_sel_arr);
+            event_vector.push(Event::new(self.events.refocus.as_reference(),ExactFromOrigin(t_tau)));
+            event_vector.push(Event::new(self.events.ref_slice_sel.as_reference(),ExactFromOrigin(t_tau)));
+            event_vector.push(Event::new(self.events.refocus.as_reference(),ExactFromOrigin(t_tau)));
+
+
+            if echo == 1{
+                event_vector.push(Event::new(self.events.phase_encode1.as_reference(),ExactFromOrigin(midpoint1)));
+            }else {
+                event_vector.push(Event::new(self.events.phase_encode2.as_reference(),ExactFromOrigin(midpoint1)));
+            }
+
+
+
+            event_vector.push(Event::new(self.events.rewinder.as_reference(),ExactFromOrigin(midpoint2)));
+        }
 
         EventQueue::new(
-            &v
+            &event_vector
         )
     }
 }

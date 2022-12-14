@@ -1,4 +1,4 @@
-use crate::pulse::{Pulse,Trapezoid, Hardpulse, CompositeHardpulse};
+use crate::pulse::{Pulse, Trapezoid, Hardpulse, CompositeHardpulse, SincPulse};
 use crate::seqframe::{self, SeqFrame, FrameType, SeqFrameExpression};
 use crate::_utils;
 use crate::pulse_function::{Function,FunctionParams};
@@ -36,6 +36,8 @@ pub trait RfFrame:Pulse {
 impl RfFrame for Trapezoid {}
 
 impl RfFrame for Hardpulse {}
+
+impl RfFrame for SincPulse {}
 
 impl RfFrame for CompositeHardpulse {
     fn phase_function(&self,sample_period_us:usize) -> Vec<Function>{

@@ -14,6 +14,7 @@ use regex::Regex;
 use seq_lib::fse_dti::FseDtiParams;
 use crate::args::{ApplySetupArgs, NewAdjArgs, NewArgs, NewConfigArgs, NewDiffusionExperimentArgs};
 use std::fs::copy;
+use seq_lib::multi_echo_2d::Me2DParams;
 use seq_lib::one_pulse::OnePulseParams;
 use seq_lib::rfcal::RfCalParams;
 use seq_lib::scout::ScoutParams;
@@ -24,9 +25,10 @@ use utils;
 use crate::scout::ScoutViewSettings;
 
 //const SEQUENCE_LIB:&str = r"C:/workstation/civm_scan/sequence_library";
-const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
+//const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
 //const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
+const SEQUENCE_LIB:&str = r"C:\Users\waust\IdeaProjects\civm_scan\test_env\sequence_library";
 pub const HEADFILE_NAME:&str = "meta";
 pub const HEADFILE_EXT:&str = "txt";
 
@@ -41,6 +43,7 @@ pub enum Sequence {
     Se2D,
     OnePulse,
     RfCal,
+    Me2D,
 }
 
 impl Sequence {
@@ -54,6 +57,7 @@ impl Sequence {
             Self::decode(&Self::Se2D),
             Self::decode(&Self::OnePulse),
             Self::decode(&Self::RfCal),
+            Self::decode(&Self::Me2D),
         ].join("\n")
     }
     pub fn encode(name:&str) -> Self {
@@ -66,6 +70,7 @@ impl Sequence {
             "se_2d" => Self::Se2D,
             "one_pulse" => Self::OnePulse,
             "rf_cal" => Self::RfCal,
+            "multi_echo_2d" => Self::Me2D,
             _=> panic!("name not recognized")
         }
     }
@@ -79,6 +84,7 @@ impl Sequence {
             Self::Se2D => String::from("se_2d"),
             Self::OnePulse => String::from("one_pulse"),
             Self::RfCal => String::from("rf_cal"),
+            Self::Me2D => String::from("multi_echo_2d"),
         }
     }
 }
@@ -109,8 +115,6 @@ impl ContextParams {
 }
 
 
-
-
 pub fn acq_dims(cfg_file:&Path) -> Result<AcqDims,SequenceLoadError> {
     Ok(load_params(cfg_file)?.acq_dims())
 }
@@ -129,6 +133,9 @@ fn load_params(cfg_file:&Path) -> Result<Box<dyn SequenceParameters>,SequenceLoa
         }
         Sequence::Se2D => {
             Box::new(Se2DParams::load(&cfg_file)?)
+        }
+        Sequence::Me2D => {
+            Box::new(Me2DParams::load(&cfg_file)?)
         }
         _=> panic!("not yet implemented")
     })
@@ -155,6 +162,9 @@ pub fn load_build_params(cfg_file:&Path) -> Result<Box<dyn Build>,SequenceLoadEr
         },
         Sequence::RfCal => {
             RfCalParams::load(&cfg_file)?.instantiate()
+        },
+        Sequence::Me2D => {
+            Me2DParams::load(&cfg_file)?.instantiate()
         },
         _=> panic!("sequence not registered")
     })
@@ -258,6 +268,9 @@ pub fn new_config(args:&NewConfigArgs){
         }
         Sequence::RfCal => {
             RfCalParams::write_default(&path_out);
+        }
+        Sequence::Me2D => {
+            Me2DParams::write_default(&path_out);
         }
         _=> panic!("not yet implemented")
     }

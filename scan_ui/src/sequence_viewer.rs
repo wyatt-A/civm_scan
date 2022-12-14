@@ -10,7 +10,7 @@ use seq_tools::execution::WaveformData;
 pub struct SequenceViewer {
     selected_sequence:Option<String>,
     events:Option<Vec<EventGraph>>,
-    grad_data:Option<Vec<Vec<[f64;2]>>>,
+    grad_data:Option<Vec<(Vec<[f64; 2]>,(u8,u8,u8))>>,
     rf_data:Option<Vec<Vec<[f64;2]>>>,
     acq_data:Option<Vec<Vec<[f64;2]>>>,
     link_axis:LinkedAxisGroup,
@@ -32,21 +32,21 @@ impl SequenceViewer {
         }
     }
 }
-fn render_grad(eg:&Vec<EventGraph>) -> Vec<Vec<[f64; 2]>> {
-    let mut plot_objects = Vec::<Vec<[f64; 2]>>::new();
+fn render_grad(eg:&Vec<EventGraph>) -> Vec<(Vec<[f64; 2]>,(u8,u8,u8))> {
+    let mut plot_objects = Vec::<(Vec<[f64; 2]>,(u8,u8,u8))>::new();
     eg.iter().for_each(|event|{
         match &event.wave_data {
             WaveformData::Grad(r, p, s) => {
                 match r {
-                    Some(data) => plot_objects.push(data.f64_pair(event.waveform_start as f64)),
+                    Some(data) => plot_objects.push((data.f64_pair(event.waveform_start as f64),(3, 252, 102))),
                     None => {}
                 }
                 match p {
-                    Some(data) => plot_objects.push(data.f64_pair(event.waveform_start as f64)),
+                    Some(data) => plot_objects.push((data.f64_pair(event.waveform_start as f64),(3, 136, 252))),
                     None => {}
                 }
                 match s {
-                    Some(data) => plot_objects.push(data.f64_pair(event.waveform_start as f64)),
+                    Some(data) => plot_objects.push((data.f64_pair(event.waveform_start as f64),(252, 3, 45))),
                     None => {}
                 }
             }
@@ -163,9 +163,9 @@ pub fn sequence_viewer(ctx: &egui::Context,ui:&mut Ui,sv:&mut SequenceViewer){
                     params.place_events().graphs_dynamic(2,4)
                 });
 
-                let rf_data = sv.grad_data.get_or_insert_with(||render_rf(events));
+                let rf_data = sv.rf_data.get_or_insert_with(||render_rf(events));
                 let acq_data = sv.acq_data.get_or_insert_with(||render_acq(events));
-                let grad_data = sv.rf_data.get_or_insert_with(||render_grad(events));
+                let grad_data = sv.grad_data.get_or_insert_with(||render_grad(events));
 
 
                 let link = LinkedAxisGroup::new(true,false);
@@ -180,7 +180,7 @@ pub fn sequence_viewer(ctx: &egui::Context,ui:&mut Ui,sv:&mut SequenceViewer){
 
                 Plot::new("grad plot").show_axes([true,false]).link_axis(sv.link_axis.clone()).view_aspect(4.0).show(ui, |plot_ui| {
                     grad_data.iter().for_each(|p|{
-                        let line = Line::new(PlotPoints::new(p.clone())).color(Color32::from_rgb(255,255,255));
+                        let line = Line::new(PlotPoints::new(p.0.clone())).color(Color32::from_rgb(p.1.0,p.1.1,p.1.2));
                         plot_ui.line(line);
                     });
                 });

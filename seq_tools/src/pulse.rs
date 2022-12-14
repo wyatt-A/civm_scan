@@ -236,7 +236,7 @@ impl Pulse for CompositeHardpulse {
 /*
     Generic sinc pulse for slice-selective rf excitation and refocusing
  */
-
+#[derive(Clone,Copy)]
 pub struct SincPulse {
     duration:f32,
     n_lobes:u16,
@@ -283,7 +283,7 @@ impl Pulse for SincPulse {
     }
 }
 
-
+/*
 
 /*
     A special gradient pulse shape the simplifies 2-d slice selective refocusing.
@@ -445,3 +445,4 @@ impl Pulse for SliceSelectiveSpoiler {
         todo!()
     }
 }
+*/
