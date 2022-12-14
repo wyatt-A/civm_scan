@@ -3,7 +3,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use glob::glob;
-use glob::GlobResult;
 use serde::{Serialize,Deserialize};
 use serde_json;
 
@@ -78,7 +77,6 @@ pub fn build_directory(wd:&Path) {
             let rf_template = Path::new(&config.seq_template_dir).join(&config.rf_template);
             let mut cmd = Command::new("seq_gen");
             cmd.args(vec![rf_template,output,entries[0].clone()]);
-            //println!("{:?}",cmd);
             let out = cmd.output().expect("failed to launch seq_gen command");
             if !out.status.success() {
                 println!("failed to generate rf seq frame");
@@ -97,7 +95,6 @@ pub fn build_directory(wd:&Path) {
             let rf_template = Path::new(&config.seq_template_dir).join(&config.grad_template);
             let mut cmd = Command::new("seq_gen");
             cmd.args(vec![rf_template,output,entries[0].clone()]);
-            //println!("{:?}",cmd);
             let out = cmd.output().expect("failed to launch seq_gen command");
             if !out.status.success() {
                 println!("failed to generate gradient seq frame");

@@ -15,7 +15,7 @@ use seq_tools::pulse::{Pulse, SincPulse, SliceSelective, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
 use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError, UseAdjustments};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError, UseAdjustments};
 use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
@@ -24,7 +24,7 @@ use crate::pulse_sequence;
 
 impl Simulate for Me2DParams {
     fn set_sim_repetitions(&mut self) {
-        self.samples.1 = 2;
+        self.n_repetitions = Some(2);
     }
 }
 
@@ -80,8 +80,9 @@ impl Initialize for Me2DParams {
             echo_time: 20E-3,
             rep_time: 500E-3,
             n_averages: 1,
-            n_repetitions: 128,
+            n_repetitions:None,
             grad_off: false,
+            setup_mode : false,
             adjustment_file:None,
         }
     }
@@ -133,10 +134,11 @@ impl CompressedSense for Me2DParams {
 
 impl Setup for Me2DParams {
     fn set_mode(&mut self) {
+        self.setup_mode = true;
     }
 
     fn set_repetitions(&mut self) {
-        self.n_repetitions = 2000;
+        self.n_repetitions = Some(2000);
     }
 }
 
@@ -172,7 +174,7 @@ impl Build for Me2D {
     fn base_params(&self) -> PPLBaseParams {
         PPLBaseParams {
             n_averages: self.params.n_averages,
-            n_repetitions: self.params.samples.1 as u32,
+            n_repetitions: self.params.n_repetitions.unwrap_or(self.params.samples.1 as u32),
             rep_time: self.params.rep_time,
             base_frequency: BaseFrequency::civm9p4t(self.params.obs_freq_offset().unwrap_or(0.0)),
             orientation: self.params.orientation.clone(),
@@ -209,8 +211,9 @@ pub struct Me2DParams {
     echo_time: f32,
     rep_time: f32,
     n_averages: u16,
-    n_repetitions: u32,
+    n_repetitions:Option<u32>,
     grad_off: bool,
+    setup_mode: bool,
     adjustment_file:Option<PathBuf>,
 }
 
@@ -307,25 +310,52 @@ impl Me2D {
         let phase_multiplier = grad_cal::grad_to_dac(phase_grad_step) as f32;
         let transform = LinTransform::new((None, Some(phase_multiplier), None), (None, None, None));
 
-        let phase_encode1 = Matrix::new_driven(
-            "c_pe_mat1",
-            pe_driver1.clone(),
-            transform,
-            DacValues::new(Some(-read_pre_phase_dac), None, None),
-            (true, false, false),
-            params.grad_off,
-            &mat_count
-        );
 
-        let phase_encode2 = Matrix::new_driven(
-            "c_pe_mat2",
-            pe_driver1,
-            transform,
-            DacValues::new(None, None, None),
-            (false, false, false),
-            params.grad_off,
-            &mat_count
-        );
+        // disable phase encoding in setup mode
+        let (phase_encode1,phase_encode2) = match params.setup_mode {
+            true => {
+                let phase_encode1 = Matrix::new_static(
+                    "c_pe_mat1",
+                    DacValues::new(Some(-read_pre_phase_dac), None, None),
+                    (true, false, false),
+                    params.grad_off,
+                    &mat_count
+                );
+                let phase_encode2 = Matrix::new_driven(
+                    "c_pe_mat2",
+                    pe_driver1,
+                    transform,
+                    DacValues::new(None, None, None),
+                    (false, false, false),
+                    true,
+                    &mat_count
+                );
+                (phase_encode1,phase_encode2)
+            }
+            false => {
+                let phase_encode1 = Matrix::new_driven(
+                    "c_pe_mat1",
+                    pe_driver1.clone(),
+                    transform,
+                    DacValues::new(Some(-read_pre_phase_dac), None, None),
+                    (true, false, false),
+                    params.grad_off,
+                    &mat_count
+                );
+
+                let phase_encode2 = Matrix::new_driven(
+                    "c_pe_mat2",
+                    pe_driver1,
+                    transform,
+                    DacValues::new(None, None, None),
+                    (false, false, false),
+                    params.grad_off,
+                    &mat_count
+                );
+                (phase_encode1,phase_encode2)
+            }
+        };
+
 
         let re_trans = LinTransform::new((None, Some(-1.0), None), (None, None, None));
         let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),false,&mat_count);
