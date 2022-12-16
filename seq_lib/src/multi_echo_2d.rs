@@ -586,7 +586,7 @@ impl Me2D {
             let midpoint2 = (echo*te_clocks + te_clocks - tau_clocks + t_echo)/2;
 
 
-            let read =Event::new(self.events.readout.as_reference(),ExactFromOrigin(t_echo));
+            let read = Event::new(self.events.readout.as_reference(),ExactFromOrigin(t_echo));
             event_vector.push(read.clone());
             let acq = Event::new(self.events.acquire.as_reference(),ExactFromOrigin(t_echo));
             event_vector.push(acq.clone());

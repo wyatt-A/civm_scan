@@ -7,6 +7,7 @@ use std::time::SystemTime;
 use regex::Regex;
 use glob::glob;
 use chrono::{DateTime,Local};
+use utils;
 
 use crate::args::*;
 
@@ -66,68 +67,72 @@ pub fn acquire_ppr(args:RunDirectoryArgs) {
     run_acquisition();
 }
 
+pub enum ScanControlError {
+    PPRNotFound,
+    ScanBusy,
+    ScanStoppedUnexpectedly,
+}
 
-pub fn run_directory(args:RunDirectoryArgs){
-    let base_dir = Path::new(&args.path);
 
-    let depth = args.depth_to_search.unwrap_or(1);
+pub fn run_directory(args:RunDirectoryArgs) -> Result<(),ScanControlError>{
 
-    let pattern = (0..depth).map(|_| r"*\").collect::<String>();
-    let pattern = format!("{}*.ppr",pattern);
+    let ppr_files = utils::find_files(&args.path,"ppr",true).ok_or(ScanControlError::PPRNotFound)?;
 
-    let pat = base_dir.join(pattern);
-    let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
-    let pairs:Vec<(PathBuf,PathBuf)> = paths.iter().map(|ppr| (ppr.clone(),ppr.with_extension("mrd"))).collect();
+    let cs_table_pattern = args.cs_table.unwrap_or(String::from("cs_table"));
+    let n_pprs = ppr_files.len();
 
     // check to make sure we are not already running something before we start
-    match scan_status() {
-        Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => {
-            println!("cannot launch new scan jobs while scan is currently running. Use abort to kill the current scan and try again");
-            return
-        }
-        _=> println!("attempting to run {} ppr(s)",pairs.len())
+    if scan_busy() {
+        println!("scan is currently active. Cannot continue");
+        return Err(ScanControlError::ScanBusy);
     }
 
     // loop thru all pprs and run them in acq mode
-    pairs.iter().enumerate().for_each(|(index,pair)| {
-        match &args.cs_table {
-            Some(table_pat) => {
-                let pat = pair.0.with_file_name(format!("*{}*",table_pat));
-                let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
-                if paths.len() < 1 {
-                    println!("no cs table found that matches pattern! table will not be uploaded");
-                }
-                else{
-                    upload_table(&paths[0]);
-                    println!("cs table uploaded");
-                }
-            }
-            None => {}
-        };
-        println!("running acquisition {} of {} ...",index+1,pairs.len());
-        set_ppr(&pair.0);
-        set_mrd(&pair.1);
+    ppr_files.iter().enumerate().for_each(|(index,ppr)| {
+        // upload a cs_table if it exists
+        match utils::get_first_match(&ppr.parent().unwrap(), &cs_table_pattern) {
+            Some(cs_table) => upload_table(&cs_table),
+            None => println!("no cs table found that matches {}. No table will be uploaded",cs_table_pattern),
+        }
+        println!("running ppr {} of {} ...",index+1,n_pprs);
+        set_ppr(&ppr);
+        set_mrd(&ppr.with_extension("mrd"));
         run_acquisition();
         thread::sleep(time::Duration::from_secs(2));
-        loop { // run_acquisition() doesn't block so we have to do it manually with a loop
-            match scan_status() {
-                // block until scanning is done
-                Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => {
-                    thread::sleep(time::Duration::from_secs(2));
-                }
-                // when acq is complete, write to an ac (acq complete) file and record the date and time
-                Status::AcquisitionComplete => {
-                    let datetime: DateTime<Local> = SystemTime::now().into();
-                    let s = format!("completion_date={}", datetime.format("%Y%m%d:%T"));
-                    let mut f = File::create(pair.0.with_extension("ac")).expect("unable to create file");
-                    f.write_all(s.as_bytes()).expect("cannot write to file");
-                    break
-                }
-                _=> break
+
+        let err = loop {
+
+            if !scan_busy() && scan_complete() {
+                utils::write_to_file(&ppr,"ac",&format!("completion_date={}", utils::time_stamp()));
+                break Ok(());
+            }else if !scan_busy() && !scan_complete() {
+                break Err(ScanControlError::ScanStoppedUnexpectedly)
             }
-        }
-    });
+            else if scan_busy() {
+                thread::sleep(time::Duration::from_secs(2))
+            }
+            else {
+                Err()
+            }
+        };
+
     println!("acquisition complete");
+    }
+err
+}
+
+pub fn scan_busy() -> bool {
+    match scan_status(){
+        Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => true,
+        _=> false
+    }
+}
+
+pub fn scan_complete() -> bool {
+    match scan_status(){
+        Status::AcquisitionComplete => true,
+        _=> false
+    }
 }
 
 
