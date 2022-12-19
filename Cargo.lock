@@ -300,6 +300,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "clean-path"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaa6b4b263a5d737e9bf6b7c09b72c41a5480aec4d7219af827f6564e950b6a5"
+
+[[package]]
 name = "clipboard-win"
 version = "4.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2242,6 +2248,7 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "clean-path",
  "glob",
  "num-complex",
  "rustfft",

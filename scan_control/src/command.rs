@@ -1,3 +1,4 @@
+#![feature(absolute_path)]
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -11,141 +12,217 @@ use utils;
 
 use crate::args::*;
 
-const DIR:&str = "C:/workstation/civm_scan/vb_script";
-const STATUS_VBS:&str = "status.vbs";
-const SET_PPR_VBS:&str = "set_ppr.vbs";
-const SETUP_VBS:&str = "setup.vbs";
-const ABORT_VBS:&str = "abort.vbs";
-const RUN_VBS:&str = "run.vbs";
-const UPLOAD_VBS:&str = "load_table.vbs";
-const SET_MRD_VBS:&str = "set_mrd.vbs";
+const VBS_DIR:&str = "C:/workstation/civm_scan/vb_script";
 
-pub fn setup_ppr(args:RunDirectoryArgs) {
-    let ppr = args.path.to_owned();
+enum VBScript {
+    Status,
+    SetPPr,
+    SetMrd,
+    Setup,
+    Abort,
+    Run,
+    UploadTable,
+}
 
-    if !set_ppr(&ppr){
-        panic!("ppr not set. Cannot continue.");
+impl VBScript {
+    fn file_name(&self) -> &str {
+        use VBScript::*;
+        match &self {
+            Status => "status.vbs",
+            SetPPr => "set_ppr.vbs",
+            Setup => "setup.vbs",
+            Abort => "abort.vbs",
+            Run => "run.vbs",
+            UploadTable => "load_table.vbs",
+            SetMrd => "set_mrd.vbs",
+        }
     }
-    match &args.cs_table {
-        Some(table_pat) => {
-            let pat = ppr.with_file_name(format!("*{}*",table_pat));
-            let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
-            if paths.len() < 1 {
-                println!("no cs table found that matches pattern! table will not be uploaded");
+    pub fn path(&self) -> PathBuf {
+        Path::new(VBS_DIR).join(self.file_name())
+    }
+    pub fn run(&self,arg:Option<&Path>) -> Result<String,ScanControlError> {
+        let mut cmd = Command::new("cscript");
+        cmd.arg(self.path());
+        match arg {
+            Some(argument) => {
+                cmd.arg(argument);
             }
-            else{
-                upload_table(&paths[0]);
-                println!("cs table uploaded");
-            }
+            None => {}
         }
-        None => {}
-    };
-    run_setup();
+        let out = cmd.output().or(Err(ScanControlError::CScriptError))?;
+        Ok(String::from_utf8(out.stdout).unwrap())
+    }
 }
 
 
+//let script = Path::new(DIR).join(SET_MRD_VBS);
+//     let mut cmd = Command::new("cscript");
+//     let out = cmd.args(vec![
+//         script,
+//         path.to_owned()
+//     ]).output().expect("failed to launch cscript");
 
-pub fn acquire_ppr(args:RunDirectoryArgs) {
-    let ppr = args.path.to_owned();
+
+
+
+// pub fn setup_ppr(args:RunDirectoryArgs) {
+//     let ppr = args.path.to_owned();
+//
+//     if !set_ppr(&ppr){
+//         panic!("ppr not set. Cannot continue.");
+//     }
+//     match &args.cs_table {
+//         Some(table_pat) => {
+//             let pat = ppr.with_file_name(format!("*{}*",table_pat));
+//             let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
+//             if paths.len() < 1 {
+//                 println!("no cs table found that matches pattern! table will not be uploaded");
+//             }
+//             else{
+//                 upload_table(&paths[0]);
+//                 println!("cs table uploaded");
+//             }
+//         }
+//         None => {}
+//     };
+//     run_setup();
+// }
+
+
+
+// pub fn acquire_ppr(args:RunDirectoryArgs) -> Result<(),ScanControlError> {
+//     let ppr = args.path.to_owned();
+//     if !ppr.exists(){
+//         return Err(ScanControlError::PPRNotFound);
+//     }
+//     let mrd = ppr.with_extension("mrd");
+//     set_ppr(&ppr);
+//     set_mrd(&mrd);
+//     let cs_table_pattern = args.cs_table.unwrap_or(String::from("cs_table"));
+//     match utils::get_first_match(&ppr.parent().unwrap(), &cs_table_pattern) {
+//         Some(cs_table) => upload_table(&cs_table),
+//         None => println!("no cs table found that matches {}. No table will be uploaded",cs_table_pattern),
+//     }
+//     run_acquisition()?;
+//     Ok(())
+// }
+
+
+pub fn acquire_ppr(args:RunDirectoryArgs) -> Result<(),ScanControlError> {
+    // check to make sure we are not already running something before we start
+    if scan_busy()? {
+        return Err(ScanControlError::ScanBusy);
+    }
+    let cs_table_pattern = args.cs_table.unwrap_or(String::from("cs_table"));
+    let parent_dir = match args.path.is_dir(){
+        true => &args.path,
+        false => args.path.parent().ok_or(ScanControlError::InvalidPath)?
+    };
+    // upload a cs_table if it exists
+    match utils::get_first_match(parent_dir, &cs_table_pattern) {
+        Some(cs_table) => upload_table(&cs_table)?,
+        None => println!("no cs table found that matches {}. No table will be uploaded",cs_table_pattern),
+    }
+    let ppr = utils::get_first_match(parent_dir,"*.ppr").ok_or(ScanControlError::PPRNotFound)?;
     let mrd = ppr.with_extension("mrd");
-    set_ppr(&ppr);
-    match &args.cs_table {
-        Some(table_pat) => {
-            let pat = ppr.with_file_name(format!("*{}*",table_pat));
-            let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
-            if paths.len() < 1 {
-                println!("no cs table found that matches pattern! table will not be uploaded");
-            }
-            else{
-                upload_table(&paths[0]);
-                println!("cs table uploaded");
-            }
-        }
-        None => {}
-    };
-    set_mrd(&mrd);
-    run_acquisition();
+    set_ppr(&ppr)?;
+    set_mrd(&mrd)?;
+    VBScript::Run.run(None)?;
+    Ok(())
 }
 
+
+
+#[derive(Debug)]
 pub enum ScanControlError {
     PPRNotFound,
     ScanBusy,
     ScanStoppedUnexpectedly,
+    CScriptError,
+    StatusNotFound,
+    UnknownStatus,
+    InvalidPath,
+    CSTableNotFound,
+    CSTableTooLarge,
 }
 
 
 pub fn run_directory(args:RunDirectoryArgs) -> Result<(),ScanControlError>{
 
+    // find all pprs recursively from base path
     let ppr_files = utils::find_files(&args.path,"ppr",true).ok_or(ScanControlError::PPRNotFound)?;
-
-    let cs_table_pattern = args.cs_table.unwrap_or(String::from("cs_table"));
     let n_pprs = ppr_files.len();
 
+    // this is the pattern used to search for a cs table in the same dir as the ppr
+    let cs_table_pattern = args.cs_table.unwrap_or(String::from("cs_table"));
+
     // check to make sure we are not already running something before we start
-    if scan_busy() {
+    if scan_busy()? {
         println!("scan is currently active. Cannot continue");
         return Err(ScanControlError::ScanBusy);
     }
 
-    // loop thru all pprs and run them in acq mode
-    ppr_files.iter().enumerate().for_each(|(index,ppr)| {
+    for file_idx in 0..n_pprs {
+        let ppr = &ppr_files[file_idx];
+
         // upload a cs_table if it exists
         match utils::get_first_match(&ppr.parent().unwrap(), &cs_table_pattern) {
-            Some(cs_table) => upload_table(&cs_table),
+            Some(cs_table) => upload_table(&cs_table)?,
             None => println!("no cs table found that matches {}. No table will be uploaded",cs_table_pattern),
         }
-        println!("running ppr {} of {} ...",index+1,n_pprs);
-        set_ppr(&ppr);
-        set_mrd(&ppr.with_extension("mrd"));
-        run_acquisition();
+
+        // launch the ppr in acquisition mode
+        println!("running ppr {} of {} ...",file_idx+1,n_pprs);
+        set_ppr(&ppr)?;
+        set_mrd(&ppr.with_extension("mrd"))?;
+        VBScript::Run.run(None)?;
         thread::sleep(time::Duration::from_secs(2));
 
-        let err = loop {
-
-            if !scan_busy() && scan_complete() {
+        loop {
+            if scan_complete()? {
+                // scan is complete so we write an ac file and break
                 utils::write_to_file(&ppr,"ac",&format!("completion_date={}", utils::time_stamp()));
-                break Ok(());
-            }else if !scan_busy() && !scan_complete() {
-                break Err(ScanControlError::ScanStoppedUnexpectedly)
-            }
-            else if scan_busy() {
-                thread::sleep(time::Duration::from_secs(2))
+                break
+            }else if !scan_busy()? {
+                // if the scan isn't complete and not busy, something unexpected happened, so we will return an error
+                return Err(ScanControlError::ScanStoppedUnexpectedly);
             }
             else {
-                Err()
+                // here the scanner must be busy so we'll wait 2 seconds and check again
+                thread::sleep(time::Duration::from_secs(2))
             }
         };
+    }
 
+    // if we get here, the scan job is done and everything is presumed okay
     println!("acquisition complete");
-    }
-err
+    Ok(())
 }
 
-pub fn scan_busy() -> bool {
-    match scan_status(){
-        Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => true,
-        _=> false
+pub fn scan_busy() -> Result<bool,ScanControlError> {
+    match scan_status()?{
+        Status::AcquisitionInProgress | Status::SetupInProgress | Status::Running => Ok(true),
+        _=> Ok(false)
     }
 }
 
-pub fn scan_complete() -> bool {
-    match scan_status(){
-        Status::AcquisitionComplete => true,
-        _=> false
+pub fn scan_complete() -> Result<bool,ScanControlError> {
+    match scan_status()?{
+        Status::AcquisitionComplete => Ok(true),
+        _=> Ok(false)
     }
 }
 
 
 //196095
-pub fn upload_table(path_to_table:&Path){
-    let script = Path::new(DIR).join(UPLOAD_VBS);
-    let mut cmd = Command::new("cscript");
+pub fn upload_table(path_to_table:&Path) -> Result<(),ScanControlError>{
+
     if !path_to_table.exists(){
-        panic!("cannot find table: {:?}",path_to_table);
+        return Err(ScanControlError::CSTableNotFound)
     }
-    let mut table_string = String::new();
-    let mut f = File::open(path_to_table).expect("cannot open table");
-    f.read_to_string(&mut table_string).expect("cannot read table");
+
+    let table_string = utils::read_to_string(path_to_table,"");
+
     let lines = table_string.lines();
     let v:Vec<i32> = lines.flat_map(|line| line.parse()).collect();
     for x in v.iter() {
@@ -155,78 +232,72 @@ pub fn upload_table(path_to_table:&Path){
     }
     let v2:Vec<i16> = v.iter().map(|entry| *entry as i16).collect();
     if v2.len() > 196095 {
-        panic!("not enough memory for table");
+        return Err(ScanControlError::CSTableTooLarge)
     }
-    let out = cmd.args(vec![
-        script,
-        path_to_table.to_owned()
-    ]).output().expect("failed to launch cscript");
-    //let s = String::from_utf8(out.stdout).unwrap();
-    //println!("{}",s);
+
+    VBScript::UploadTable.run(Some(path_to_table))?;
+    Ok(())
 }
 
-pub fn set_ppr(path:&Path) -> bool {
-    let script = Path::new(DIR).join(SET_PPR_VBS);
-    let mut cmd = Command::new("cscript");
-    if !path.exists(){
-        println!("cannot find ppr file: {:?}",path);
-        return false
-    }
-    let out = cmd.args(vec![
-        script,
-        path.to_owned()
-    ]).output().expect("failed to launch cscript");
-    true
-}
+// pub fn set_ppr(path:&Path) -> bool {
+//     let script = Path::new(VBS_DIR).join(SET_PPR_VBS);
+//     let mut cmd = Command::new("cscript");
+//     if !path.exists(){
+//         println!("cannot find ppr file: {:?}",path);
+//         return false
+//     }
+//     let out = cmd.args(vec![
+//         script,
+//         path.to_owned()
+//     ]).output().expect("failed to launch cscript");
+//     true
+// }
 
-pub fn set_mrd(path:&Path) -> bool {
-    let script = Path::new(DIR).join(SET_MRD_VBS);
-    let mut cmd = Command::new("cscript");
-    let out = cmd.args(vec![
-        script,
-        path.to_owned()
-    ]).output().expect("failed to launch cscript");
-    true
-}
+// pub fn set_mrd(path:&Path) -> bool {
+//     let script = Path::new(VBS_DIR).join(SET_MRD_VBS);
+//     let mut cmd = Command::new("cscript");
+//     let out = cmd.args(vec![
+//         script,
+//         path.to_owned()
+//     ]).output().expect("failed to launch cscript");
+//     true
+// }
 
-pub fn run_setup() {
-    let stat = scan_status();
-    match stat {
-        Status::AcquisitionInProgress => println!("acquisition is already in progress. You must abort the scan first."),
-        Status::SetupInProgress => println!("setup is already in progress. You must abort the scan first."),
-        _=> {
-            let script = Path::new(DIR).join(SETUP_VBS);
-            let mut cmd = Command::new("cscript");
-            let out = cmd.args(vec![
-                script
-            ]).output().expect("failed to launch cscript");
-        }
-    }
-}
+// pub fn run_setup() {
+//     let stat = scan_status();
+//     match stat {
+//         Status::AcquisitionInProgress => println!("acquisition is already in progress. You must abort the scan first."),
+//         Status::SetupInProgress => println!("setup is already in progress. You must abort the scan first."),
+//         _=> {
+//             let script = Path::new(VBS_DIR).join(SETUP_VBS);
+//             let mut cmd = Command::new("cscript");
+//             let out = cmd.args(vec![
+//                 script
+//             ]).output().expect("failed to launch cscript");
+//         }
+//     }
+// }
 
-pub fn run_acquisition() {
-    let stat = scan_status();
-    match stat {
-        Status::AcquisitionInProgress => println!("acquisition is already in progress. You must abort the scan first."),
-        Status::SetupInProgress => println!("setup is in progress. You must abort the current scan first."),
-        _=> {
-            let script = Path::new(DIR).join(RUN_VBS);
-            let mut cmd = Command::new("cscript");
-            let out = cmd.args(vec![
-                script
-            ]).output().expect("failed to launch cscript");
-        }
-    }
-}
+// pub fn run_acquisition() -> Result<(),ScanControlError> {
+//
+//     use Status::*;
+//
+//     match scan_status() {
+//         AcquisitionInProgress | SetupInProgress => Err(ScanControlError::ScanBusy),
+//         _=> {
+//             let script = Path::new(VBS_DIR).join(RUN_VBS);
+//             let mut cmd = Command::new("cscript");
+//             cmd.args(vec![
+//                 script
+//             ]).output().expect("failed to launch cscript");
+//             Ok(())
+//         }
+//     }
+//
+// }
 
 
-pub fn abort() {
-    let script = Path::new(DIR).join(ABORT_VBS);
-    let mut cmd = Command::new("cscript");
-    let out = cmd.args(vec![
-        script
-    ]).output().expect("failed to launch cscript");
-}
+
 
 #[derive(Debug)]
 pub enum Status {
@@ -240,42 +311,105 @@ pub enum Status {
 }
 
 impl Status {
-    pub fn from_id(id:i32) -> Self {
+    pub fn from_id(id:i32) -> Result<Self,ScanControlError> {
         use Status::*;
         match id {
-            5 => Aborted,
-            2 => SetupInProgress,
-            3 => AcquisitionInProgress,
-            4 => AcquisitionComplete,
-            0 => Idle,
-            _=> Unknown
+            5 => Ok(Aborted),
+            2 => Ok(SetupInProgress),
+            3 => Ok(AcquisitionInProgress),
+            4 => Ok(AcquisitionComplete),
+            0 => Ok(Idle),
+            _=> Err(ScanControlError::UnknownStatus)
         }
     }
 }
 
-pub fn scan_status() -> Status {
-    let script = Path::new(DIR).join(STATUS_VBS);
-    let mut cmd = Command::new("cscript");
-    let out = cmd.args(vec![
-        script
-    ]).output().expect("failed to launch cscript");
-    let stdout = String::from_utf8(out.stdout).expect("failed to parse bytes");
-    let lines = stdout.lines();
-    let reg = Regex::new(r"status_id:([0-9])").unwrap();
-    let mut status = String::new();
-    lines.for_each(|line|{
-        //println!("{}",line);
-        let caps = reg.captures(line);
-        if caps.is_some(){
-            let stat:String = caps.unwrap().get(1).map_or("", |m| m.as_str()).to_string();
-            if !stat.is_empty(){
-                status = stat;
-            }
-        }
-    });
-    if status.is_empty(){
-        panic!("status not found!");
-    }
-    let id = status.parse().expect("unable to parse string");
-    Status::from_id(id)
+pub fn scan_status() -> Result<Status,ScanControlError> {
+    let stdout = VBScript::Status.run(None)?;
+    let reg = Regex::new(r"status_id:([0-9])").expect("invalid regex");
+    let caps = reg.captures(&stdout).ok_or(ScanControlError::StatusNotFound)?;
+    let stat_string = caps.get(1).map_or("", |m| m.as_str()).to_string();
+    let stat_id:i32 = stat_string.parse().or(Err(ScanControlError::StatusNotFound))?;
+    Ok(Status::from_id(stat_id)?)
 }
+
+pub fn abort() -> Result<(),ScanControlError> {
+    VBScript::Abort.run(None)?;
+    Ok(())
+}
+
+pub fn set_mrd(filepath:&Path) -> Result<(),ScanControlError> {
+    // the file path's parent should exist, otherwise scan will not know what to do
+    // also, the path needs to be absolute
+    let filepath = utils::absolute_path(filepath);
+    let mrd_dir = filepath.parent().ok_or(ScanControlError::InvalidPath)?;
+    if !mrd_dir.exists() {
+        return Err(ScanControlError::InvalidPath);
+    }
+    let mrd = filepath.with_extension("mrd");
+    VBScript::SetMrd.run(Some(&mrd))?;
+    Ok(())
+}
+
+pub fn set_ppr(filepath:&Path) -> Result<(),ScanControlError> {
+    let filepath = utils::absolute_path(filepath).with_extension("ppr");
+    if !filepath.exists(){
+        return Err(ScanControlError::InvalidPath);
+    }
+    VBScript::SetPPr.run(Some(&filepath))?;
+    Ok(())
+}
+
+
+pub fn setup_ppr(args:RunDirectoryArgs) -> Result<(),ScanControlError> {
+
+    // check to make sure we are not already running something before we start
+    if scan_busy()? {
+        return Err(ScanControlError::ScanBusy);
+    }
+    let cs_table_pattern = args.cs_table.unwrap_or(String::from("cs_table"));
+    let parent_dir = match args.path.is_dir(){
+        true => &args.path,
+        false => args.path.parent().ok_or(ScanControlError::InvalidPath)?
+    };
+    // upload a cs_table if it exists
+    match utils::get_first_match(parent_dir, &cs_table_pattern) {
+        Some(cs_table) => upload_table(&cs_table)?,
+        None => println!("no cs table found that matches {}. No table will be uploaded",cs_table_pattern),
+    }
+
+    let ppr = utils::get_first_match(parent_dir,"*.ppr").ok_or(ScanControlError::PPRNotFound)?;
+
+    set_ppr(&ppr)?;
+    VBScript::Setup.run(None)?;
+    Ok(())
+}
+
+
+
+// pub fn scan_status() -> Status {
+//     let script = Path::new(VBS_DIR).join(STATUS_VBS);
+//     let mut cmd = Command::new("cscript");
+//     let out = cmd.args(vec![
+//         script
+//     ]).output().expect("failed to launch cscript");
+//     let stdout = String::from_utf8(out.stdout).expect("failed to parse bytes");
+//     let lines = stdout.lines();
+//     let reg = Regex::new(r"status_id:([0-9])").unwrap();
+//     let mut status = String::new();
+//     lines.for_each(|line|{
+//         //println!("{}",line);
+//         let caps = reg.captures(line);
+//         if caps.is_some(){
+//             let stat:String = caps.unwrap().get(1).map_or("", |m| m.as_str()).to_string();
+//             if !stat.is_empty(){
+//                 status = stat;
+//             }
+//         }
+//     });
+//     if status.is_empty(){
+//         panic!("status not found!");
+//     }
+//     let id = status.parse().expect("unable to parse string");
+//     Status::from_id(id)
+// }

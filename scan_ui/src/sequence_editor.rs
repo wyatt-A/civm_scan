@@ -43,7 +43,7 @@ pub fn sequence_editor(ctx: &egui::Context,ui:&mut Ui,se:&mut SequenceEditor){
     let sequence_library = Path::new("./test_env/sequence_library");
 
     let config_names = se.config_names.get_or_insert_with(||{
-        let files = utils::find_files(sequence_library,"json").unwrap();
+        let files = utils::find_files(sequence_library,"json",true).unwrap();
         files.iter().map(|f| {
             let s = f.file_stem().unwrap();
             s.to_str().unwrap().to_string()

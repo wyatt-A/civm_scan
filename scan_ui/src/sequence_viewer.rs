@@ -132,7 +132,7 @@ pub fn sequence_viewer(ctx: &egui::Context,ui:&mut Ui,sv:&mut SequenceViewer){
         }
 
         let config_names = sv.config_names.get_or_insert_with(||{
-            let files = utils::find_files(sequence_library,"json").unwrap();
+            let files = utils::find_files(sequence_library,"json",true).unwrap();
             files.iter().map(|f| {
                 let s = f.file_stem().unwrap();
                 s.to_str().unwrap().to_string()

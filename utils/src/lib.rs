@@ -1,3 +1,4 @@
+use std::env::current_dir;
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{Write, Read};
@@ -7,7 +8,15 @@ use walkdir::WalkDir;
 use rustfft::{FftPlanner};
 use num_complex::Complex;
 use chrono::{DateTime,Local};
+use clean_path::{clean, Clean};
 
+
+pub fn absolute_path(path:&Path) -> PathBuf {
+    match path.is_absolute() {
+        true => path.clean().to_owned(),
+        false => current_dir().expect("unable to get current directory").join(path).clean()
+    }
+}
 
 pub fn date_stamp() -> String {
     let datetime: DateTime<Local> = SystemTime::now().into();

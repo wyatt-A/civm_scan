@@ -16,10 +16,6 @@ pub enum Action {
     SetMRD(PathArgs),
     /// get the status of the scan supervisor
     Status,
-    /// run in continuous setup mode with no data collection
-    RunSetup,
-    /// run the current ppr to generate a mrd file
-    RunScan,
     /// finds all pprs nested in the parent directory and runs them
     RunDirectory(RunDirectoryArgs),
     /// abort the scan

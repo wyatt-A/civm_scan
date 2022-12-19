@@ -49,7 +49,7 @@ impl ScoutViewPort {
     }
 
     pub fn find_raw_data(&mut self,scout_data_dir:&Path) -> Option<[PathBuf;3]>{
-        let raw_files = utils::find_files(scout_data_dir,"mrd");
+        let raw_files = utils::find_files(scout_data_dir,"mrd",true);
         match raw_files {
             Some(files) => {
                 if files.len() >= 3 {

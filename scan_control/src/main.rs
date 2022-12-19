@@ -9,37 +9,31 @@ fn main(){
 
     match args.action {
         Action::UploadTable(path_str) => {
-            upload_table(Path::new(&path_str.path))
+            upload_table(Path::new(&path_str.path)).unwrap()
         }
         Action::SetPPR(path_str) => {
             println!("Setting ppr ...");
-            set_ppr(Path::new(&path_str.path));
+            set_ppr(Path::new(&path_str.path)).unwrap();
         }
         Action::SetMRD(path_str) => {
             println!("Setting mrd ...");
-            set_mrd(Path::new(&path_str.path));
+            set_mrd(Path::new(&path_str.path)).unwrap();
         }
         Action::Status => {
-            let stat = scan_status();
+            let stat = scan_status().unwrap();
             println!("scan_status: {:?}",stat);
         }
-        Action::RunSetup => {
-            run_setup()
-        }
-        Action::RunScan => {
-            run_acquisition()
-        }
         Action::Abort => {
-            abort()
+            abort().unwrap()
         }
         Action::RunDirectory(args) => {
-            run_directory(args)
+            run_directory(args).unwrap()
         }
         Action::SetupPPR(args) => {
-            setup_ppr(args);
+            setup_ppr(args).unwrap()
         }
         Action::AcquirePPR(args) => {
-            acquire_ppr(args)
+            acquire_ppr(args).unwrap()
         }
     }
 }
