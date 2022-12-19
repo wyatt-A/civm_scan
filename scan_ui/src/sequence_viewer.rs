@@ -138,9 +138,7 @@ pub fn sequence_viewer(ctx: &egui::Context,ui:&mut Ui,sv:&mut SequenceViewer){
                 s.to_str().unwrap().to_string()
             }).collect()
         });
-
-
-
+        
         egui::ComboBox::from_label("")
             .selected_text(format!("{}", sv.selected_sequence.clone().unwrap_or(String::from("None"))))
             .show_ui(ui, |ui| {

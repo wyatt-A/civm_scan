@@ -84,9 +84,10 @@ fn sinc(amplitude:f32,n_lobes:u16,n_samples:usize) -> Vec<f32> {
     let n:Vec<f32> = (0..n_samples).map(|i| i as f32).collect();
     let args:Vec<f32> = n.iter().map(|i| pi*lobe_val*((i-nsamp_over_2)/nsamp_over_2)).collect();
     args.iter().map(|i|
-        match i {
-            0.0 => amplitude,
-            _=> amplitude*(i.sin()/i)
+        if *i == 0.0 {
+            amplitude
+        }else {
+            amplitude*(i.sin()/i)
         }
     ).collect()
 }

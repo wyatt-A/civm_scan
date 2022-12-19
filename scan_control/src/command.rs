@@ -1,16 +1,13 @@
-#![feature(absolute_path)]
-use std::fs::File;
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{thread,time};
-use std::time::SystemTime;
 use regex::Regex;
-use glob::glob;
-use chrono::{DateTime,Local};
 use utils;
-
+use cs_table::cs_table::CSTable;
+use cs_table::cs_table::MAX_TABLE_ELEMENTS;
 use crate::args::*;
+
+
 
 const VBS_DIR:&str = "C:/workstation/civm_scan/vb_script";
 
@@ -213,91 +210,17 @@ pub fn scan_complete() -> Result<bool,ScanControlError> {
     }
 }
 
-
-//196095
 pub fn upload_table(path_to_table:&Path) -> Result<(),ScanControlError>{
-
     if !path_to_table.exists(){
         return Err(ScanControlError::CSTableNotFound)
     }
-
-    let table_string = utils::read_to_string(path_to_table,"");
-
-    let lines = table_string.lines();
-    let v:Vec<i32> = lines.flat_map(|line| line.parse()).collect();
-    for x in v.iter() {
-        if *x > i16::MAX as i32 {
-            panic!("detected value larger than max int16: {}",*x);
-        }
-    }
-    let v2:Vec<i16> = v.iter().map(|entry| *entry as i16).collect();
-    if v2.len() > 196095 {
+    let table = CSTable::open(path_to_table);
+    if table.n_elements() > MAX_TABLE_ELEMENTS {
         return Err(ScanControlError::CSTableTooLarge)
     }
-
     VBScript::UploadTable.run(Some(path_to_table))?;
     Ok(())
 }
-
-// pub fn set_ppr(path:&Path) -> bool {
-//     let script = Path::new(VBS_DIR).join(SET_PPR_VBS);
-//     let mut cmd = Command::new("cscript");
-//     if !path.exists(){
-//         println!("cannot find ppr file: {:?}",path);
-//         return false
-//     }
-//     let out = cmd.args(vec![
-//         script,
-//         path.to_owned()
-//     ]).output().expect("failed to launch cscript");
-//     true
-// }
-
-// pub fn set_mrd(path:&Path) -> bool {
-//     let script = Path::new(VBS_DIR).join(SET_MRD_VBS);
-//     let mut cmd = Command::new("cscript");
-//     let out = cmd.args(vec![
-//         script,
-//         path.to_owned()
-//     ]).output().expect("failed to launch cscript");
-//     true
-// }
-
-// pub fn run_setup() {
-//     let stat = scan_status();
-//     match stat {
-//         Status::AcquisitionInProgress => println!("acquisition is already in progress. You must abort the scan first."),
-//         Status::SetupInProgress => println!("setup is already in progress. You must abort the scan first."),
-//         _=> {
-//             let script = Path::new(VBS_DIR).join(SETUP_VBS);
-//             let mut cmd = Command::new("cscript");
-//             let out = cmd.args(vec![
-//                 script
-//             ]).output().expect("failed to launch cscript");
-//         }
-//     }
-// }
-
-// pub fn run_acquisition() -> Result<(),ScanControlError> {
-//
-//     use Status::*;
-//
-//     match scan_status() {
-//         AcquisitionInProgress | SetupInProgress => Err(ScanControlError::ScanBusy),
-//         _=> {
-//             let script = Path::new(VBS_DIR).join(RUN_VBS);
-//             let mut cmd = Command::new("cscript");
-//             cmd.args(vec![
-//                 script
-//             ]).output().expect("failed to launch cscript");
-//             Ok(())
-//         }
-//     }
-//
-// }
-
-
-
 
 #[derive(Debug)]
 pub enum Status {

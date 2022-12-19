@@ -245,7 +245,7 @@ pub trait Build {
 
     fn is_valid(&self) -> (bool,Option<String>) {
         match self.ppl(Path::new("dummy_path"),false,false) {
-            Ok(ppl) => (true,None),
+            Ok(_) => (true,None),
             Err(e) => {
                 (false,Some(format!("event queue error! {:?}",e)))
             }
@@ -333,19 +333,17 @@ pub trait Build {
 }
 
 // s/mm^2 -> dac
-pub fn b_val_to_dac(pulse: DiffusionPulseShape, b_val:f32, delta:f32, Delta:f32, direction:(f32, f32, f32)) -> (i16, i16, i16) {
-    let g = b_val_to_grad(pulse,b_val,delta,Delta);
+pub fn b_val_to_dac(pulse: DiffusionPulseShape, b_val:f32, delta:f32, big_delta:f32, direction:(f32, f32, f32)) -> (i16, i16, i16) {
+    let g = b_val_to_grad(pulse,b_val,delta,big_delta);
     let grad_vec = grad_to_grad_vec(g,direction); // T/mm
     (tesla_per_mm_to_dac(grad_vec.0),tesla_per_mm_to_dac(grad_vec.1),tesla_per_mm_to_dac(grad_vec.2))
 }
 
 // s/mm^2 -> T/mm
-pub fn b_val_to_grad(pulse: DiffusionPulseShape, b_val:f32, delta:f32, Delta:f32) -> f32 {
-    //gp = sqrt(bval*pi^2*delta^(-2)*gamma^(-2)*(4*Delta - delta)^(-1))
-    //let gamma:f32 = 267.52218744E6;
+pub fn b_val_to_grad(pulse: DiffusionPulseShape, b_val:f32, delta:f32, big_delta:f32) -> f32 {
     match pulse {
         DiffusionPulseShape::HalfSin => {
-            (b_val*PI.powi(2)*delta.powi(-2)*GAMMA.powi(-2)*(4.0*Delta - delta).powi(-1)).sqrt()
+            (b_val*PI.powi(2)*delta.powi(-2)*GAMMA.powi(-2)*(4.0*big_delta - delta).powi(-1)).sqrt()
         }
     }
 }

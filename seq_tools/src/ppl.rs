@@ -1,10 +1,4 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use encoding::all::ISO_8859_1;
-use encoding::{DecoderTrap, EncoderTrap, Encoding};
-use regex::Regex;
+use std::path::{Path};
 use serde::{Deserialize, Serialize};
 use crate::command_string::CommandString;
 use crate::acq_event::SpectralWidth;
@@ -13,9 +7,7 @@ use crate::ppl_function;
 use crate::_utils;
 use crate::rf_frame::RF_MAX_DAC;
 use crate::seqframe::{FrameType, RF_SEQ_FILE_LABEL, GRAD_SEQ_FILE_LABEL};
-use crate::seqframe::FrameType::Grad;
 use crate::gradient_matrix::{LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, LONG_TEMPVAL_VAR_NAME, LUT_INDEX_VAR_NAME};
-use crate::pulse_function::Function;
 use crate::grad_cal;
 
 const CIVM_INCLUDE:&str = r"C:\workstation\SequenceTools\CivmSequenceTools_v1.0\civm_var_20_long.PPH";
@@ -27,11 +19,6 @@ const STD_GRAD_SEQ:&str = r"c:\smis\seqlib\g3040_15.seq";
 const LUT_INCLUDE:&str = r"C:\smis\include\lututils.pph";
 
 const CALC_MATRIX:&str = "c_calc_mat";
-
-// 92456, 101857, 92456, 112634
-const GRAD_X:i32 = 101857;
-const GRAD_Y:i32 = 92456;
-const GRAD_Z:i32 = 112634;
 
 const SPECTRAL_WIDTH_VAR:&str = "sample_period";
 const GRAD_STRENGTH_VAR:&str = "grad_var";
@@ -344,19 +331,12 @@ impl Declarations {
 
 pub struct Initializations {
     block_initializations:Vec<String>,
-    temp_vars:Vec<String>
 }
 
 impl Initializations {
     pub fn default(event_queue:&EventQueue) -> Self {
         Self {
             block_initializations:event_queue.ppl_initializations().iter().map(|cmd| cmd.commands.clone()).collect(),
-            temp_vars:vec![
-                format!("{} = 0;",LUT_TEMPVAL_VAR_NAME_1),
-                format!("{} = 0;",LUT_TEMPVAL_VAR_NAME_2),
-                format!("{} = 0L;",LONG_TEMPVAL_VAR_NAME),
-                format!("{} = 0L;",LUT_INDEX_VAR_NAME)
-            ]
         }
     }
     pub fn print(&self) -> String {
@@ -416,7 +396,7 @@ impl PPL {
             declarations:Declarations::default(&event_queue),
             initializations:Initializations::default(&event_queue),
             setup:Setup{grad_clock,orientation,phase_unit},
-            loop_structure:event_queue.flat_loop_structure(repetitions,averages,rep_time,acceleration),
+            loop_structure:event_queue.flat_loop_structure(repetitions,averages,rep_time,acceleration).unwrap(),
             simulate
         })
     }
@@ -794,25 +774,23 @@ impl CalcBlock {
 pub struct FlatLoopStructure {
     outer:Loop,
     inner:Loop,
-    rep_time:f32,
     calc_block:CalcBlock,
     exec_block:Vec<CommandString>
 }
 
 impl FlatLoopStructure {
-    pub fn new(repetitions:u32, averages:u16, rep_time:f32, event_queue:&mut EventQueue,acceleration:u16) -> Self {
+    pub fn new(repetitions:u32, averages:u16, rep_time:f32, event_queue:&mut EventQueue,acceleration:u16) -> Result<Self,EventQueueError> {
         // lock in events in the event queue so timing is accurate
         let calc_block = CalcBlock::new(event_queue.export_calc_blocks());
         let calc_time = calc_block.duration_clocks();
         let loop_time = FlatLoopStructure::loop_waittimer();
-        event_queue.set_rep_time(rep_time,loop_time,calc_time);
-        Self {
+        event_queue.set_rep_time(rep_time,loop_time,calc_time)?;
+        Ok(Self {
             outer:Loop::Repetition(repetitions,acceleration),
             inner:Loop::Average(averages),
-            rep_time,
             calc_block,
             exec_block:event_queue.export_exec_blocks() // rep time must be set before exporting execs
-        }
+        })
     }
     fn loop_waittimer() -> i32 {
         500

@@ -1,9 +1,6 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use crate::rf_frame::RfFrame;
-use crate::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfState, RfStateType};
+use crate::rf_state::{RfState, RfStateType};
 use crate::command_string::CommandString;
-use crate::pulse::{CompositeHardpulse, Pulse};
 use crate::_utils;
 use crate::execution::{ExecutionBlock, WaveformData, PlotTrace, BlockExecution, EventType};
 use crate::ppl_function;
@@ -146,7 +143,7 @@ impl<RF: 'static> ExecutionBlock for RfEvent<RF> where RF:RfFrame + Clone{
         true
     }
 
-    fn render_magnitude(&self, time_step_us: usize, driver_value: u32) -> WaveformData {
+    fn render_magnitude(&self, time_step_us: usize, _driver_value: u32) -> WaveformData {
         let power = self.rf_state.power();
         match power {
             RfStateType::Static(dac) => {

@@ -1,7 +1,6 @@
 use crate::pulse::{HalfSin, Pulse, Trapezoid};
 use crate::pulse_function::Function;
 use crate::seqframe::{self, SeqFrame, FrameType, SeqFrameExpression};
-use crate::_utils;
 
 const GRAD_MAX_DAC:i16 = 32767;
 

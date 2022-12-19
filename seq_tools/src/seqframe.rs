@@ -1,10 +1,9 @@
 use encoding::{Encoding, EncoderTrap};
 use encoding::all::ISO_8859_1;
-use std::path::{Path,PathBuf};
-use crate::_utils;
+use std::path::{Path};
 use std::io::Write;
 use std::fs::File;
-use crate::pulse_function::{Function, FunctionParams};
+use crate::pulse_function::{Function};
 
 const CLOCK_PERIOD_NS:usize = 100;
 const GRAD_CLOCK_MULTIPLIER:usize = 20; // this means that the gradient clock period is 2 us
@@ -139,74 +138,6 @@ impl SeqFrameExpression for Function {
         }
     }
 }
-
-// #[derive(Copy,Clone)]
-// pub struct FunctionParams {
-//     n_samples:usize,
-//     max_dac:i16
-// }
-//
-// impl FunctionParams{
-//     pub fn new(n_samples:usize,max_dac:i16) -> Self {
-//         Self {
-//             n_samples,
-//             max_dac
-//         }
-//     }
-// }
-//
-// pub enum Function {
-//     RampUp(FunctionParams),
-//     RampDown(FunctionParams),
-//     HalfSin(FunctionParams),
-//     Plateau(FunctionParams),
-//     Sinc(u16,FunctionParams)
-// }
-
-
-
-
-
-
-// impl Expression {
-//
-//     pub fn ramp_up(n_samples:usize,max_dac:i16) -> Expression {
-//         Expression {
-//             n_samples,
-//             text: format!("ramp(0,{})",max_dac)
-//         }
-//     }
-//
-//     pub fn ramp_down(n_samples:usize,max_dac:i16) -> Expression {
-//         Expression {
-//             n_samples,
-//             text: format!("ramp({},0)",max_dac)
-//         }
-//     }
-//
-//     pub fn half_sin(n_samples:usize,max_dac:i16) -> Expression{
-//         Expression {
-//             n_samples,
-//             text: format!("{}*sin(PI*(Ñ/({}-1)))",max_dac,n_samples)
-//         }
-//     }
-//
-//     pub fn plateau(n_samples:usize,max_dac:i16) -> Expression{
-//         Expression {
-//             n_samples,
-//             text: format!("{}",max_dac)
-//         }
-//     }
-//
-//     pub fn sinc(n_lobes:u8,n_samples:usize,max_dac:i16) -> Expression{
-//         let lobes = if n_lobes%2 == 0 {n_lobes+1} else {n_lobes};
-//         let lobe_val = (lobes + 1)/2;
-//         Expression {
-//             n_samples,
-//             text: format!("{}*sinc(PI*{}*((Ñ-({}/2))/({}/2)))",max_dac,lobe_val,n_samples,n_samples)
-//         }
-//     }
-// }
 
 #[derive(Debug)]
 pub struct SeqFrame {

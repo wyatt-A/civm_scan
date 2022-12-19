@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 use rustfft::{FftPlanner};
 use num_complex::Complex;
 use chrono::{DateTime,Local};
-use clean_path::{clean, Clean};
+use clean_path::{Clean};
 
 
 pub fn absolute_path(path:&Path) -> PathBuf {

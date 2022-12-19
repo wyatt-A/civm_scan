@@ -1,9 +1,7 @@
-use std::borrow::BorrowMut;
 use std::rc::Rc;
 use crate::execution::{ExecutionBlock, WaveformData, EventType};
 use crate::ppl_function::MIN_DELAY_CLOCKS;
 use serde::{Serialize};
-use serde_json;
 use crate::command_string::CommandString;
 use crate::ppl::{FlatLoopStructure, Adjustment};
 use crate::_utils;
@@ -16,7 +14,6 @@ use crate::acq_event::SpectralWidth;
 pub struct Event {
     pub execution:Box<dyn ExecutionBlock>,
     center:i32,
-    is_origin:bool,
     label:String,
     unique_label:String, // unique label in case duplicate execution block is run
     post_delay:i32
@@ -63,15 +60,10 @@ impl Event {
             }
         };
         println!("event center for {} set to {}", exec_block.label(), _utils::clock_to_sec(center));
-        let is_origin = match &placement {
-            Origin => true,
-            _ => false
-        };
         let label = exec_block.label();
         Rc::new(RefCell::new(Self {
             execution:exec_block,
             center,
-            is_origin,
             label:label.clone(),
             unique_label:label.clone(),
             post_delay:MIN_DELAY_CLOCKS
@@ -205,9 +197,10 @@ impl EventQueue {
         Ok(())
     }
     /** Sets the rep time and all other event post-delay properties */
-    pub fn set_rep_time(&mut self,rep_time:f32,loop_time:i32,calc_time:i32){
-        self.set_post_delay();
-        self.set_tr_makeup(rep_time,loop_time,calc_time);
+    pub fn set_rep_time(&mut self,rep_time:f32,loop_time:i32,calc_time:i32) -> Result<(),EventQueueError>{
+        self.set_post_delay()?;
+        self.set_tr_makeup(rep_time,loop_time,calc_time)?;
+        Ok(())
     }
     /** Sets the post-delays for every event except the last, which needs special attention */
     fn set_post_delay(&mut self) -> Result<(),EventQueueError> {
@@ -219,8 +212,8 @@ impl EventQueue {
             println!("end of {}:{} -> start of {}:{}",this_label,this_end,next_label,next_start);
             let difference = next_start - this_end;
             if difference < 0 {
-                return Err(EventQueueError::EventCollison(format!("end of {}:{} -> start of {}:{}",this_label,this_end,next_label,next_start)));
                 println!("there is something wrong with event placement. Has the queue been solved?");
+                return Err(EventQueueError::EventCollison(format!("end of {}:{} -> start of {}:{}",this_label,this_end,next_label,next_start)));
             }
             self.events[i].as_ref().borrow_mut().set_post_delay(difference);
         }
@@ -246,7 +239,7 @@ impl EventQueue {
     // if there are 4 acq events, there is assumed to be 4 echos, so the view count needs to be incrementd
     // by 4 at the end of the loop. We also need to check the condition that the total number of view is a multple
     // of the number of echos in the view loop
-    pub fn flat_loop_structure(&mut self,repetitions:u32,averages:u16,rep_time:f32,acceleration:u16) -> FlatLoopStructure {
+    pub fn flat_loop_structure(&mut self,repetitions:u32,averages:u16,rep_time:f32,acceleration:u16) -> Result<FlatLoopStructure,EventQueueError> {
         FlatLoopStructure::new(repetitions,averages,rep_time,self,acceleration)
     }
     pub fn ppl_user_adjustments(&self) -> Option<Vec<Adjustment>> {

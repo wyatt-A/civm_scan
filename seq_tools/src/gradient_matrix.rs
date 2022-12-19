@@ -11,7 +11,6 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::command_string::{CommandString, Command};
 use crate::ppl::{AVERAGES_LOOP_COUNTER_VAR, Adjustment, VIEW_LOOP_COUNTER_VAR};
 
 pub const LONG_TEMPVAL_VAR_NAME:&str = "tempval_long";
@@ -113,7 +112,7 @@ pub enum Dimension{
 }
 
 impl EncodeStrategy {
-    pub fn dac_value(&self,driver_val:u32,matrix:&Matrix,trans:LinTransform,default_dac:DacValues,echo_index:usize) -> DacValues {
+    pub fn dac_value(&self,driver_val:u32,trans:LinTransform,default_dac:DacValues,echo_index:usize) -> DacValues {
         match self {
             EncodeStrategy::FullySampled(dim,size1,size2) => {
                 match dim {
@@ -475,7 +474,7 @@ impl Matrix {
             MatrixType::Driven(driver, transform, dac_values) => {
                 match &driver.kind {
                     MatrixDriverType::PhaseEncode(strategy) => {
-                        strategy.dac_value(driver_value, &self, *transform, *dac_values, driver.echo_index)
+                        strategy.dac_value(driver_value, *transform, *dac_values, driver.echo_index)
                     }
                 }
             }

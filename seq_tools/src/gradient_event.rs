@@ -1,17 +1,10 @@
-use std::cell::RefCell;
-use std::process::Command;
-use std::rc::Rc;
 use crate::gradient_frame::GradFrame;
-use crate::gradient_list::GradList;
-use crate::gradient_matrix::{Matrix, DacValues, MatrixType, MatrixDriver, MatrixDriverType, EncodeStrategy, LinTransform};
-use crate::pulse::Trapezoid;
+use crate::gradient_matrix::{Matrix, MatrixType};
 use crate::command_string::CommandString;
 use crate::event_block::GradEventType;
-use crate::execution::{ExecutionBlock, WaveformData, PlotTrace, BlockExecution, EventType};
+use crate::execution::{ExecutionBlock, WaveformData, BlockExecution, EventType};
 use crate::ppl_function;
 use crate::_utils;
-use crate::resource::Resource;
-use crate::gradient_matrix::MatrixDriverType::PhaseEncode;
 use crate::ppl::Adjustment;
 use crate::seqframe::{GRAD_SEQ_FILE_LABEL, SeqFrame};
 
@@ -282,11 +275,9 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
         // only applies to matrices of type driven and derived
         let set_matrix_vars = match self.matrix.kind(){
             MatrixType::Driven(_,_,_) | MatrixType::Derived(_,_) | MatrixType::Static(_) => Some(self.matrix.set_vars()),
-            _ => None
         };
         let create_matrix = match self.matrix.kind(){
             MatrixType::Driven(_,_,_) | MatrixType::Derived(_,_) | MatrixType::Static(_) => Some(self.matrix.create_matrix()),
-            _ => None
         };
         let mut cmds = Vec::<String>::new();
 

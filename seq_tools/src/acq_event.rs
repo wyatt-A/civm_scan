@@ -2,17 +2,9 @@ use crate::execution::{BlockExecution, ExecutionBlock, PlotTrace, WaveformData, 
 use crate::command_string::CommandString;
 use crate::rf_state::{RfState, RfStateType};
 use crate::{ppl_function, _utils};
-use crate::pulse_function::{Function,FunctionParams};
 use crate::ppl::Adjustment;
 use crate::grad_cal;
-use crate::pulse::Trapezoid;
-use crate::gradient_event::GradEvent;
-use std::cell::RefCell;
-use std::rc::Rc;
 use serde::{Deserialize, Serialize};
-use crate::gradient_matrix::{Matrix, DacValues};
-use crate::event_block::GradEventType;
-use crate::_utils::sec_to_clock;
 
 // time allocated for setting reciever phase
 const TIME_BLOCK_1:i32 = 500;
@@ -23,11 +15,6 @@ const TIME_BLOCK_2:i32 = 500;
 
 const NO_SAMPLES_VAR:&str = "no_samples";
 const SAMPLE_PERIOD_VAR:&str = "sample_period";
-const NO_DISCARD_VAR:&str = "no_discard";
-const MIN_DISCARD:u16 = 0;
-const MAX_DISCARD:u16 = 16;
-const MIN_SAMPLES:u16 = 8;
-const MAX_SAMPLES:u16 = 65535;
 
 #[derive(Clone,PartialEq,Serialize,Deserialize)]
 pub enum SpectralWidth {
@@ -169,23 +156,23 @@ impl ExecutionBlock for AcqEvent {
         self.label.clone()
     }
     fn render_normalized(&self, time_step_us:usize) -> WaveformData {
+        let _ = time_step_us;
         let step = _utils::clock_to_sec(self.sample_period_clocks());
         let n = self.n_samples();
         let t:Vec<f32> = (0..n).map(|x| x as f32 * step).collect();
         let a:Vec<f32> = vec![1.0;n as usize];
         WaveformData::Acq(PlotTrace::new(t,a))
     }
-
     fn kind(&self) -> EventType {
         EventType::Acq(self.sample_rate.clone(),self.n_samples,self.n_discards)
     }
     fn blocking(&self) -> bool {
         true
     }
-    fn seq_params(&self, sample_period_us: usize) -> Option<String> {
+    fn seq_params(&self, _sample_period_us: usize) -> Option<String> {
         None
     }
-    fn render_magnitude(&self, time_step_us: usize, driver_value: u32) -> WaveformData {
+    fn render_magnitude(&self, time_step_us: usize, _driver_value: u32) -> WaveformData {
         self.render_normalized(time_step_us)
     }
 }

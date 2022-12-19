@@ -1,4 +1,4 @@
-use clap::{Parser,Arg,Subcommand};
+use clap::{Parser};
 use std::path::Path;
 use scan_control::command::*;
 use scan_control::args::*;

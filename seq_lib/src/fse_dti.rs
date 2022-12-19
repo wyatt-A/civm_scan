@@ -60,8 +60,8 @@ impl CompressedSense for FseDtiParams {
     }
     fn set_cs_table(&mut self) {
         let n_reps = CSTable::open(
-            &self.cs_table().unwrap(),
-            self.samples.1 as i16,self.samples.2 as i16)
+            &self.cs_table().unwrap()
+        )
             .n_views() as u32/self.view_acceleration as u32;
         self.n_repetitions = n_reps;
     }

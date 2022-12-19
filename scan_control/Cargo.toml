@@ -11,3 +11,4 @@ clap = { version = "4.0.18", features = ["derive"] }
 glob = "0.3.0"
 chrono = "0.4.23"
 utils = {path = "../utils"}
+cs_table = {path="../cs_table"}

@@ -133,11 +133,11 @@ fn zero_fill(array:&Array2::<Complex<f32>>,
              dims:(usize,usize,usize),
              dummy_excitations:usize,
              view_acceleration:usize) ->  Array3::<Complex<f32>>{
-    let cs_table = CSTable::open(cs_table,dims.1 as i16,dims.2 as i16);
+    let cs_table = CSTable::open(cs_table);
     let mut zf_arr = Array4::<f32>::zeros([dims.2,dims.1,dims.0,2]);
     let mut zf_arr = Array3::<Complex<f32>>::zeros([dims.2,dims.1,dims.0]);
 
-    let indices = cs_table.indices(dummy_excitations*view_acceleration);
+    let indices = cs_table.indices(dummy_excitations*view_acceleration,[dims.1 as i16,dims.2 as i16]);
     // scan the indices to make sure non are out of range.
 
     // the min index must be 0, and the max must be dim - 1 (if they are off by one we will attempt a correction with an offset)
@@ -154,13 +154,12 @@ fn zero_fill(array:&Array2::<Complex<f32>>,
         }
     }
 
-    for (i,index) in cs_table.indices(dummy_excitations*view_acceleration).iter().enumerate() {
+    for (i,index) in cs_table.indices(dummy_excitations*view_acceleration,[dims.1 as i16,dims.2 as i16]).iter().enumerate() {
         let mut zf_slice = zf_arr.slice_mut(s![(index.0+offset.0) as usize,(index.1+offset.1) as usize,..]);
         zf_slice += &array.slice(s![i,..]);
     }
     zf_arr
 }
-
 
 
 

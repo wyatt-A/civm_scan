@@ -2,11 +2,11 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
+pub const MAX_TABLE_ELEMENTS:usize = 196095;
 
 pub struct CSTable {
     source:PathBuf,
     elements:Vec<i16>,
-    matrix_size:(i16,i16)
 }
 
 pub struct KspaceCoord {
@@ -15,11 +15,10 @@ pub struct KspaceCoord {
 }
 
 impl CSTable {
-    pub fn open(source: &Path,n_phase1:i16,n_phase2:i16) -> Self {
+    pub fn open(source: &Path) -> Self {
         if !source.exists() {
             panic!("cs table not found!");
         }
-
         let mut s = String::new();
         let mut f = File::open(&source).expect("cannot open file");
         f.read_to_string(&mut s).expect("cannot read from file");
@@ -28,7 +27,6 @@ impl CSTable {
         Self {
             source:source.to_owned(),
             elements:e,
-            matrix_size:(n_phase1,n_phase2)
         }
     }
 
@@ -57,9 +55,9 @@ impl CSTable {
         coords
     }
 
-    pub fn indices(&self,read_element_offset:usize) -> Vec<(i16,i16)> {
-        let phase_off = self.matrix_size.0/2 as i16;
-        let slice_off = self.matrix_size.1/2 as i16;
+    pub fn indices(&self,read_element_offset:usize,matrix_size:[i16;2]) -> Vec<(i16,i16)> {
+        let phase_off = matrix_size[0]/2;
+        let slice_off = matrix_size[1]/2;
         self.coordinates(read_element_offset).iter().map(|coord| (coord.k_phase + phase_off,coord.k_slice + slice_off)).collect()
     }
 
@@ -78,23 +76,4 @@ impl CSTable {
 pub trait CompressedSensing {
     fn set_cs_table(&mut self);
     fn cs_table(&self) -> PathBuf;
-}
-
-#[test]
-fn test() {
-    let table = r"C:\workstation\data\petableCS_stream\stream_CS480_8x_pa18_pb54";
-
-    let table_path = Path::new(table);
-
-    let mut s = String::new();
-
-    let mut f = File::open(table_path).expect("cannot open file");
-    f.read_to_string(&mut s).expect("cannot read from file");
-
-    // we are expecting a list of integers
-
-    let nums:Vec<i16> = s.lines().flat_map(|line| line.parse()).collect();
-
-    //let mut coords = Vec::<Coordinate>::new();
-
 }

@@ -1,5 +1,4 @@
-use crate::gradient_matrix::{LUT_INDEX_VAR_NAME, LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, LONG_TEMPVAL_VAR_NAME, DriverVar};
-use crate::command_string::{CommandString,Command};
+use crate::gradient_matrix::{LUT_INDEX_VAR_NAME, LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, DriverVar};
 use crate::ppl::{Adjustment, VIEW_LOOP_COUNTER_VAR};
 
 #[derive(Clone,Debug)]
@@ -177,7 +176,6 @@ impl RfState {
                             PhaseCycleStrategy::CycleCPMG(acceleration) => {
                                 format!("{} = 400*(2*(({}/{}+{})%2)+1);",self.phase_var(),&driver.driver_var,acceleration,driver.echo_index)
                             }
-                            _=> "phase cycle strategy not implemented yet".to_owned()
                         }
                     }
                     _=> "driver not implemented yet".to_owned()
