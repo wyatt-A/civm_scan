@@ -1,17 +1,16 @@
 /*
     Here we are implementing adjustment calculations
  */
-
 use std::path::{Path, PathBuf};
 use mr_data::mrd::MRData;
 use seq_lib::one_pulse::OnePulseParams;
 use seq_lib::pulse_sequence::{AdjustmentResults, Initialize};
 use utils;
-use ndarray::{s,Array6,Order};
+use ndarray::{s,Order};
 use seq_lib::rfcal::RfCalParams;
-use serde::{Serialize,Deserialize};
 use crate::build;
 use scan_control;
+use scan_control::command::ScanControlError;
 use crate::build::ContextParams;
 
 pub const RF_CAL_DIRNAME:&str = "rf";
@@ -65,14 +64,14 @@ impl Adjustment {
         let view = slice.to_shape((n_samples,Order::RowMajor)).expect("incorrect shape for array").to_vec();
 
         // get peak location of the freq spectrum
-        let mut ft = utils::complex_abs(&utils::fft_shift(&utils::fft(&view,view.len())));
+        let ft = utils::complex_abs(&utils::fft_shift(&utils::fft(&view,view.len())));
         let idx = utils::arg_max(&ft);
         // convert to freq offset
         let hz_per_sample = params.spectral_width.hertz() as f32/n_samples as f32;
         let dc_sample = n_samples/2 + 1;
         let obs_offset = (idx as f32 - dc_sample as f32) * hz_per_sample;
 
-        let mut freq_axis:Vec<f64> = (0..ft.len()).map(|idx|hz_per_sample as f64 * idx as f64).collect();
+        let freq_axis:Vec<f64> = (0..ft.len()).map(|idx|hz_per_sample as f64 * idx as f64).collect();
         //freq_axis.rotate_right(ft.len()/2);
 
         let plot_points:Vec<[f64;2]> = ft.iter().enumerate().map(|(idx,y)|{
@@ -136,7 +135,7 @@ impl Adjustment {
         }).collect();
         (dac_vs_signal_difference,dac_seconds)
     }
-    pub fn run(&self) {
+    pub fn run(&self) -> Result<(),ScanControlError> {
         // proper rf calibration depends on a frequency calibration being performed
         // run the frequency calibration routine
         let params = build::load_adj_params(&self.freq_cal_config).expect("cannot load parameters");
@@ -146,7 +145,7 @@ impl Adjustment {
             path: self.freq_cal_dir.clone(),
             cs_table: None,
             depth_to_search: Some(0)
-        });
+        })?;
 
         // analyze the results
         let (freq_spec,freq_offset) = self.calc_freq_offset();
@@ -160,7 +159,7 @@ impl Adjustment {
             path: self.rf_cal_dir.clone(),
             cs_table: None,
             depth_to_search: Some(0)
-        });
+        })?;
 
         let (signal_difference,rf_dac_secs) = self.calc_rf_dac_seconds();
 
@@ -170,6 +169,6 @@ impl Adjustment {
             freq_spectrum:freq_spec,
             rf_cal_spin_vs_stim:signal_difference
         }.to_file(&self.results_file);
-
+        Ok(())
     }
 }

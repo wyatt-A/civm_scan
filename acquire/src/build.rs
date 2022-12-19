@@ -1,10 +1,8 @@
 use std::collections::HashMap;
-use std::f32::consts::PI;
 use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use cs_table::cs_table::CSTable;
-use seq_lib::pulse_sequence::{Build, SequenceParameters, DiffusionWeighted, CompressedSense, Setup, DWSequenceParameters, Initialize, AcqDims, ScoutConfig, AdjustmentParameters, SequenceLoadError};
+use seq_lib::pulse_sequence::{Build, SequenceParameters, DWSequenceParameters, Initialize, AcqDims, ScoutConfig, AdjustmentParameters, SequenceLoadError};
 use headfile::headfile::Headfile;
 use dyn_clone::clone_box;
 use encoding::all::ISO_8859_1;
@@ -18,9 +16,7 @@ use seq_lib::multi_echo_2d::Me2DParams;
 use seq_lib::one_pulse::OnePulseParams;
 use seq_lib::rfcal::RfCalParams;
 use seq_lib::scout::ScoutParams;
-use seq_lib::se_2d::Se2DParams;
 use seq_lib::se_dti::SeDtiParams;
-use seq_tools::ppl::Orientation;
 use utils;
 use crate::scout::ScoutViewSettings;
 
@@ -34,7 +30,6 @@ const SEQUENCE_LIB:&str = r"C:\workstation\dev\civm_scan\test_env\sequence_libra
 pub const HEADFILE_NAME:&str = "meta";
 pub const HEADFILE_EXT:&str = "txt";
 
-const BUILD:bool = true;
 
 pub enum Sequence {
     FseDti,
@@ -42,7 +37,6 @@ pub enum Sequence {
     MGRE,
     GRE,
     Scout,
-    Se2D,
     OnePulse,
     RfCal,
     Me2D,
@@ -56,7 +50,6 @@ impl Sequence {
             Self::decode(&Self::MGRE),
             Self::decode(&Self::GRE),
             Self::decode(&Self::Scout),
-            Self::decode(&Self::Se2D),
             Self::decode(&Self::OnePulse),
             Self::decode(&Self::RfCal),
             Self::decode(&Self::Me2D),
@@ -69,7 +62,6 @@ impl Sequence {
             "mgre" => Self::MGRE,
             "gre" => Self::GRE,
             "scout" => Self::Scout,
-            "se_2d" => Self::Se2D,
             "one_pulse" => Self::OnePulse,
             "rf_cal" => Self::RfCal,
             "multi_echo_2d" => Self::Me2D,
@@ -83,7 +75,6 @@ impl Sequence {
             Self::MGRE => String::from("mgre"),
             Self::GRE => String::from("gre"),
             Self::Scout => String::from("scout"),
-            Self::Se2D => String::from("se_2d"),
             Self::OnePulse => String::from("one_pulse"),
             Self::RfCal => String::from("rf_cal"),
             Self::Me2D => String::from("multi_echo_2d"),
@@ -133,9 +124,6 @@ fn load_params(cfg_file:&Path) -> Result<Box<dyn SequenceParameters>,SequenceLoa
         Sequence::Scout => {
             Box::new(ScoutParams::load(&cfg_file)?)
         }
-        Sequence::Se2D => {
-            Box::new(Se2DParams::load(&cfg_file)?)
-        }
         Sequence::Me2D => {
             Box::new(Me2DParams::load(&cfg_file)?)
         }
@@ -155,9 +143,6 @@ pub fn load_build_params(cfg_file:&Path) -> Result<Box<dyn Build>,SequenceLoadEr
         },
         Sequence::Scout => {
             ScoutParams::load(&cfg_file)?.instantiate()
-        }
-        Sequence::Se2D => {
-            Se2DParams::load(&cfg_file)?.instantiate()
         }
         Sequence::OnePulse => {
             OnePulseParams::load(&cfg_file)?.instantiate()
@@ -235,13 +220,13 @@ pub fn new(args:&NewArgs) {
 
 pub fn new_setup(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_params(&cfg_file).expect("cannot load parameters");;
+    let params = load_params(&cfg_file).expect("cannot load parameters");
     build_setup(params,&args.context_params());
 }
 
 pub fn new_adjustment(args:&NewAdjArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_adj_params(&cfg_file).expect("cannot load parameters");;
+    let params = load_adj_params(&cfg_file).expect("cannot load parameters");
     build_adj(params,&args.context_params());
 }
 
@@ -261,9 +246,6 @@ pub fn new_config(args:&NewConfigArgs){
         }
         Sequence::Scout => {
             ScoutParams::write_default(&path_out);
-        }
-        Sequence::Se2D => {
-            Se2DParams::write_default(&path_out);
         }
         Sequence::OnePulse => {
             OnePulseParams::write_default(&path_out);
@@ -285,7 +267,7 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
         println!("cannot find specified b-table {:?}",b_table);
         return
     }
-    let params = load_dw_params(&cfg_file).expect("cannot load parameters");;
+    let params = load_dw_params(&cfg_file).expect("cannot load parameters");
 
     if !args.destination.exists() {
         create_dir_all(&args.destination).expect(&format!("unable to create directory: {:?}",args.destination));
@@ -295,7 +277,7 @@ pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
 
 pub fn new_scout_experiment(args:&NewArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
-    let params = load_scout_params(&cfg_file).expect("cannot load parameters");;
+    let params = load_scout_params(&cfg_file).expect("cannot load parameters");
     build_scout_experiment(params,&args.context_params(),&ScoutViewSettings::default());
 }
 
@@ -368,7 +350,7 @@ pub fn ppr_var_map(ppr_string:&str) -> Option<HashMap<String,String>> {
     let freq_reg = Regex::new(r":OBSERVE_FREQUENCY").expect("invalid regex");
 
     let mut map = HashMap::<String,String>::new();
-    let mut str = ppr_string.to_owned();
+    let str = ppr_string.to_owned();
     let lines:Vec<String> = str.lines().map(|s| s.to_string()).collect();
     lines.iter().for_each(|line| {
         let captures = var_reg.captures(line);

@@ -15,7 +15,6 @@ pub struct SequenceViewer {
     acq_data:Option<Vec<Vec<[f64;2]>>>,
     link_axis:LinkedAxisGroup,
     config_names:Option<Vec<String>>,
-    selected_config:Option<String>,
 }
 
 impl SequenceViewer {
@@ -28,10 +27,10 @@ impl SequenceViewer {
             acq_data:None,
             link_axis:LinkedAxisGroup::new(true,false),
             config_names:None,
-            selected_config:None,
         }
     }
 }
+
 fn render_grad(eg:&Vec<EventGraph>) -> Vec<(Vec<[f64; 2]>,(u8,u8,u8))> {
     let mut plot_objects = Vec::<(Vec<[f64; 2]>,(u8,u8,u8))>::new();
     eg.iter().for_each(|event|{
@@ -79,50 +78,7 @@ fn render_acq(eg:&Vec<EventGraph>) -> Vec<Vec<[f64; 2]>> {
 }
 
 
-// fn test_render(config_file:&Path) -> Vec<Vec<[f64; 2]>>{
-//
-//     let events = build::load_build_params(config_file).expect("cannot load parameters").instatiate().place_events().graphs_dynamic(2,0);
-//
-//     //let events = b.place_events().graphs_dynamic(2,0);
-//
-//     let mut plot_objects = Vec::<Vec<[f64; 2]>>::new();
-//
-//     events.iter().for_each(|event|{
-//         match &event.wave_data {
-//             WaveformData::Rf(amp,phase) => {
-//                 plot_objects.push(amp.f64_pair(event.waveform_start as f64));
-//                 //plot_objects.push(phase.f64_pair());
-//             }
-//             WaveformData::Grad(r,p,s) => {
-//                 match r {
-//                     Some(data) => plot_objects.push(data.f64_pair(event.waveform_start as f64)),
-//                     None => {}
-//                 }
-//                 match p {
-//                     Some(data) => plot_objects.push(data.f64_pair(event.waveform_start as f64)),
-//                     None => {}
-//                 }
-//                 match s {
-//                     Some(data) => plot_objects.push(data.f64_pair(event.waveform_start as f64)),
-//                     None => {}
-//                 }
-//             }
-//             WaveformData::Acq(data) => {
-//                 plot_objects.push(data.f64_pair(event.waveform_start as f64))
-//             }
-//         }
-//     });
-//     plot_objects
-// }
-
-//pub enum WaveformData {
-//     Rf(PlotTrace,PlotTrace),
-//     Grad(Option<PlotTrace>,Option<PlotTrace>,Option<PlotTrace>),
-//     Acq(PlotTrace),
-// }
-
-
-pub fn sequence_viewer(ctx: &egui::Context,ui:&mut Ui,sv:&mut SequenceViewer){
+pub fn sequence_viewer(ctx: &egui::Context,_ui:&mut Ui,sv:&mut SequenceViewer){
     egui::Window::new("Sequence Viewer").show(ctx, |ui| {
 
         let sequence_library = Path::new("./test_env/sequence_library");
@@ -164,9 +120,6 @@ pub fn sequence_viewer(ctx: &egui::Context,ui:&mut Ui,sv:&mut SequenceViewer){
                 let rf_data = sv.rf_data.get_or_insert_with(||render_rf(events));
                 let acq_data = sv.acq_data.get_or_insert_with(||render_acq(events));
                 let grad_data = sv.grad_data.get_or_insert_with(||render_grad(events));
-
-
-                let link = LinkedAxisGroup::new(true,false);
 
 
                 Plot::new("rf plot").show_axes([true,false]).link_axis(sv.link_axis.clone()).view_aspect(4.0).show(ui, |plot_ui| {

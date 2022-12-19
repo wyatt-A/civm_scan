@@ -101,7 +101,7 @@ impl AcqHeadfile for SeDtiParams {
             alpha: 90.0,
             bw: self.spectral_width.hertz() as f32 /2.0,
             n_echos: 1,
-            S_PSDname: self.name()
+            s_psdname: self.name()
         }
     }
 }
@@ -324,13 +324,10 @@ impl SeDti {
     fn gradient_matrices(params: &SeDtiParams) -> GradMatrices {
         let waveforms = Self::waveforms(params);
         let mat_count = Matrix::new_tracker();
-        let n_read = params.samples.0;
-        let n_discards = params.sample_discards;
         let fov_read = params.fov.0;
         let non_adjustable = (false, false, false);
 
         /* READOUT */
-        let read_sample_time_sec = params.spectral_width.sample_time(n_read + n_discards);
         let read_grad_dac = params.spectral_width.fov_to_dac(fov_read);
         let readout = Matrix::new_static("read_mat", DacValues::new(Some(read_grad_dac), None, None), non_adjustable, params.grad_off, &mat_count);
 
@@ -339,8 +336,6 @@ impl SeDti {
         let phase_encode_strategy = EncodeStrategy::LUT(Dimension::_3D, lut);
 
         let pe_driver1 = MatrixDriver::new(DriverVar::Repetition, MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()), Some(0));
-        let pe_driver2 = MatrixDriver::new(DriverVar::Repetition, MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()), Some(1));
-        let pe_driver3 = MatrixDriver::new(DriverVar::Repetition, MatrixDriverType::PhaseEncode(phase_encode_strategy), Some(1));
         let read_pre_phase_dac = waveforms.phase_encode.magnitude_net(0.5 * waveforms.readout.power_net(read_grad_dac as f32)) as i16;
         let (phase_grad_step, slice_grad_step) = match params.setup_mode {
             false => {
@@ -353,7 +348,6 @@ impl SeDti {
         let phase_multiplier = grad_cal::grad_to_dac(phase_grad_step) as f32;
         let slice_multiplier = grad_cal::grad_to_dac(slice_grad_step) as f32;
         let transform = LinTransform::new((None, Some(phase_multiplier), Some(slice_multiplier)), (None, None, None));
-        let static_dac_vals = DacValues::new(Some(-read_pre_phase_dac), None, None);
         let phase_encode1 = Matrix::new_driven(
             "c_pe_mat1",
             pe_driver1,

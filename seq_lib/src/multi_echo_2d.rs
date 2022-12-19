@@ -6,21 +6,18 @@ use std::io::{Read, Write};
 use seq_tools::{grad_cal, _utils};
 use seq_tools::acq_event::{AcqEvent, SpectralWidth};
 use seq_tools::event_block::{Event, EventQueue, GradEventType};
-use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin, Origin};
+use seq_tools::event_block::EventPlacementType::{Before, ExactFromOrigin, Origin};
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
 use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
 use seq_tools::pulse::{Pulse, SincPulse, SliceSelective, Trapezoid};
 use seq_tools::rf_event::RfEvent;
-use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
-use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError, UseAdjustments};
+use seq_tools::rf_state::{RfStateType};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, CompressedSense, Simulate, AcqDimensions, AcqDims, Initialize, MrdToKspace, MrdToKspaceParams, MrdFormat, SequenceLoadError, UseAdjustments};
 use serde_json;
 use serde::{Serialize,Deserialize};
-use cs_table::cs_table::CSTable;
-use headfile::headfile::{DWHeadfile, DWHeadfileParams, AcqHeadfile, AcqHeadfileParams};
-use crate::pulse_sequence;
+use headfile::headfile::{AcqHeadfile, AcqHeadfileParams};
 
 impl Simulate for Me2DParams {
     fn set_sim_repetitions(&mut self) {
@@ -55,7 +52,7 @@ impl AcqHeadfile for Me2DParams {
             alpha: 90.0,
             bw: self.spectral_width.hertz() as f32 /2.0,
             n_echos: self.n_echos as i32,
-            S_PSDname: self.name()
+            s_psdname: self.name()
         }
     }
 }
@@ -231,7 +228,6 @@ pub struct Me2DEvents {
     refocus: RfEvent<SincPulse>,
     ref_slice_sel: GradEvent<Trapezoid>,
     phase_encode1: GradEvent<Trapezoid>,
-    phase_encode2: GradEvent<Trapezoid>,
     readout: GradEvent<Trapezoid>,
     acquire: AcqEvent,
     rewinder: GradEvent<Trapezoid>,
@@ -251,7 +247,6 @@ struct Waveforms {
 
 struct GradMatrices {
     phase_encode1: Matrix,
-    phase_encode2: Matrix,
     readout: Matrix,
     rewinder: Matrix,
     slice_sel: Matrix,
@@ -297,13 +292,10 @@ impl Me2D {
     fn gradient_matrices(params: &Me2DParams) -> GradMatrices {
         let waveforms = Self::waveforms(params);
         let mat_count = Matrix::new_tracker();
-        let n_read = params.samples.0;
-        let n_discards = params.sample_discards;
         let fov_read = params.fov.0;
         let non_adjustable = (false, false, false);
 
         /* READOUT */
-        let read_sample_time_sec = params.spectral_width.sample_time(n_read + n_discards);
         let read_grad_dac = params.spectral_width.fov_to_dac(fov_read);
         let readout = Matrix::new_static("read_mat", DacValues::new(Some(read_grad_dac), None, None), non_adjustable, params.grad_off, &mat_count);
 
@@ -346,15 +338,6 @@ impl Me2D {
         let re_trans = LinTransform::new((None, Some(-1.0), None), (None, None, None));
         let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),params.grad_off,&mat_count);
 
-        let phase_encode2 = Matrix::new_driven(
-            "c_pe_mat2",
-            pe_driver1.clone(),
-            transform,
-            DacValues::new(Some(-read_pre_phase_dac), None, None),
-            (true, false, false),
-            params.grad_off,
-            &mat_count
-        );
 
         let crusher = Matrix::new_static(
             "c_crush_mat1",
@@ -443,7 +426,6 @@ impl Me2D {
 
         GradMatrices {
             phase_encode1,
-            phase_encode2,
             readout,
             rewinder,
             slice_sel,
@@ -504,13 +486,6 @@ impl Me2D {
             "phase_encode1"
         );
 
-        let phase_encode2 = GradEvent::new(
-            (None, Some(w.phase_encode), None),
-            &m.phase_encode2,
-            GradEventType::Blocking,
-            "phase_encode2"
-        );
-
         let readout = GradEvent::new(
             (Some(w.readout), None, None),
             &m.readout,
@@ -545,7 +520,6 @@ impl Me2D {
             slice_ref,
             excitation,
             phase_encode1,
-            phase_encode2,
             readout,
             acquire,
             rewinder,
@@ -582,7 +556,6 @@ impl Me2D {
 
             let t_echo = echo*te_clocks;
             let t_tau = echo*te_clocks - tau_clocks;
-            let midpoint1 = (t_echo + t_tau)/2;
             let midpoint2 = (echo*te_clocks + te_clocks - tau_clocks + t_echo)/2;
 
 

@@ -30,7 +30,7 @@ impl StudyPanel {
     }
 }
 
-pub fn study_panel(ctx: &egui::Context,ui:&mut Ui,sp:&mut StudyPanel){
+pub fn study_panel(ctx: &egui::Context,_ui:&mut Ui,sp:&mut StudyPanel){
 
     // run a check for adjustment data and load it up into memory if we find one
 

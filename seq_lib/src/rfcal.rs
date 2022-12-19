@@ -1,27 +1,22 @@
-use std::rc::Rc;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use std::fs::{File};
 use std::io::{Read, Write};
 use seq_tools::{grad_cal, _utils};
 use seq_tools::acq_event::{AcqEvent, SpectralWidth};
 use seq_tools::event_block::{Event, EventQueue, GradEventType};
-use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin, Origin};
+use seq_tools::event_block::EventPlacementType::{ExactFromOrigin, Origin};
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
-use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
-use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
-use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, SliceSelective, Trapezoid};
+use seq_tools::gradient_matrix::{DacValues, DriverVar, Matrix};
+use seq_tools::ppl::{GradClock, PhaseUnit,BaseFrequency};
+use seq_tools::pulse::{Hardpulse, SliceSelective, Trapezoid};
 use seq_tools::rf_event::RfEvent;
-use seq_tools::rf_state::{PhaseCycleStrategy, RfDriver, RfDriverType, RfStateType};
-use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionWeighted, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, AdjustmentParameters, SequenceLoadError};
+use seq_tools::rf_state::{RfDriver, RfDriverType, RfStateType};
+use crate::pulse_sequence::{Build, PPLBaseParams, Setup, Simulate, Initialize, AdjustmentParameters, SequenceLoadError};
 use serde_json;
 use serde::{Serialize,Deserialize};
-use cs_table::cs_table::CSTable;
-use headfile::headfile::{DWHeadfile, DWHeadfileParams, AcqHeadfile, AcqHeadfileParams};
 use seq_tools::ppl::Orientation::CivmStandard;
 use seq_tools::rf_frame::RF_MAX_DAC;
-use crate::pulse_sequence;
 
 
 impl Setup for RfCalParams {
@@ -309,20 +304,4 @@ impl RfCal {
             ]
         )
     }
-}
-
-
-#[test]
-fn rf_cal_test(){
-    let params = RfCalParams::default();
-    let mut b = params.instantiate();
-    //b.ppl_export(Path::new("."),"rf_cal",false,false);
-    let q = b.place_events();
-
-    let g = q.graphs_dynamic(2,0);
-
-
-
-    println!("{:?}",g);
-
 }

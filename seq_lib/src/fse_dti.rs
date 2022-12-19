@@ -152,7 +152,7 @@ impl AcqHeadfile for FseDtiParams {
             alpha: 90.0,
             bw: self.spectral_width.hertz() as f32 /2.0,
             n_echos: 3,
-            S_PSDname: self.name()
+            s_psdname: self.name()
         }
     }
 }
@@ -342,13 +342,10 @@ impl FseDti {
         fn gradient_matrices(params: &FseDtiParams) -> GradMatrices {
             let waveforms = Self::waveforms(params);
             let mat_count = Matrix::new_tracker();
-            let n_read = params.samples.0;
-            let n_discards = params.sample_discards;
             let fov_read = params.fov.0;
             let non_adjustable = (false, false, false);
 
             /* READOUT */
-            let read_sample_time_sec = params.spectral_width.sample_time(n_read + n_discards);
             let read_grad_dac = params.spectral_width.fov_to_dac(fov_read);
             let readout = Matrix::new_static("read_mat", DacValues::new(Some(read_grad_dac), None, None), non_adjustable, params.grad_off, &mat_count);
 
@@ -371,7 +368,6 @@ impl FseDti {
             let phase_multiplier = grad_cal::grad_to_dac(phase_grad_step) as f32;
             let slice_multiplier = grad_cal::grad_to_dac(slice_grad_step) as f32;
             let transform = LinTransform::new((None, Some(phase_multiplier), Some(slice_multiplier)), (None, None, None));
-            let static_dac_vals = DacValues::new(Some(-read_pre_phase_dac), None, None);
             let phase_encode1 = Matrix::new_driven(
                 "c_pe_mat1",
                 pe_driver1,

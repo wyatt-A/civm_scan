@@ -3,6 +3,7 @@ use seq_tools::ppl::Orientation;
 use crate::build;
 use serde::{Serialize,Deserialize};
 use scan_control::args::RunDirectoryArgs;
+use scan_control::command::ScanControlError;
 use crate::build::ContextParams;
 
 
@@ -48,7 +49,7 @@ impl Scout {
             view_settings:ScoutViewSettings::default()
         }
     }
-    pub fn run(&self){
+    pub fn run(&self) -> Result<(),ScanControlError>{
 
 
         std::fs::create_dir_all(&self.context.export_dir).expect("unable to create directory!");
@@ -62,7 +63,8 @@ impl Scout {
             path: self.context.export_dir.clone(),
             cs_table: None,
             depth_to_search: Some(1),
-        });
+        })?;
+        Ok(())
     }
 
 }

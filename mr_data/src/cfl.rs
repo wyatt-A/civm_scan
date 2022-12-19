@@ -1,19 +1,14 @@
-use std::{collections::HashMap, hash};
+use std::{collections::HashMap};
 use std::path::{Path,PathBuf};
 use std::fs::{create_dir_all, File};
 use std::io::{Read,Write};
-use std::process::Command;
 use byteorder::{ByteOrder,BigEndian,LittleEndian};
-use ndarray::{s, Array3, Array4, Order, Dim, ArrayD, IxDyn, concatenate, Ix, ArrayViewMut, OwnedRepr, Ix3, ArrayBase, AssignElem, Array2};
-use ndarray::{Array, ArrayView, array, Axis};
-use ndarray::iter::Axes;
-use ndarray::Order::RowMajor;
+use ndarray::{s, Array3, Array4, Order, Array2};
+use ndarray::{Array, Axis};
 use serde::{Deserialize, Serialize};
 use rustfft::{FftPlanner};
 use serde_json;
-use utils;
 use num_complex::Complex;
-//use nifti::{NiftiObject, ReaderOptions, NiftiVolume};
 use nifti::writer::WriterOptions;
 
 
@@ -201,8 +196,6 @@ pub fn complex_slice_to_magnitude(slice:&Array2<Complex<f32>>) -> Array2<f32> {
 
 pub fn from_complex_volume(vol:&Array3<Complex<f32>>,cfl_base:&Path) {
     let flat = complex_vol_to_vec(vol);
-    let shape = vol.shape();
-    let dims = (shape[2],shape[1],shape[0]);
     write_data(&flat, cfl_base);
     write_cfl_header(vol,cfl_base);
 }
@@ -323,7 +316,7 @@ fn _fermi_filter(vol:&mut Array3<Complex<f32>>,w1:f32,w2:f32) -> &mut Array3<Com
 
     vol.outer_iter_mut().enumerate().for_each(|(x_i,mut slice)|{
         slice.outer_iter_mut().enumerate().for_each(|(y_i,mut line)| {
-            line.iter_mut().enumerate().for_each(|(z_i,mut sample)|{
+            line.iter_mut().enumerate().for_each(|(z_i,sample)|{
                 let x_c_sq = ((x_i as f32) - (dx/2) as f32).powi(2);
                 let y_c_sq = ((y_i as f32) - (dy/2) as f32).powi(2);
                 let z_c_sq = ((z_i as f32) - (dz/2) as f32).powi(2);

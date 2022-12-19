@@ -1,16 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
 use eframe::egui;
 use eframe::egui::{Color32, Ui};
-use eframe::egui::Key::P;
 use eframe::egui::plot::{Legend, Line, Plot, PlotPoints};
 use acquire::adjustment::ADJ_FILE_NAME;
-use acquire::build::ContextParams;
 use seq_lib::pulse_sequence::AdjustmentResults;
-use seq_tools::ppl::Adjustment;
 use crate::study_panel::StudyPanel;
+use scan_control::command::ScanControlError;
 
 const ADJ_DATA_DIR_NAME:&str = "adj_data";
 
@@ -18,7 +15,6 @@ pub struct BasicAdjustmentPanel {
     current_results:Option<PathBuf>,
     adj_data:Option<AdjustmentResults>,
     status_message:String,
-    adjustments_running:bool,
     process_handle:Option<JoinHandle<()>>
 }
 
@@ -28,7 +24,6 @@ impl BasicAdjustmentPanel{
             current_results:None,
             adj_data:None,
             status_message:String::from(""),
-            adjustments_running:false,
             process_handle:None,
         }
     }
@@ -77,14 +72,15 @@ impl BasicAdjustmentPanel {
 
 }
 
-pub fn run_adjustments(study_dir:&Path) {
+pub fn run_adjustments(study_dir:&Path) -> Result<(),ScanControlError> {
     let freq_cal = Path::new(r"C:\workstation\dev\civm_scan\test_env\sequence_library/1p.json");
     let rf_cal = Path::new(r"C:\workstation\dev\civm_scan\test_env\sequence_library\rf_cal.json");
     let dir = study_dir.join(ADJ_DATA_DIR_NAME);
-    acquire::adjustment::Adjustment::new(freq_cal,rf_cal,&dir).run();
+    acquire::adjustment::Adjustment::new(freq_cal,rf_cal,&dir).run()?;
+    Ok(())
 }
 
-pub fn basic_adjustemnt(ctx: &egui::Context,ui:&mut Ui,ba:&mut BasicAdjustmentPanel,sp:&StudyPanel){
+pub fn basic_adjustemnt(ctx: &egui::Context,_ui:&mut Ui,ba:&mut BasicAdjustmentPanel,sp:&StudyPanel){
 
     // run a check for adjustment data and load it up into memory if we find one
 
@@ -134,7 +130,7 @@ pub fn basic_adjustemnt(ctx: &egui::Context,ui:&mut Ui,ba:&mut BasicAdjustmentPa
                                         // should go in a new thread
                                         ba.process_handle = Some(thread::spawn(move || {
                                             println!("spawning new thread");
-                                            run_adjustments(&dir_for_thread)
+                                            run_adjustments(&dir_for_thread).unwrap();
                                         }));
                                     } ,
                                     None => ba.status_message = String::from("study directory is not specified")

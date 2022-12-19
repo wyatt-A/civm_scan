@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::ops::Index;
 use std::path::{Path,PathBuf};
 use serde::{Deserialize, Serialize};
 use regex::Regex;
@@ -30,7 +29,7 @@ pub struct AcqHeadfileParams {
     pub alpha:f32,
     pub bw:f32,
     pub n_echos:i32,
-    pub S_PSDname:String,
+    pub s_psdname:String,
 }
 
 pub struct DWHeadfileParams {
@@ -239,12 +238,12 @@ impl ReconHeadfile {
         f.write_all(s.as_bytes()).expect("cannot write to file");
     }
 
-    fn from_file(file_path:&Path) -> Self {
-        let mut f = File::open(file_path).expect("cannot open file");
-        let mut s = String::new();
-        f.read_to_string(&mut s).expect("cannot read from file");
-        serde_json::from_str(&s).expect("cannot deserialize file")
-    }
+    // fn from_file(file_path:&Path) -> Self {
+    //     let mut f = File::open(file_path).expect("cannot open file");
+    //     let mut s = String::new();
+    //     f.read_to_string(&mut s).expect("cannot read from file");
+    //     serde_json::from_str(&s).expect("cannot deserialize file")
+    // }
 }
 
 impl AcqHeadfileParams {
@@ -260,7 +259,7 @@ impl AcqHeadfileParams {
         h.insert(String::from("te"),self.te_ms.to_string());
         h.insert(String::from("bw"),self.bw.to_string());
         h.insert(String::from("ne"),self.n_echos.to_string());
-        h.insert(String::from("S_PSDname"),self.S_PSDname.to_string());
+        h.insert(String::from("S_PSDname"),self.s_psdname.to_string());
         h
     }
 }
@@ -371,37 +370,6 @@ impl Headfile{
     }
 
 }
-
-fn transcribe_numeric<T>(hash:&mut HashMap<String,String>,old_name:&str,new_name:&str,scale:T)
-    where T: std::fmt::Display + std::str::FromStr + std::ops::MulAssign,
-          <T as std::str::FromStr>::Err: std::fmt::Debug
-{
-    match hash.get(old_name){
-        Some(string) => {
-            let mut num:T = string.parse().expect("cannot parse value");
-            num *= scale;
-            let str = num.to_string();
-            hash.insert(new_name.to_string(),str);
-        }
-        None => {println!("{} field not found... not transcribing",old_name);}
-    }
-}
-
-fn transcribe_string(hash:&mut HashMap<String,String>,old_name:&str,new_name:&str)
-{
-    match hash.get(old_name){
-        Some(str) => {
-            hash.insert(new_name.to_string(),str.to_string());
-        },
-        None => {
-            println!("{} field not found... not transcribing",old_name);
-        }
-    }
-}
-
-//N60200_m41,/Volumes/delosspace,256,18.abb.11,.raw
-// # recon_person=wa41
-// # tag_file_creator=James_matlab
 
 pub struct ArchiveTag {
     pub runno:String,

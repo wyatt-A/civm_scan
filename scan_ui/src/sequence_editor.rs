@@ -3,15 +3,10 @@
 */
 
 use std::path::Path;
-use std::str::FromStr;
 use eframe::egui;
 use eframe::egui::{Ui};
-use eframe::epaint::ahash::{HashMap, HashMapExt};
-//use serde::{Serialize,Deserialize};
-use serde_json::{Result, Value};
 use acquire::build;
 use utils;
-
 
 pub struct SequenceEditor {
     config_names:Option<Vec<String>>,
@@ -36,9 +31,8 @@ impl SequenceEditor {
 }
 
 
-pub fn sequence_editor(ctx: &egui::Context,ui:&mut Ui,se:&mut SequenceEditor){
+pub fn sequence_editor(ctx: &egui::Context,_ui:&mut Ui,se:&mut SequenceEditor){
 
-    let seq_config = Path::new("./test_env/sequence_library/5xfad_fse.json");
 
     let sequence_library = Path::new("./test_env/sequence_library");
 
@@ -107,7 +101,7 @@ pub fn sequence_editor(ctx: &egui::Context,ui:&mut Ui,se:&mut SequenceEditor){
                 let f = utils::write_to_file(&sequence_library.join("temp_config"),"json",&str_buff);
 
                 match &se.selected {
-                    Some(config) => {
+                    Some(_) => {
                         let valid = build::validate(&f);
                         let _ = match valid.0 {
                             true => {
@@ -132,11 +126,4 @@ pub fn sequence_editor(ctx: &egui::Context,ui:&mut Ui,se:&mut SequenceEditor){
         ui.code_editor(str_buff);
     });
 
-}
-
-#[derive(Debug,PartialEq)]
-enum Enum {
-    First,
-    Second,
-    Third,
 }

@@ -1869,6 +1869,7 @@ dependencies = [
  "mr_data",
  "ndarray",
  "ndarray-stats",
+ "scan_control",
  "seq_lib",
  "seq_tools",
  "serde",

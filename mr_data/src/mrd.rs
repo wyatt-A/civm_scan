@@ -1,15 +1,12 @@
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::ops::Range;
 use seq_lib::pulse_sequence::{AcqDims, MrdFormat, MrdToKspaceParams};
-//use acquire::build::acq_dims;
 use cs_table::cs_table::CSTable;
 use byteorder::{LittleEndian,ByteOrder};
-use ndarray::{s, Array3, Array4, Array6, Order, Dim, ArrayD, IxDyn, concatenate, Ix, Array2, Ix6};
-use ndarray::{Array, ArrayView, array, Axis};
-use ndarray::iter::Axes;
-use ndarray::Order::RowMajor;
+use ndarray::{s, Array3, Array6, Order, ArrayD, IxDyn, concatenate, Array2};
+use ndarray::{Axis};
 use num_complex::Complex;
 use crate::cfl;
 
@@ -24,19 +21,6 @@ const N_SLICE_BYTES:Range<usize> = 12..16;
 const N_ECHOS_BYTES:Range<usize> = 152..156;
 const N_EXPERIMENT_BYTES:Range<usize> = 156..160;
 
-
-
-#[test]
-fn test(){
-    let mrd = Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m00/resources/m00.mrd");
-
-    let cs_table = Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m00/resources/cs_table");
-
-    let p = MrdToKspaceParams::from_file(Path::new("/Users/Wyatt/scratch/N60187.work/N60187_m00/resources/mrd_to_kspace.mtk"));
-
-    let vol = fse_raw_to_vol(mrd,cs_table,&p);
-    cfl::to_nifti(&vol,&mrd.with_file_name("m00_ksapce.nii"));
-}
 
 
 pub fn cs_mrd_to_kspace(mrd:&Path,cs_table:&Path,cfl_base:&Path,params:&MrdToKspaceParams) {
@@ -71,20 +55,20 @@ pub fn se_raw_to_vol(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&Mr
     cfl::write_cfl_vol(&vol,cfl_out_base_name);
 }
 
-fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&MrdToKspaceParams) {
-    let fname = cfl_out_base_name.file_name().expect(&format!("cannot determine base name from {:?}",cfl_out_base_name)).to_str().unwrap();
-    let n = params.n_objects;
-    let w = ((n-1) as f32).log10().floor() as usize + 1;
-    let formatter = |index:usize| format!("m{:0width$ }",index,width=w);
-    for i in 0..n {
-        let postfix = formatter(i);
-        let qualified_name = format!("{}_{}",fname,postfix);
-        let cfl = cfl_out_base_name.with_file_name(qualified_name);
-        let formatted = format_multi_echo_raw(mrd,params.n_read,params.n_views,params.dummy_excitations,i);
-        let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
-        cfl::write_cfl_vol(&vol,&cfl);
-    }
-}
+// fn multi_echo_raw_to_cfl(mrd:&Path,cs_table:&Path,cfl_out_base_name:&Path,params:&MrdToKspaceParams) {
+//     let fname = cfl_out_base_name.file_name().expect(&format!("cannot determine base name from {:?}",cfl_out_base_name)).to_str().unwrap();
+//     let n = params.n_objects;
+//     let w = ((n-1) as f32).log10().floor() as usize + 1;
+//     let formatter = |index:usize| format!("m{:0width$ }",index,width=w);
+//     for i in 0..n {
+//         let postfix = formatter(i);
+//         let qualified_name = format!("{}_{}",fname,postfix);
+//         let cfl = cfl_out_base_name.with_file_name(qualified_name);
+//         let formatted = format_multi_echo_raw(mrd,params.n_read,params.n_views,params.dummy_excitations,i);
+//         let vol = zero_fill(&formatted,cs_table,(params.n_read,params.n_phase1,params.n_phase2),params.dummy_excitations,params.view_acceleration);
+//         cfl::write_cfl_vol(&vol,&cfl);
+//     }
+// }
 
 
 fn format_fse_raw(mrd:&Path,n_read:usize,n_views:usize,n_dummy_excitations:usize) -> Array2::<Complex<f32>> {
@@ -134,7 +118,6 @@ fn zero_fill(array:&Array2::<Complex<f32>>,
              dummy_excitations:usize,
              view_acceleration:usize) ->  Array3::<Complex<f32>>{
     let cs_table = CSTable::open(cs_table);
-    let mut zf_arr = Array4::<f32>::zeros([dims.2,dims.1,dims.0,2]);
     let mut zf_arr = Array3::<Complex<f32>>::zeros([dims.2,dims.1,dims.0]);
 
     let indices = cs_table.indices(dummy_excitations*view_acceleration,[dims.1 as i16,dims.2 as i16]);
@@ -339,16 +322,3 @@ fn bytes_to_int(byte_slice:&[u8]) -> i16 {
     buff.copy_from_slice(&byte_slice);
     i16::from_le_bytes(buff)
 }
-
-
-fn read_to_string(file_path:&Path) -> String {
-    let mut f = File::open(file_path).expect("cannot open file");
-    let mut s = String::new();
-    f.read_to_string(&mut s).expect("cannot read from file");
-    s
-}
-
-
-
-
-

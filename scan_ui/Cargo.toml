@@ -17,3 +17,4 @@ serde_json = "1.0.87"
 serde = { version = "1.0.144", features = ["derive"] }
 seq_tools = {path = "../seq_tools"}
 seq_lib = {path = "../seq_lib"}
+scan_control = { path = "../scan_control"}

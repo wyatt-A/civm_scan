@@ -1,5 +1,5 @@
 use eframe::egui;
-use ndarray::{s, Array2, Order};
+use ndarray::{Array2, Order};
 use ndarray_stats::QuantileExt;
 use eframe::egui::ColorImage;
 

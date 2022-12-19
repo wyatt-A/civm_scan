@@ -9,15 +9,14 @@ use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
 use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
-use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid};
+use seq_tools::pulse::{Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
-use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
+use seq_tools::rf_state::{RfStateType};
 use seq_tools::_utils::{sec_to_clock};
-use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, DiffusionPulseShape, CompressedSense, b_val_to_dac, Simulate, AcqDimensions, AcqDims, Initialize, DWSequenceParameters, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError, UseAdjustments};
+use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, CompressedSense, Simulate, AcqDimensions, AcqDims, Initialize, MrdToKspace, MrdToKspaceParams, MrdFormat, ScoutConfig, SequenceLoadError, UseAdjustments};
 use serde_json;
 use serde::{Serialize,Deserialize};
-use headfile::headfile::{DWHeadfile, DWHeadfileParams, AcqHeadfile, AcqHeadfileParams};
-use crate::pulse_sequence;
+use headfile::headfile::{AcqHeadfile, AcqHeadfileParams};
 
 impl Simulate for ScoutParams {
     fn set_sim_repetitions(&mut self) {
@@ -52,7 +51,7 @@ impl AcqHeadfile for ScoutParams {
             alpha: 90.0,
             bw: self.spectral_width.hertz() as f32 /2.0,
             n_echos: 1,
-            S_PSDname: self.name()
+            s_psdname: self.name()
         }
     }
 }
@@ -281,13 +280,10 @@ impl Scout {
     fn gradient_matrices(params: &ScoutParams) -> GradMatrices {
         let waveforms = Self::waveforms(params);
         let mat_count = Matrix::new_tracker();
-        let n_read = params.samples.0;
-        let n_discards = params.sample_discards;
         let fov_read = params.fov.0;
         let non_adjustable = (false, false, false);
 
         /* READOUT */
-        let read_sample_time_sec = params.spectral_width.sample_time(n_read + n_discards);
         let read_grad_dac = params.spectral_width.fov_to_dac(fov_read);
         let readout = Matrix::new_static("read_mat", DacValues::new(Some(read_grad_dac), None, None), non_adjustable, params.grad_off, &mat_count);
 
@@ -413,7 +409,7 @@ impl Scout {
     fn place_events(&self) -> EventQueue {
         let te = self.params.echo_time;
 
-        let sd = _utils::sec_to_clock(2.0*self.params.ramp_time + 2.0*self.params.rf_duration) as u32;
+        let sd = sec_to_clock(2.0*self.params.ramp_time + 2.0*self.params.rf_duration) as u32;
 
         let excitation = Event::new(self.events.excitation.as_reference(), Origin);
 

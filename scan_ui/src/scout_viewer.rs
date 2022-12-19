@@ -43,7 +43,7 @@ impl ScoutViewPort {
 
         self.process_handle = Some(std::thread::spawn(move ||{
             println!("launching new thread");
-            acquire::scout::Scout::new(scout_params,&ctx).run();
+            acquire::scout::Scout::new(scout_params,&ctx).run().unwrap();
         }));
 
     }
@@ -94,7 +94,7 @@ impl ScoutViewPort {
     }
 }
 
-pub fn scout_viewer(ctx: &egui::Context,ui:&mut Ui,scout_view:&mut ScoutViewPort,ba:&BasicAdjustmentPanel,study_panel:&StudyPanel){
+pub fn scout_viewer(ctx: &egui::Context,_ui:&mut Ui,scout_view:&mut ScoutViewPort,ba:&BasicAdjustmentPanel,study_panel:&StudyPanel){
     egui::Window::new("Scout View").collapsible(false).show(ctx, |ui| {
 
         match study_panel.study_dir() {
