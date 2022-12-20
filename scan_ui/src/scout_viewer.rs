@@ -94,8 +94,7 @@ impl ScoutViewPort {
     }
 }
 
-pub fn scout_viewer(ctx: &egui::Context,_ui:&mut Ui,scout_view:&mut ScoutViewPort,ba:&BasicAdjustmentPanel,study_panel:&StudyPanel){
-    egui::Window::new("Scout View").collapsible(false).show(ctx, |ui| {
+pub fn scout_viewer(ctx: &egui::Context,ui:&mut Ui,scout_view:&mut ScoutViewPort,ba:&BasicAdjustmentPanel,study_panel:&StudyPanel){
 
         match study_panel.study_dir() {
             Some(dir) => {
@@ -131,5 +130,4 @@ pub fn scout_viewer(ctx: &egui::Context,_ui:&mut Ui,scout_view:&mut ScoutViewPor
             }
         }
 
-    });
 }

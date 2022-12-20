@@ -66,8 +66,6 @@ pub struct NewConfigArgs {
 pub struct ApplySetupArgs {
     pub setup_ppr:PathBuf,
     pub children:PathBuf,
-    #[clap(short, long)]
-    pub depth:Option<u16>
 }
 
 #[derive(clap::Args,Debug)]

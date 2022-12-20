@@ -45,17 +45,14 @@ impl eframe::App for MyApp {
         egui::SidePanel::left("my_left_panel").show(ctx, |ui| {
             ui.label("Window Selector");
 
-            egui::CollapsingHeader::new("Basic Adjustment Panel").show(ui, |ui| {
-                basic_adjustemnt(ctx,ui,&mut self.adjustment_panel,&self.study_panel);
-            });
 
             egui::CollapsingHeader::new("Sequence Selector").show(ui, |ui| {
                 sequence_editor(ctx,ui,&mut self.sequence_editor);
             });
 
-            egui::CollapsingHeader::new("Scout Viewer").show(ui, |ui| {
-                scout_viewer(ctx,ui,&mut self.scout_view_port,&self.adjustment_panel,&self.study_panel);
-            });
+            // egui::CollapsingHeader::new("Scout Viewer").show(ui, |ui| {
+            //     scout_viewer(ctx,ui,&mut self.scout_view_port,&self.adjustment_panel,&self.study_panel);
+            // });
 
             egui::CollapsingHeader::new("Sequence Viewer").show(ui, |ui| {
                 sequence_viewer(ctx,ui,&mut self.sequence_viwer);
@@ -65,6 +62,8 @@ impl eframe::App for MyApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Civm Scan");
             study_panel(ctx,ui,&mut self.study_panel);
+            scout_viewer(ctx,ui,&mut self.scout_view_port,&self.adjustment_panel,&self.study_panel);
+            basic_adjustemnt(ctx,ui,&mut self.adjustment_panel,&self.study_panel);
             protocol_panel(ctx,ui,&mut self.protocol_panel,&mut self.study_panel,&mut self.adjustment_panel);
         });
     }

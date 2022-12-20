@@ -80,12 +80,9 @@ pub fn run_adjustments(study_dir:&Path) -> Result<(),ScanControlError> {
     Ok(())
 }
 
-pub fn basic_adjustemnt(ctx: &egui::Context,_ui:&mut Ui,ba:&mut BasicAdjustmentPanel,sp:&StudyPanel){
+pub fn basic_adjustemnt(ctx: &egui::Context,ui:&mut Ui,ba:&mut BasicAdjustmentPanel,sp:&StudyPanel){
 
     // run a check for adjustment data and load it up into memory if we find one
-
-
-    egui::Window::new("Adjustments").collapsible(false).show(ctx, |ui| {
 
         match &sp.study_dir(){
             Some(dir) => {
@@ -146,5 +143,4 @@ pub fn basic_adjustemnt(ctx: &egui::Context,_ui:&mut Ui,ba:&mut BasicAdjustmentP
             }
         }
 
-    });
 }

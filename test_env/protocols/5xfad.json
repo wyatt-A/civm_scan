@@ -4,11 +4,13 @@
   "items": [
     {
       "alias": "5xfad_fse",
-      "require_setup": true
+      "require_setup": true,
+      "b_value_table": "C:\\workstation\\data\\diffusion_table\\ICO61_6b0.txt"
     },
     {
       "alias": "5xfad_se",
-      "require_setup": true
+      "require_setup": true,
+      "b_value_table": "C:\\workstation\\data\\diffusion_table\\ICO61_6b0.txt"
     }
   ],
   "state": "Idle"

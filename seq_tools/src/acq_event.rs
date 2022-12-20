@@ -15,6 +15,7 @@ pub enum SpectralWidth {
     SW200kH,
     SW133kH,
     SW80kH,
+    SW25kH,
 }
 
 impl SpectralWidth {
@@ -23,7 +24,8 @@ impl SpectralWidth {
             SpectralWidth::SW100kH => 100_000,
             SpectralWidth::SW200kH => 200_000,
             SpectralWidth::SW133kH => 133_333,
-            SpectralWidth::SW80kH => 80_000
+            SpectralWidth::SW80kH => 80_000,
+            SpectralWidth::SW25kH => 25_000,
         }
     }
     // delay required after sampling is complete, but before control is returned
@@ -47,6 +49,7 @@ impl SpectralWidth {
             SpectralWidth::SW100kH => format!("{}, {}, \"100  KHz  10 µs\"",100,23),
             SpectralWidth::SW133kH => format!("{}, {}, \"133  KHz 7.5 µs\"",75,24),
             SpectralWidth::SW80kH => format!("{}, {}, \"80.0 KHz 12.5 µs\"",125,22),
+            SpectralWidth::SW25kH => format!("{}, {}, \"25.0 KHz  40 µs\"",400,18),
         }
     }
 }

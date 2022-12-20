@@ -3,8 +3,8 @@ use eframe::egui;
 use eframe::egui::Ui;
 use utils;
 
-const BASE_STUDY_DIR:&str = "/Users/Wyatt/scratch";
-//const BASE_STUDY_DIR:&str = "d:/dev/studies";
+//const BASE_STUDY_DIR:&str = "/Users/Wyatt/scratch";
+const BASE_STUDY_DIR:&str = "d:/dev/studies";
 const STUDY_PREFIX:&str = "N";
 
 

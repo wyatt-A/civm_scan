@@ -24,8 +24,8 @@ use crate::scout::ScoutViewSettings;
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
 //const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
-pub const SEQUENCE_LIB:&str = r"C:\Users\waust\IdeaProjects\civm_scan\test_env\sequence_library";
-//const SEQUENCE_LIB:&str = r"C:\workstation\dev\civm_scan\test_env\sequence_library";
+//pub const SEQUENCE_LIB:&str = r"C:\Users\waust\IdeaProjects\civm_scan\test_env\sequence_library";
+pub const SEQUENCE_LIB:&str = r"C:\workstation\dev\civm_scan\test_env\sequence_library";
 
 pub const HEADFILE_NAME:&str = "meta";
 pub const HEADFILE_EXT:&str = "txt";
@@ -260,7 +260,7 @@ pub fn new_config(args:&NewConfigArgs){
     }
 }
 
-pub fn new_diffusion_experiment(args:&NewDiffusionExperimentArgs) {
+pub fn new_diffusion_experiment(args: &NewDiffusionExperimentArgs) {
     let cfg_file = Path::new(SEQUENCE_LIB).join(&args.alias).with_extension("json");
     let b_table = Path::new(&args.b_table);
     if !b_table.exists() {
@@ -282,19 +282,12 @@ pub fn new_scout_experiment(args:&NewArgs) {
 }
 
 pub fn apply_setup(args:&ApplySetupArgs) {
-    if args.children.is_file() {
-        sync_pprs(&args.setup_ppr,&vec![args.children.clone()]);
-        if args.depth.is_some(){
-            let r = args.depth.unwrap();
-            let entries = find_files(&args.children, ".ppr", r);
-            sync_pprs(&args.setup_ppr,&entries);
+    match utils::find_files(&args.children,"ppr",true) {
+        Some(entries) => sync_pprs(&args.setup_ppr,&entries),
+        None => {
+            let none = Vec::<PathBuf>::new();
+            sync_pprs(&args.setup_ppr,&none);
         }
-    }
-    else {
-        let r = args.depth.unwrap_or(0);
-        let entries = find_files(&args.children, ".ppr", r);
-        sync_pprs(&args.setup_ppr,&entries);
-        println!("updating {} ppr files",entries.len());
     }
 }
 

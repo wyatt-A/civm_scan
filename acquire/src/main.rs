@@ -9,7 +9,7 @@ fn main(){
         ListSequences => println!("{}", Sequence::list()),
         NewConfig(args) => new_config(&args),
         New(args) => new(&args),
-        NewDiffusionExperiment(args) => new_diffusion_experiment(&args),
+        NewDiffusionExperiment(args) => new_diffusion_experiment(args),
         NewScout(args) => new_scout_experiment(&args),
         NewSetup(args) => new_setup(&args),
         ApplySetup(args) => apply_setup(&args),
