@@ -24,8 +24,8 @@ use crate::scout::ScoutViewSettings;
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/sequence_library";
 //const SEQUENCE_LIB:&str = "/Users/Wyatt/IdeaProjects/test_data/seq_lib";
 //const SEQUENCE_LIB:&str = r"C:\Users\waust\OneDrive\Desktop\test_data\seq_lib";
-//const SEQUENCE_LIB:&str = r"C:\Users\waust\IdeaProjects\civm_scan\test_env\sequence_library";
-const SEQUENCE_LIB:&str = r"C:\workstation\dev\civm_scan\test_env\sequence_library";
+pub const SEQUENCE_LIB:&str = r"C:\Users\waust\IdeaProjects\civm_scan\test_env\sequence_library";
+//const SEQUENCE_LIB:&str = r"C:\workstation\dev\civm_scan\test_env\sequence_library";
 
 pub const HEADFILE_NAME:&str = "meta";
 pub const HEADFILE_EXT:&str = "txt";

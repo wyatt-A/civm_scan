@@ -1,0 +1,15 @@
+{
+  "name": "5xfad",
+  "require_adjustments": true,
+  "items": [
+    {
+      "alias": "5xfad_fse",
+      "require_setup": true
+    },
+    {
+      "alias": "5xfad_se",
+      "require_setup": true
+    }
+  ],
+  "state": "Idle"
+}

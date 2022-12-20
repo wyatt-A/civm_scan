@@ -1,6 +1,7 @@
 //#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 use eframe::egui;
 use scan_ui::basic_adjustment::{basic_adjustemnt, BasicAdjustmentPanel};
+use scan_ui::protocol_panel::{protocol_panel, ProtocolPanel};
 use scan_ui::sequence_editor::{sequence_editor, SequenceEditor};
 use scan_ui::scout_viewer::{scout_viewer,ScoutViewPort};
 use scan_ui::sequence_viewer::{sequence_viewer, SequenceViewer};
@@ -21,6 +22,7 @@ struct MyApp {
     adjustment_panel:BasicAdjustmentPanel,
     sequence_viwer:SequenceViewer,
     study_panel:StudyPanel,
+    protocol_panel:ProtocolPanel,
 }
 
 impl Default for MyApp {
@@ -31,6 +33,7 @@ impl Default for MyApp {
             adjustment_panel:BasicAdjustmentPanel::default(),
             sequence_viwer:SequenceViewer::default(),
             study_panel:StudyPanel::default(),
+            protocol_panel:ProtocolPanel::default(),
         }
     }
 }
@@ -41,10 +44,6 @@ impl eframe::App for MyApp {
 
         egui::SidePanel::left("my_left_panel").show(ctx, |ui| {
             ui.label("Window Selector");
-
-            egui::CollapsingHeader::new("Study Panel").show(ui, |ui| {
-                study_panel(ctx,ui,&mut self.study_panel);
-            });
 
             egui::CollapsingHeader::new("Basic Adjustment Panel").show(ui, |ui| {
                 basic_adjustemnt(ctx,ui,&mut self.adjustment_panel,&self.study_panel);
@@ -61,11 +60,12 @@ impl eframe::App for MyApp {
             egui::CollapsingHeader::new("Sequence Viewer").show(ui, |ui| {
                 sequence_viewer(ctx,ui,&mut self.sequence_viwer);
             });
-
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Civm Scan");
+            study_panel(ctx,ui,&mut self.study_panel);
+            protocol_panel(ctx,ui,&mut self.protocol_panel,&mut self.study_panel,&mut self.adjustment_panel);
         });
     }
 }
