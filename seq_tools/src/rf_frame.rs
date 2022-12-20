@@ -1,8 +1,7 @@
+use crate::hardware_constants::RF_MAX_DAC;
 use crate::pulse::{Pulse, Trapezoid, Hardpulse, CompositeHardpulse, SincPulse};
 use crate::seqframe::{self, SeqFrame, FrameType, SeqFrameExpression};
 use crate::pulse_function::{Function,FunctionParams};
-
-pub const RF_MAX_DAC:i16 = 2047;
 
 // this is like inheritance, forcing whatever implements GradFrame to also implement Pulse
 pub trait RfFrame:Pulse {

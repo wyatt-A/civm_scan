@@ -3,13 +3,9 @@ use encoding::all::ISO_8859_1;
 use std::path::{Path};
 use std::io::Write;
 use std::fs::File;
+use crate::hardware_constants::{CLOCK_PERIOD_NS, GRAD_CLOCK_MULTIPLIER, RF_CLOCK_MULTIPLIER};
 use crate::pulse_function::{Function};
 
-const CLOCK_PERIOD_NS:usize = 100;
-const GRAD_CLOCK_MULTIPLIER:usize = 20; // this means that the gradient clock period is 2 us
-const RF_CLOCK_MULTIPLIER:usize = 1; // this means that the min rf clock period is 100 ns
-pub const GRAD_SEQ_FILE_LABEL:&str = "civm_grad";
-pub const RF_SEQ_FILE_LABEL:&str = "civm_rf";
 
 pub enum FrameType{
     Grad,

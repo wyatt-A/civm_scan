@@ -1,8 +1,7 @@
+use crate::hardware_constants::GRAD_MAX_DAC;
 use crate::pulse::{HalfSin, Pulse, Trapezoid};
 use crate::pulse_function::Function;
 use crate::seqframe::{self, SeqFrame, FrameType, SeqFrameExpression};
-
-const GRAD_MAX_DAC:i16 = 32767;
 
 // this is like inheritance, forcing whatever implements GradFrame to also implement Pulse
 pub trait GradFrame:Pulse {
@@ -20,11 +19,3 @@ pub trait GradFrame:Pulse {
 
 impl GradFrame for Trapezoid {}
 impl GradFrame for HalfSin {}
-
-#[test]
-fn test(){
-    println!("gradient seqframe test ...");
-    let t = Trapezoid::new(100E-6,2E-3);
-    let s = t.grad_seq_frame("trap",2);
-    println!("{}",s.serialize());
-}

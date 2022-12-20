@@ -9,7 +9,6 @@ use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin,
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
-use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
 use seq_tools::pulse::{CompositeHardpulse, HalfSin, Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{PhaseCycleStrategy, RfStateType};
@@ -19,6 +18,8 @@ use serde_json;
 use serde::{Serialize,Deserialize};
 use cs_table::cs_table::CSTable;
 use headfile::headfile::{AcqHeadfileParams, DWHeadfileParams, DWHeadfile, AcqHeadfile};
+use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
+use seq_tools::ppl_header::BaseFrequency;
 
 
 impl Setup for FseDtiParams {

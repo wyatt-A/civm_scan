@@ -8,15 +8,16 @@ use seq_tools::event_block::EventPlacementType::{ExactFromOrigin, Origin};
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, DriverVar, Matrix};
-use seq_tools::ppl::{GradClock, PhaseUnit,BaseFrequency};
+use seq_tools::ppl::{GradClock, PhaseUnit};
 use seq_tools::pulse::{Hardpulse, SliceSelective, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{RfDriver, RfDriverType, RfStateType};
 use crate::pulse_sequence::{Build, PPLBaseParams, Setup, Simulate, Initialize, AdjustmentParameters, SequenceLoadError};
 use serde_json;
 use serde::{Serialize,Deserialize};
+use seq_tools::hardware_constants::RF_MAX_DAC;
 use seq_tools::ppl::Orientation::CivmStandard;
-use seq_tools::rf_frame::RF_MAX_DAC;
+use seq_tools::ppl_header::BaseFrequency;
 
 
 impl Setup for RfCalParams {

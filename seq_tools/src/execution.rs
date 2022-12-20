@@ -2,7 +2,7 @@ use crate::acq_event::{SpectralWidth};
 use crate::command_string::CommandString;
 use crate::{ppl_function};
 use serde::{Serialize};
-use crate::ppl::{Adjustment};
+use crate::ppl_header::Adjustment;
 
 #[derive(PartialEq)]
 pub enum EventType {

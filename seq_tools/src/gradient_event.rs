@@ -5,15 +5,11 @@ use crate::event_block::GradEventType;
 use crate::execution::{ExecutionBlock, WaveformData, BlockExecution, EventType};
 use crate::ppl_function;
 use crate::_utils;
-use crate::ppl::Adjustment;
-use crate::seqframe::{GRAD_SEQ_FILE_LABEL, SeqFrame};
+use crate::hardware_constants::GRAD_SEQ_FILE_LABEL;
+use crate::ppl_header::Adjustment;
+use crate::seqframe::SeqFrame;
+use crate::timing_constants::{GRAD_EXTRA_CHANNEL_START_DELAY, GRAD_SINGLE_CHANNEL_START_DELAY, GRAD_TIME_BLOCK_1, GRAD_TIME_BLOCK_2};
 
-const TIME_BLOCK_1:i32 = 300;
-const TIME_BLOCK_2:i32 = 300;
-
-//const SINGLE_CHANNEL_START_DELAY:i32 = 100; // cost of 1 channel start
-const SINGLE_CHANNEL_START_DELAY:i32 = 0; // cost of 1 channel start
-const EXTRA_CHANNEL_START_DELAY:i32 = 30; // added cost per 1 channel more (81 + 31 for 2 channels)
 
 const READ_MASK:&str = "0x0002";
 const PHASE_MASK:&str = "0x0020";
@@ -157,7 +153,7 @@ impl<GF> GradEvent<GF> where GF:GradFrame + Copy {
         count
     }
     pub fn hardware_start_delay(&self) -> i32 {
-        (self.n_active_channels()-1)*EXTRA_CHANNEL_START_DELAY + SINGLE_CHANNEL_START_DELAY
+        (self.n_active_channels()-1)* GRAD_EXTRA_CHANNEL_START_DELAY + GRAD_SINGLE_CHANNEL_START_DELAY
     }
     pub fn frame_duration_clocks(&self,chann:Channel) -> Option<i32> {
         match chann {
@@ -195,10 +191,10 @@ impl<GF> GradEvent<GF> where GF:GradFrame + Copy {
 
 impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
     fn block_duration(&self) -> i32 {
-        TIME_BLOCK_1 + TIME_BLOCK_2
+        GRAD_TIME_BLOCK_1 + GRAD_TIME_BLOCK_2
     }
     fn time_to_start(&self) -> i32 {
-        self.hardware_start_delay() + TIME_BLOCK_1
+        self.hardware_start_delay() + GRAD_TIME_BLOCK_1
     }
     fn time_to_end(&self) -> i32 {
         self.time_to_start() + self.max_waveform_duration()
@@ -212,10 +208,10 @@ impl<GF: 'static> ExecutionBlock for GradEvent<GF> where GF:GradFrame + Copy{
                 ppl_function::start_timer(),
                 self.select_matrix(),
                 self.set_list(),
-                ppl_function::wait_timer(TIME_BLOCK_1),
+                ppl_function::wait_timer(GRAD_TIME_BLOCK_1),
                 ppl_function::start_timer(),
                 ppl_function::grad_start(&self.channel_mask()),
-                ppl_function::wait_timer(TIME_BLOCK_2),
+                ppl_function::wait_timer(GRAD_TIME_BLOCK_2),
             ].join("\n")
         );
         BlockExecution::new(cmd,post_delay_clocks)

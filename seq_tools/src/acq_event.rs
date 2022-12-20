@@ -2,19 +2,12 @@ use crate::execution::{BlockExecution, ExecutionBlock, PlotTrace, WaveformData, 
 use crate::command_string::CommandString;
 use crate::rf_state::{RfState, RfStateType};
 use crate::{ppl_function, _utils};
-use crate::ppl::Adjustment;
 use crate::grad_cal;
 use serde::{Deserialize, Serialize};
+use crate::ppl_constants::{NO_SAMPLES_VAR, SAMPLE_PERIOD_VAR};
+use crate::ppl_header::Adjustment;
+use crate::timing_constants::{ACQ_TIME_BLOCK_1, ACQ_TIME_BLOCK_2};
 
-// time allocated for setting reciever phase
-const TIME_BLOCK_1:i32 = 500;
-// time required after call to acquire before samples are collected
-//const TIME_BLOCK_2:i32 = 221;
-//const TIME_BLOCK_2:i32 = 600;
-const TIME_BLOCK_2:i32 = 500;
-
-const NO_SAMPLES_VAR:&str = "no_samples";
-const SAMPLE_PERIOD_VAR:&str = "sample_period";
 
 #[derive(Clone,PartialEq,Serialize,Deserialize)]
 pub enum SpectralWidth {
@@ -105,10 +98,10 @@ impl AcqEvent{
 
 impl ExecutionBlock for AcqEvent {
     fn block_duration(&self) -> i32 {
-        self.sample_time_clocks() + TIME_BLOCK_1 + TIME_BLOCK_2 + self.sample_rate.post_delay()
+        self.sample_time_clocks() + ACQ_TIME_BLOCK_1 + ACQ_TIME_BLOCK_2 + self.sample_rate.post_delay()
     }
     fn time_to_start(&self) -> i32 {
-        TIME_BLOCK_1 + TIME_BLOCK_2
+        ACQ_TIME_BLOCK_1 + ACQ_TIME_BLOCK_2
     }
     fn time_to_end(&self) -> i32 {
         self.time_to_start() + self.sample_time_clocks()
@@ -122,7 +115,7 @@ impl ExecutionBlock for AcqEvent {
                 ppl_function::start_timer(),
                 ppl_function::resync(),
                 ppl_function::set_rec_phase_with_var(&self.phase_state.phase_var()),
-                ppl_function::wait_timer(TIME_BLOCK_1),
+                ppl_function::wait_timer(ACQ_TIME_BLOCK_1),
                 ppl_function::acquire(&self.n_samples_var(),&self.sample_period_var())
             ].join("\n")
         );
@@ -176,21 +169,3 @@ impl ExecutionBlock for AcqEvent {
         self.render_normalized(time_step_us)
     }
 }
-
-// #[test]
-// fn test(){
-//
-//     let phase = RfStateType::Static(0);
-//     let acq = AcqEvent::new("acq", SpectralWidth::SW100kH, 128, 0, phase);
-//
-//     //let header = acq.block_header_statements();
-//     let dec = acq.block_declaration();
-//     let consts = acq.block_constant_initialization();
-//     let init = acq.block_initialization();
-//     let calc = acq.block_calculation();
-//     let exec = acq.block_execution(64).cmd_string();
-//     println!("{}",dec.commands);
-//     println!("{}",init.commands);
-//     println!("{}",calc.unwrap().commands);
-//     println!("{}",exec.commands);
-// }

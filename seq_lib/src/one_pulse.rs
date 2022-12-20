@@ -6,14 +6,14 @@ use seq_tools::acq_event::{AcqEvent, SpectralWidth};
 use seq_tools::event_block::{Event, EventQueue};
 use seq_tools::event_block::EventPlacementType::{After, Origin};
 use seq_tools::execution::ExecutionBlock;
-use seq_tools::ppl::{GradClock, PhaseUnit,BaseFrequency};
 use seq_tools::pulse::{Hardpulse};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{RfStateType};
 use crate::pulse_sequence::{Build, PPLBaseParams, Simulate, Initialize, AdjustmentParameters, SequenceLoadError};
 use serde_json;
 use serde::{Serialize,Deserialize};
-use seq_tools::ppl::Orientation::CivmStandard;
+use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
+use seq_tools::ppl_header::BaseFrequency;
 
 impl Simulate for OnePulseParams {
     fn set_sim_repetitions(&mut self) {
@@ -81,7 +81,7 @@ impl Build for OnePulse {
             n_repetitions: self.params.n_repetitions,
             rep_time: self.params.rep_time,
             base_frequency: BaseFrequency::civm9p4t(0.0),
-            orientation: CivmStandard,
+            orientation: Orientation::CivmStandard,
             grad_clock: GradClock::CPS20,
             phase_unit: PhaseUnit::Min,
             view_acceleration: 1,

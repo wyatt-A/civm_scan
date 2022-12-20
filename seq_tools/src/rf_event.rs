@@ -6,13 +6,11 @@ use crate::execution::{ExecutionBlock, WaveformData, PlotTrace, BlockExecution, 
 use crate::ppl_function;
 use crate::pulse_function::render_function_vector;
 use crate::_utils::us_to_clock;
-use crate::ppl::Adjustment;
-use crate::seqframe::{RF_SEQ_FILE_LABEL, SeqFrame};
+use crate::hardware_constants::RF_SEQ_FILE_LABEL;
+use crate::ppl_header::Adjustment;
+use crate::seqframe::SeqFrame;
+use crate::timing_constants::{RF_TIME_BLOCK, RFSTART_POSTDELAY, RFSTART_PREDELAY};
 
-//const TIME_BLOCK:i32 = 150; // clock cycles (100ns)
-const TIME_BLOCK:i32 = 400; // clock cycles (100ns)
-const RFSTART_PREDELAY:i32 = 600; // clock cycles
-const RFSTART_POSTDELAY:i32 = 84; // clock cycles (found experimentally)
 
 #[derive(Clone)]
 pub struct RfEvent<RF> where RF:RfFrame{
@@ -39,7 +37,7 @@ impl<RF> RfEvent<RF> where RF:RfFrame {
         _utils::sec_to_us(self.rf_frame.duration())
     }
     pub fn pulse_duration_clocks(&self) -> i32 {
-        _utils::us_to_clock(self.pulse_duration_us())
+        us_to_clock(self.pulse_duration_us())
     }
     pub fn init_list(&self) -> String {
         let d_us = self.pulse_duration_us();
@@ -55,22 +53,43 @@ impl<RF> RfEvent<RF> where RF:RfFrame {
 }
 
 impl<RF: 'static> ExecutionBlock for RfEvent<RF> where RF:RfFrame + Clone{
-    fn kind(&self) -> EventType {
-        EventType::Rf
-    }
     fn block_duration(&self) -> i32 {
-        TIME_BLOCK + RFSTART_PREDELAY + us_to_clock(self.pulse_duration_us()) + RFSTART_POSTDELAY
+        RF_TIME_BLOCK + RFSTART_PREDELAY + us_to_clock(self.pulse_duration_us()) + RFSTART_POSTDELAY
+    }
+    fn time_to_start(&self) -> i32 {
+        RF_TIME_BLOCK + RFSTART_PREDELAY
+    }
+    fn time_to_end(&self) -> i32 {
+        self.time_to_start() + self.pulse_duration_clocks()
+    }
+    fn time_to_center(&self) -> i32 {
+        self.time_to_start() + self.pulse_duration_clocks()/2
     }
     fn block_execution(&self,post_delay:i32) -> BlockExecution {
         let cmd_str = vec![
             ppl_function::start_timer(),
             ppl_function::resync(),
             ppl_function::set_phase_with_var(&self.rf_state.phase_var()),
-            ppl_function::wait_timer(TIME_BLOCK),
+            ppl_function::wait_timer(RF_TIME_BLOCK),
             ppl_function::rf_start(self.uid, self.pulse_duration_us() as u16, &self.rf_state.power_var(), _utils::clock_to_us(RFSTART_PREDELAY) as u16),
         ];
         let cmd_str = CommandString::new_hardware_exec(&cmd_str.join("\n"));
         BlockExecution::new(cmd_str,post_delay)
+    }
+    fn block_header_adjustments(&self) -> Option<Vec<Adjustment>> {
+        self.rf_state.header_declaration()
+    }
+    fn block_constant_initialization(&self) -> Option<CommandString> {
+        None
+    }
+    fn block_initialization(&self) -> CommandString {
+        CommandString::new_calculation(
+            &vec![
+                self.rf_state.init_phase_var(),
+                self.rf_state.init_power_var().unwrap_or("".to_string()),
+                self.init_list(),
+            ].join("\n")
+        )
     }
     fn block_declaration(&self) -> CommandString {
         let cmd_str = vec![
@@ -79,6 +98,7 @@ impl<RF: 'static> ExecutionBlock for RfEvent<RF> where RF:RfFrame + Clone{
         ].join("\n");
         CommandString::new_declare(&cmd_str)
     }
+
     fn block_calculation(&self) -> Option<CommandString> {
         let mut cmds = Vec::<String>::new();
         cmds.push(self.rf_state.set_phase());
@@ -90,35 +110,9 @@ impl<RF: 'static> ExecutionBlock for RfEvent<RF> where RF:RfFrame + Clone{
         }
         Some(CommandString::new_calculation(&cmds.join("\n")))
     }
-    fn block_initialization(&self) -> CommandString {
-        CommandString::new_calculation(
-            &vec![
-                self.rf_state.init_phase_var(),
-                self.rf_state.init_power_var().unwrap_or("".to_string()),
-                self.init_list(),
-            ].join("\n")
-        )
-    }
-    fn block_constant_initialization(&self) -> Option<CommandString> {
-        None
-    }
-    fn block_header_adjustments(&self) -> Option<Vec<Adjustment>> {
-        self.rf_state.header_declaration()
-    }
+
     fn as_reference(&self) -> Box<dyn ExecutionBlock> {
         Box::new(self.clone())
-    }
-
-    fn time_to_start(&self) -> i32 {
-        TIME_BLOCK + RFSTART_PREDELAY
-    }
-
-    fn time_to_end(&self) -> i32 {
-        self.time_to_start() + self.pulse_duration_clocks()
-    }
-
-    fn time_to_center(&self) -> i32 {
-        self.time_to_start() + self.pulse_duration_clocks()/2
     }
 
     fn label(&self) -> String {
@@ -132,15 +126,19 @@ impl<RF: 'static> ExecutionBlock for RfEvent<RF> where RF:RfFrame + Clone{
         let phase_plot = PlotTrace::new(t,phase);
         WaveformData::Rf(amplitude_plot,phase_plot)
     }
+
+    fn kind(&self) -> EventType {
+        EventType::Rf
+    }
+    fn blocking(&self) -> bool {
+        true
+    }
     fn seq_params(&self,sample_period_us:usize) -> Option<String> {
         let (amp,phase) = self.seq_frame(sample_period_us);
         Some(vec![
             amp.serialize(),
             phase.serialize()
         ].join("\n"))
-    }
-    fn blocking(&self) -> bool {
-        true
     }
 
     fn render_magnitude(&self, time_step_us: usize, _driver_value: u32) -> WaveformData {
@@ -165,34 +163,3 @@ impl<RF: 'static> ExecutionBlock for RfEvent<RF> where RF:RfFrame + Clone{
         }
     }
 }
-
-/*
-starttimer();
-resync();
-phase(excitation_phase);
-waittimer(150);
-MR3031_RFSTART(2,100,excitation,60,4)
-delay32(c_excitation_postdel);
- */
-
-// #[test]
-// fn test(){
-//
-//     let phase_cycling = PhaseCycleStrategy::LUTNinetyTwoSeventy(480,Some(480));
-//     let phase_cycle_driver = RfDriver::new("no_complete_views",RfDriverType::PhaseCycle3D(phase_cycling));
-//     let phase = RfStateType::Driven(phase_cycle_driver);
-//     let power = RfStateType::Adjustable(400);
-//     let pulse = CompositeHardpulse::new_180(100E-6);
-//     let rfe = RfEvent::new("excite",0,pulse,power,phase);
-//
-//     //let header = rfe.block_header_statements();
-//     let dec = rfe.block_declaration();
-//     let consts = rfe.block_constant_initialization();
-//     let init = rfe.block_initialization();
-//     let calc = rfe.block_calculation();
-//     let exec = rfe.block_execution(64).cmd_string();
-//     println!("{}",dec.commands);
-//     println!("{}",init.commands);
-//     println!("{}",calc.unwrap().commands);
-//     println!("{}",exec.commands);
-// }

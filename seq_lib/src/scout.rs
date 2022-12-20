@@ -1,14 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::fs::{File};
 use std::io::{Read, Write};
-use seq_tools::{grad_cal, _utils};
+use seq_tools::{grad_cal};
 use seq_tools::acq_event::{AcqEvent, SpectralWidth};
 use seq_tools::event_block::{Event, EventQueue, GradEventType};
 use seq_tools::event_block::EventPlacementType::{After, Before, ExactFromOrigin, Origin};
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
-use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
 use seq_tools::pulse::{Hardpulse, Pulse, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{RfStateType};
@@ -17,6 +16,8 @@ use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, Com
 use serde_json;
 use serde::{Serialize,Deserialize};
 use headfile::headfile::{AcqHeadfile, AcqHeadfileParams};
+use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
+use seq_tools::ppl_header::BaseFrequency;
 
 impl Simulate for ScoutParams {
     fn set_sim_repetitions(&mut self) {

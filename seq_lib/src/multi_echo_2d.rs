@@ -10,7 +10,6 @@ use seq_tools::event_block::EventPlacementType::{Before, ExactFromOrigin, Origin
 use seq_tools::execution::ExecutionBlock;
 use seq_tools::gradient_event::GradEvent;
 use seq_tools::gradient_matrix::{DacValues, Dimension, DriverVar, EncodeStrategy, LinTransform, Matrix, MatrixDriver, MatrixDriverType};
-use seq_tools::ppl::{GradClock, Orientation, PhaseUnit,BaseFrequency};
 use seq_tools::pulse::{Pulse, SincPulse, SliceSelective, Trapezoid};
 use seq_tools::rf_event::RfEvent;
 use seq_tools::rf_state::{RfStateType};
@@ -18,6 +17,8 @@ use crate::pulse_sequence::{Build, PPLBaseParams, SequenceParameters, Setup, Com
 use serde_json;
 use serde::{Serialize,Deserialize};
 use headfile::headfile::{AcqHeadfile, AcqHeadfileParams};
+use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
+use seq_tools::ppl_header::BaseFrequency;
 
 impl Simulate for Me2DParams {
     fn set_sim_repetitions(&mut self) {

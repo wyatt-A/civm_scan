@@ -11,12 +11,9 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::ppl::{AVERAGES_LOOP_COUNTER_VAR, Adjustment, VIEW_LOOP_COUNTER_VAR};
+use crate::ppl_constants::{AVERAGES_LOOP_COUNTER_VAR, LONG_TEMPVAL_VAR_NAME, LUT_INDEX_VAR_NAME, LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, VIEW_LOOP_COUNTER_VAR};
+use crate::ppl_header::Adjustment;
 
-pub const LONG_TEMPVAL_VAR_NAME:&str = "tempval_long";
-pub const LUT_TEMPVAL_VAR_NAME_1:&str = "lut_tempval_1";
-pub const LUT_TEMPVAL_VAR_NAME_2:&str = "lut_tempval_2";
-pub const LUT_INDEX_VAR_NAME:&str = "lut_index";
 
 #[derive(Clone,Copy,Debug)]
 struct TransCoeffs {

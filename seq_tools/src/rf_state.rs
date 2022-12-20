@@ -1,5 +1,6 @@
-use crate::gradient_matrix::{LUT_INDEX_VAR_NAME, LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, DriverVar};
-use crate::ppl::{Adjustment, VIEW_LOOP_COUNTER_VAR};
+use crate::gradient_matrix::DriverVar;
+use crate::ppl_constants::{LUT_INDEX_VAR_NAME, LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, VIEW_LOOP_COUNTER_VAR};
+use crate::ppl_header::Adjustment;
 
 #[derive(Clone,Debug)]
 pub struct RfState {

@@ -3,11 +3,12 @@ use crate::execution::{ExecutionBlock, WaveformData, EventType};
 use crate::ppl_function::MIN_DELAY_CLOCKS;
 use serde::{Serialize};
 use crate::command_string::CommandString;
-use crate::ppl::{FlatLoopStructure, Adjustment};
 use crate::_utils;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use crate::acq_event::SpectralWidth;
+use crate::loop_structure::FlatLoopStructure;
+use crate::ppl_header::Adjustment;
 
 
 // this is where execution blocks inherit an absolute time relative to one another

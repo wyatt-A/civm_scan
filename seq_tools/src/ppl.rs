@@ -1,62 +1,23 @@
 use std::path::{Path};
 use serde::{Deserialize, Serialize};
 use crate::command_string::CommandString;
-use crate::acq_event::SpectralWidth;
 use crate::event_block::{EventQueue, EventQueueError};
 use crate::ppl_function;
-use crate::_utils;
-use crate::rf_frame::RF_MAX_DAC;
-use crate::seqframe::{FrameType, RF_SEQ_FILE_LABEL, GRAD_SEQ_FILE_LABEL};
-use crate::gradient_matrix::{LUT_TEMPVAL_VAR_NAME_1, LUT_TEMPVAL_VAR_NAME_2, LONG_TEMPVAL_VAR_NAME, LUT_INDEX_VAR_NAME};
+use crate::ppl_constants::{
+    AVERAGES_LOOP_COUNTER_VAR, CALC_MATRIX, CIVM_INCLUDE, GRAD_FN_INCLUDE, GRAD_STRENGTH_VAR,
+    LONG_TEMPVAL_VAR_NAME, LUT_INCLUDE, LUT_INDEX_VAR_NAME, LUT_TEMPVAL_VAR_NAME_1,
+    LUT_TEMPVAL_VAR_NAME_2, NO_AVERAGES_MAX, NO_AVERAGES_MIN, NO_AVERAGES_VAR, NO_DISCARD_MAX,
+    NO_DISCARD_MIN, NO_DISCARD_VAR, NO_ECHOES_MAX, NO_ECHOES_MIN, NO_ECHOES_VAR, NO_SAMPLES_MAX,
+    NO_SAMPLES_MIN, NO_SAMPLES_VAR, NO_VIEWS_MAX, NO_VIEWS_MIN, NO_VIEWS_VAR, RECEIVER_MASK_MAX,
+    RECEIVER_MASK_MIN, RECEIVER_MASK_VAR, RF_FN_INCLUDE, SPECTRAL_WIDTH_VAR, STD_FN_INCLUDE,
+    STD_GRAD_SEQ, STD_RF_SEQ, VIEW_LOOP_COUNTER_VAR
+};
 use crate::grad_cal;
+use crate::hardware_constants::{GRAD_SEQ_FILE_LABEL, RF_SEQ_FILE_LABEL};
+use crate::loop_structure::FlatLoopStructure;
+use crate::ppl_header::{BaseFrequency, DspRoutine, Header};
+use crate::seqframe::FrameType;
 
-const CIVM_INCLUDE:&str = r"C:\workstation\SequenceTools\CivmSequenceTools_v1.0\civm_var_20_long.PPH";
-const STD_FN_INCLUDE:&str = r"stdfn_15.pph";
-const GRAD_FN_INCLUDE:&str = r"m3040_20.pph";
-const RF_FN_INCLUDE:&str = r"m3031_15.pph";
-const STD_RF_SEQ:&str = r"c:\smis\seqlib\RFstd.seq";
-const STD_GRAD_SEQ:&str = r"c:\smis\seqlib\g3040_15.seq";
-const LUT_INCLUDE:&str = r"C:\smis\include\lututils.pph";
-
-const CALC_MATRIX:&str = "c_calc_mat";
-
-const SPECTRAL_WIDTH_VAR:&str = "sample_period";
-const GRAD_STRENGTH_VAR:&str = "grad_var";
-const RECEIVER_MASK_VAR:&str = "rec_sel";
-const RECEIVER_MASK_MIN:u32 = 1;
-const RECEIVER_MASK_MAX:u32 = 65535;
-
-const NO_SAMPLES_VAR:&str = "no_samples";
-const NO_SAMPLES_MIN:u32 = 8;
-const NO_SAMPLES_MAX:u32 = 65535;
-
-const NO_DISCARD_VAR:&str = "no_discard";
-const NO_DISCARD_MIN:u32 = 0;
-const NO_DISCARD_MAX:u32 = 64;
-
-const NO_ECHOES_VAR:&str = "no_echoes";
-const NO_ECHOES_MIN:u32 = 1;
-const NO_ECHOES_MAX:u32 = 64;
-
-const NO_VIEWS_VAR:&str = "no_views";
-const VIEW_LOOP_NAME:&str = "views_loop";
-pub const VIEW_LOOP_COUNTER_VAR:&str = "no_completed_views";
-
-const NO_VIEWS_MIN:u32 = 1;
-const NO_VIEWS_MAX:u32 = 500_000;
-
-const NO_AVERAGES_VAR:&str = "no_averages";
-const AVERAGES_LOOP_NAME:&str = "averages_loop";
-pub const AVERAGES_LOOP_COUNTER_VAR:&str = "no_completed_averages";
-const NO_AVERAGES_MIN:u32 = 1;
-const NO_AVERAGES_MAX:u32 = 65535;
-
-const FREQ_OFFSET_MIN:i32 = -40000000;
-const FREQ_OFFSET_MAX:i32 = 40000000;
-
-pub enum DspRoutine {
-    Dsp
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Orientation {
@@ -129,67 +90,6 @@ impl PhaseUnit{
     }
 }
 
-impl DspRoutine {
-    fn print(&self) -> String {
-        match self {
-            DspRoutine::Dsp =>
-                String::from("DSP_ROUTINE \"dsp\";")
-        }
-    }
-    pub fn print_ppr(&self) -> String {
-        match self {
-            DspRoutine::Dsp =>
-                String::from(":DSP_ROUTINE dsp")
-        }
-    }
-}
-
-
-// pub enum BaseFrequency {
-//     Civm9p4T(f32)
-// }
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct BaseFrequency {
-    base_freq:f32,
-    obs_offset:f32
-}
-
-
-impl BaseFrequency {
-
-    pub fn civm9p4t(offset:f32) -> Self {
-        Self {
-            base_freq:30171576.0,
-            obs_offset:offset
-        }
-    }
-    fn print(&self) -> String {
-                format!("OBSERVE_FREQUENCY \"9.4T 1H\",{},{},{},MHz, kHz, Hz, rx1MHz;",
-                        FREQ_OFFSET_MIN,FREQ_OFFSET_MAX,self.obs_offset)
-    }
-    fn print_ppr(&self) -> String {
-                format!(":OBSERVE_FREQUENCY \"9.4T 1H\", {:.1}, MHz, kHz, Hz, rx1MHz"
-                        ,self.base_freq+self.obs_offset)
-    }
-    pub fn set_freq_buffer(&self) -> String {
-        ppl_function::set_base_freq()
-    }
-}
-
-pub struct Header {
-    pub dsp_routine:DspRoutine,
-    pub receiver_mask:u16,
-    pub base_frequency:BaseFrequency,
-    pub samples:u16,
-    pub spectral_width: SpectralWidth,
-    pub sample_discards:u16,
-    pub repetitions:u32,
-    pub echos:u16,
-    pub echo_divisor:u16,
-    pub averages:u16,
-    pub user_adjustments:Option<Vec<Adjustment>>
-}
 
 
 
@@ -271,8 +171,8 @@ impl Includes {
 }
 
 pub struct Constants {
-    block_constants:Vec<String>,
-    miscellaneous:Vec<String>,
+    block:Vec<String>,
+    required:Vec<String>,
 }
 
 impl Constants {
@@ -284,29 +184,29 @@ impl Constants {
         };
 
         Self {
-            block_constants:bc.iter().map(|cmd| cmd.commands.clone()).collect(),
-            miscellaneous:vec![
+            block:bc.iter().map(|cmd| cmd.commands.clone()).collect(),
+            required:vec![
                 format!("const {} 1;",CALC_MATRIX),
             ]
         }
     }
     pub fn print(&self) -> String {
         let mut strvec = Vec::<String>::new();
-        strvec.extend(self.miscellaneous.clone());
-        strvec.extend(self.block_constants.clone());
+        strvec.extend(self.required.clone());
+        strvec.extend(self.block.clone());
         strvec.join("\n")
     }
 }
 
 pub struct Declarations {
-    block_declarations:Vec<String>,
+    block:Vec<String>,
     temp_vars:Vec<String>
 }
 
 impl Declarations {
     pub fn default(event_queue:&EventQueue) -> Self {
         Self {
-            block_declarations:event_queue.ppl_declarations().iter().map(|cmd| cmd.commands.clone()).collect(),
+            block:event_queue.ppl_declarations().iter().map(|cmd| cmd.commands.clone()).collect(),
             temp_vars:vec![
                 format!("int {};",LUT_TEMPVAL_VAR_NAME_1),
                 format!("int {};",LUT_TEMPVAL_VAR_NAME_2),
@@ -323,25 +223,25 @@ impl Declarations {
     }
     pub fn print(&self) -> String {
         let mut strvec = Vec::<String>::new();
-        strvec.extend(self.block_declarations.clone());
+        strvec.extend(self.block.clone());
         strvec.extend(self.temp_vars.clone());
         strvec.join("\n")
     }
 }
 
 pub struct Initializations {
-    block_initializations:Vec<String>,
+    block:Vec<String>,
 }
 
 impl Initializations {
     pub fn default(event_queue:&EventQueue) -> Self {
         Self {
-            block_initializations:event_queue.ppl_initializations().iter().map(|cmd| cmd.commands.clone()).collect(),
+            block:event_queue.ppl_initializations().iter().map(|cmd| cmd.commands.clone()).collect(),
         }
     }
     pub fn print(&self) -> String {
         let mut strvec = Vec::<String>::new();
-        strvec.extend(self.block_initializations.clone());
+        strvec.extend(self.block.clone());
         strvec.join("\n")
     }
 }
@@ -437,78 +337,6 @@ impl Setup {
     }
 }
 
-
-
-pub enum AdjustmentInterface {
-    Scrollbar,
-    Text,
-}
-
-pub struct Adjustment {
-    interface:AdjustmentInterface,
-    title:String,
-    title_hint:String,
-    target_var:String,
-    min:i16,
-    max:i16,
-    scale:f32,
-    default:i16,
-}
-
-impl Adjustment {
-    pub fn new_rf_pow_adj(label:&str,target_var:&str,default_val:i16) -> Self {
-        Self {
-            title:format!("{} dac percent",label),
-            title_hint:String::from("%"),
-            target_var:String::from(target_var),
-            min:0,
-            max:RF_MAX_DAC,
-            scale:RF_MAX_DAC as f32/100.0,
-            default:default_val,
-            interface:AdjustmentInterface::Scrollbar
-        }
-    }
-    pub fn new_rf_phase_adj(label:&str,target_var:&str,default_val:i16) -> Self {
-        Self {
-            title:format!("{} phase adjustment",label),
-            title_hint:String::from("400=90deg"),
-            target_var:String::from(target_var),
-            min:-800,
-            max:800,
-            scale:1.0,
-            default:default_val,
-            interface:AdjustmentInterface::Scrollbar
-        }
-    }
-    pub fn new_grad_adj(label:&str,target_var:&str,half_range:i16) -> Self {
-        Self {
-            title:format!("{}",label),
-            title_hint:String::from("dac"),
-            target_var:String::from(target_var),
-            min:-half_range,
-            max:half_range,
-            scale:1.0,
-            default:0,
-            interface:AdjustmentInterface::Text
-        }
-    }
-    fn print(&self) -> String {
-        match self.interface {
-            AdjustmentInterface::Text => {
-                format!("EDITTEXT \"{}\",\"{}\",\"%.2f\",{},{},{},{},{};",
-                        self.title,self.title_hint,self.min,self.max,self.default,self.scale,self.target_var,)
-            },
-            AdjustmentInterface::Scrollbar => {
-                format!("SCROLLBAR \"{}\",\"{}\",\"%.2f\",{},{},{},{},{};",
-                        self.title,self.title_hint,self.min,self.max,self.default,self.scale,self.target_var,)
-            }
-        }
-
-    }
-    fn print_ppr(&self) -> String {
-        format!(":VAR {}, {}",self.target_var,self.default)
-    }
-}
 
 struct PPLNumeric {
     keyword:String,
@@ -687,167 +515,4 @@ impl Header {
         o
     }
 }
-
-
-
-impl Loop {
-    pub fn start(&self) -> String {
-        match self {
-            Loop::Repetition(_,_) =>
-                Loop::_start(VIEW_LOOP_NAME),
-            Loop::Average(_) =>
-                Loop::_start(AVERAGES_LOOP_NAME)
-        }
-    }
-    pub fn end(&self) -> String {
-        match self{
-            Loop::Repetition(_,step) =>
-                Loop::_end(VIEW_LOOP_NAME,VIEW_LOOP_COUNTER_VAR,NO_VIEWS_VAR,*step),
-            Loop::Average(_) =>
-                Loop::_end(AVERAGES_LOOP_NAME,AVERAGES_LOOP_COUNTER_VAR,NO_AVERAGES_VAR,1),
-        }
-    }
-
-    pub fn init_counter(&self) -> String {
-        match self {
-            Loop::Repetition(_,_) =>
-                format!("{} = 0;",VIEW_LOOP_COUNTER_VAR),
-            Loop::Average(_) =>
-                format!("{} = 0;",AVERAGES_LOOP_COUNTER_VAR)
-        }
-    }
-
-    fn _start(loop_name:&str) -> String {
-        format!("{}:",loop_name)
-    }
-    fn _end(loop_name:&str,counter_name:&str,varname:&str,step:u16) -> String {
-        vec![
-            format!("{} = {} + {};",counter_name,counter_name,step),
-            format!("if ({} < {}*{})",counter_name,step,varname),
-            format!("goto {};",loop_name),
-        ].join("\n")
-    }
-
-}
-
-pub enum Loop {
-    Repetition(u32,u16),
-    Average(u16)
-}
-
-pub struct CalcBlock {
-    body:Vec<CommandString>,
-}
-
-impl CalcBlock {
-    pub fn new(calc_commands:Vec<CommandString>) -> Self {
-        Self {
-            body:calc_commands
-        }
-    }
-    fn header(&self) -> Vec<CommandString>{
-        vec![
-            CommandString::new_calculation(&ppl_function::start_timer()),
-            CommandString::new_calculation(&ppl_function::host_request()),
-            CommandString::new_calculation(&ppl_function::system_out())
-        ]
-    }
-    pub fn footer(&self) -> Vec<CommandString> {
-        vec![CommandString::new_calculation(&ppl_function::wait_timer(self.duration_clocks()))]
-    }
-    pub fn duration_clocks(&self) -> i32 {
-        // todo! estimate required duration from body
-        _utils::ms_to_clock(3)
-    }
-    pub fn print(&self) -> String {
-        let h:Vec<String> = self.header().iter().map(|cmds| cmds.commands.clone()).collect();
-        let b:Vec<String> = self.body.iter().map(|cmds| cmds.commands.clone()).collect();
-        let f:Vec<String> = self.footer().iter().map(|cmds| cmds.commands.clone()).collect();
-        vec![
-            h.join("\n"),
-            b.join("\n"),
-            f.join("\n")
-        ].join("\n")
-    }
-}
-
-pub struct FlatLoopStructure {
-    outer:Loop,
-    inner:Loop,
-    calc_block:CalcBlock,
-    exec_block:Vec<CommandString>
-}
-
-impl FlatLoopStructure {
-    pub fn new(repetitions:u32, averages:u16, rep_time:f32, event_queue:&mut EventQueue,acceleration:u16) -> Result<Self,EventQueueError> {
-        // lock in events in the event queue so timing is accurate
-        let calc_block = CalcBlock::new(event_queue.export_calc_blocks());
-        let calc_time = calc_block.duration_clocks();
-        let loop_time = FlatLoopStructure::loop_waittimer();
-        event_queue.set_rep_time(rep_time,loop_time,calc_time)?;
-        Ok(Self {
-            outer:Loop::Repetition(repetitions,acceleration),
-            inner:Loop::Average(averages),
-            calc_block,
-            exec_block:event_queue.export_exec_blocks() // rep time must be set before exporting execs
-        })
-    }
-    fn loop_waittimer() -> i32 {
-        500
-    }
-
-    pub fn print(&self) -> String {
-
-        let exec_string_vec:Vec<String> = self.exec_block.iter().map(|block| block.commands.clone()).collect();
-        let exec_string = exec_string_vec.join("\n");
-
-        vec![
-            ppl_function::start_timer(),
-            self.outer.init_counter(),
-            self.outer.start(),
-            self.inner.init_counter(),
-            self.inner.start(),
-            ppl_function::wait_timer(FlatLoopStructure::loop_waittimer()),
-            self.calc_block.print(),
-            exec_string,
-            ppl_function::start_timer(),
-            self.inner.end(),
-            self.outer.end()
-        ].join("\n")
-    }
-    pub fn n_reps(&self) -> u32 {
-        match self.outer {
-            Loop::Repetition(n,_) => n,
-            _=> panic!("this loop structure must have an outer repetition loop")
-        }
-    }
-    pub fn n_averages(&self) -> u32 {
-        match self.outer {
-            Loop::Average(n) => n as u32,
-            _=> panic!("this loop structure must have an inner averages loop")
-        }
-    }
-}
-
-
-#[test]
-fn test(){
-    let h = Header{
-        dsp_routine:DspRoutine::Dsp,
-        receiver_mask:1,
-        base_frequency:BaseFrequency::civm9p4t(0.0),
-        samples:788,
-        spectral_width: SpectralWidth::SW200kH,
-        sample_discards:0,
-        repetitions:28000,
-        echos:4,
-        echo_divisor:1,
-        averages:1,
-        user_adjustments:None
-    };
-
-    println!("{}",h.print())
-}
-
-
 

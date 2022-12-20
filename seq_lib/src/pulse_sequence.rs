@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use seq_tools::event_block::{EventQueue, EventQueueError};
 use seq_tools::seqframe::SeqFrame;
 use build_sequence::build_directory::{Config,build_directory};
-use seq_tools::ppl::{BaseFrequency, GradClock, Orientation, PhaseUnit, PPL};
+use seq_tools::ppl::PPL;
 use serde_json;
 use serde::{Serialize,Deserialize};
 use seq_tools::grad_cal::{GAMMA, tesla_per_mm_to_dac};
@@ -13,6 +13,8 @@ use dyn_clone::DynClone;
 use headfile::headfile::{AcqHeadfile,DWHeadfile};
 use seq_tools::pulse::Pulse;
 use utils;
+use seq_tools::ppl::{GradClock, Orientation, PhaseUnit};
+use seq_tools::ppl_header::BaseFrequency;
 
 #[derive(Serialize,Deserialize)]
 pub struct AdjustmentResults {
