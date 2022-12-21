@@ -34,6 +34,10 @@ impl CSTable {
         self.elements.len()
     }
 
+    pub fn elements(&self) -> Vec<i16> {
+        self.elements.clone()
+    }
+
     pub fn n_views(&self) -> usize {
         self.elements.len()/2
     }
