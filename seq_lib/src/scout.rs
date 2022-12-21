@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::fs::{File};
 use std::io::{Read, Write};
+use std::rc::Rc;
 use seq_tools::{grad_cal};
 use seq_tools::acq_event::{AcqEvent, SpectralWidth};
 use seq_tools::event_block::{Event, EventQueue, GradEventType};
@@ -307,8 +308,9 @@ impl Scout {
         );
 
         let re_trans = LinTransform::new((None, Some(-1.0), None), (None, None, None));
-        let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),false,&mat_count);
+        //let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),false,&mat_count);
 
+        let rewinder = Matrix::new_derived("c_re_mat",&Rc::new(phase_encode1.clone()),re_trans,(false, false, false),false,&mat_count);
 
         let grad = 10.0*waveforms.excitation.bandwidth_hz()/params.slice_thickness;
         let slice_dac = grad_cal::grad_to_dac(grad);
@@ -321,8 +323,17 @@ impl Scout {
             &mat_count
         );
 
-        let slice_ref = slice_sel.derive(
+        // let slice_ref = slice_sel.derive(
+        //     "slice_ref_mat",
+        //     LinTransform::new((None,None,Some(-1.0)),(None,None,None)),
+        //     (false,false,false),
+        //     false,
+        //     &mat_count
+        // );
+
+        let slice_ref = Matrix::new_derived(
             "slice_ref_mat",
+            &Rc::new(slice_sel.clone()),
             LinTransform::new((None,None,Some(-1.0)),(None,None,None)),
             (false,false,false),
             false,

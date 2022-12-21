@@ -337,8 +337,9 @@ impl Me2D {
         };
 
         let re_trans = LinTransform::new((None, Some(-1.0), None), (None, None, None));
-        let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),params.grad_off,&mat_count);
+        //let rewinder = phase_encode1.derive("c_re_mat",re_trans,(false, false, false),params.grad_off,&mat_count);
 
+        let rewinder = Matrix::new_derived("c_re_mat",&Rc::new(phase_encode1.clone()),re_trans,(false, false, false),params.grad_off,&mat_count);
 
         let crusher = Matrix::new_static(
             "c_crush_mat1",

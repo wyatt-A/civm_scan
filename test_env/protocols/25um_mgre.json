@@ -1,0 +1,12 @@
+{
+  "name": "25um_mgre",
+  "require_adjustments": true,
+  "items": [
+    {
+      "alias": "mgre",
+      "require_setup": false,
+      "b_value_table": null
+    }
+  ],
+  "state": "Idle"
+}

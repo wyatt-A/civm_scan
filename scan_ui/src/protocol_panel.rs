@@ -92,15 +92,21 @@ pub fn protocol_panel(_ctx: &egui::Context,ui:&mut Ui,pp:&mut ProtocolPanel,sp:&
                         if pp.setup_complete {
                             if ui.button("build protocol").clicked(){
 
+                                let setup_pprs = match p.require_adjustments {
+                                    true => Some(pp.setup_pprs.clone().unwrap()),
+                                    false => None
+                                };
+
+                                let adj_file = ba.adjustment_file();
+
                                 let thread_protocol = (*p).clone();
                                 let thread_study_dir = (*study_dir).to_owned();
-                                let thread_setup_pprs = pp.setup_pprs.clone().unwrap();
 
                                 let (tx, rx) = std::sync::mpsc::channel();
                                 pp.build_listener = Some(rx);
 
                                 std::thread::spawn(move||{
-                                    thread_protocol.build_acquisition(&thread_study_dir,&thread_setup_pprs);
+                                    thread_protocol.build_acquisition(&thread_study_dir,setup_pprs,adj_file);
                                     tx.send(true).unwrap();
                                 });
 

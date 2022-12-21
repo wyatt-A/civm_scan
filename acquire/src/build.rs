@@ -12,6 +12,7 @@ use regex::Regex;
 use seq_lib::fse_dti::FseDtiParams;
 use crate::args::{ApplySetupArgs, NewAdjArgs, NewArgs, NewConfigArgs, NewDiffusionExperimentArgs};
 use std::fs::copy;
+use seq_lib::mgre::MgreParams;
 use seq_lib::multi_echo_2d::Me2DParams;
 use seq_lib::one_pulse::OnePulseParams;
 use seq_lib::rfcal::RfCalParams;
@@ -127,6 +128,9 @@ fn load_params(cfg_file:&Path) -> Result<Box<dyn SequenceParameters>,SequenceLoa
         Sequence::Me2D => {
             Box::new(Me2DParams::load(&cfg_file)?)
         }
+        Sequence::MGRE => {
+            Box::new(MgreParams::load(&cfg_file)?)
+        }
         _=> panic!("not yet implemented")
     })
 }
@@ -153,6 +157,9 @@ pub fn load_build_params(cfg_file:&Path) -> Result<Box<dyn Build>,SequenceLoadEr
         Sequence::Me2D => {
             Me2DParams::load(&cfg_file)?.instantiate()
         },
+        Sequence::MGRE => {
+            MgreParams::load(&cfg_file)?.instantiate()
+        }
         _=> panic!("sequence not registered")
     })
 }
@@ -255,6 +262,9 @@ pub fn new_config(args:&NewConfigArgs){
         }
         Sequence::Me2D => {
             Me2DParams::write_default(&path_out);
+        }
+        Sequence::MGRE => {
+            MgreParams::write_default(&path_out);
         }
         _=> panic!("not yet implemented")
     }

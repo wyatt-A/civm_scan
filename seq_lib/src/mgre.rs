@@ -100,14 +100,16 @@ impl Initialize for MgreParams {
             samples: (788, 480, 480),
             sample_discards: 0,
             spectral_width: SpectralWidth::SW200kH,
-            rf_alpha_flip_angle:40.0,
+            readout_padding:100E-6,
+            rf_alpha_flip_angle:30.0,
             rf_alpha_duration: 140E-6,
             tr_spoil_duration: 700E-6,
-            ramp_time: 200E-6,
-            phase_encode_time: 700E-6,
-            echo_time: 13.98E-3,
+            read_rewind_duration: 1.14E-3,
+            ramp_time: 100E-6,
+            phase_encode_time: 600E-6,
+            echo_time: 3.24E-3,
             n_echos: 4,
-            echo_spacing: 0.0,
+            echo_spacing: 6E-3,
             rep_time: 50E-3,
             n_averages: 1,
             n_repetitions: 2000,
@@ -215,9 +217,11 @@ pub struct MgreParams {
     samples: (u16, u16, u16),
     sample_discards: u16,
     spectral_width: SpectralWidth,
+    readout_padding: f32,
     rf_alpha_flip_angle: f32,
     rf_alpha_duration: f32,
     tr_spoil_duration: f32,
+    read_rewind_duration:f32,
     ramp_time: f32,
     phase_encode_time: f32,
     echo_time: f32,
@@ -251,6 +255,7 @@ pub struct MgreEvents {
 struct Waveforms {
     excitation: Hardpulse,
     phase_encode: Trapezoid,
+    read_rewind: Trapezoid,
     readout: Trapezoid,
     tr_spoiler: Trapezoid,
 }
@@ -274,14 +279,16 @@ impl Mgre {
     }
 
     fn waveforms(params: &MgreParams) -> Waveforms {
-        let read_sample_time_sec = params.spectral_width.sample_time(params.samples.0 + params.sample_discards);
+        let read_sample_time_sec = params.spectral_width.sample_time(params.samples.0 + params.sample_discards) + params.readout_padding;
         let excitation = Hardpulse::new(params.rf_alpha_duration);
         let readout = Trapezoid::new(params.ramp_time, read_sample_time_sec);
         let phase_encode = Trapezoid::new(params.ramp_time, params.phase_encode_time);
         let tr_spoiler = Trapezoid::new(params.ramp_time, params.tr_spoil_duration);
+        let read_rewind = Trapezoid::new(params.ramp_time,params.read_rewind_duration);
         Waveforms {
             excitation,
             phase_encode,
+            read_rewind,
             readout,
             tr_spoiler,
         }
@@ -340,7 +347,7 @@ impl Mgre {
             &mat_count
         );
 
-        let read_rewind_dac = waveforms.phase_encode.magnitude_net(1.0 * waveforms.readout.power_net(read_grad_dac as f32)) as i16;
+        let read_rewind_dac = waveforms.read_rewind.magnitude_net(1.0 * waveforms.readout.power_net(read_grad_dac as f32)) as i16;
 
         let phase_encode_mid = Matrix::new_static(
             "c_pe_mid_mat",
@@ -352,12 +359,14 @@ impl Mgre {
 
         // rewinder matrix at end of echo train
         let rewind_transform = LinTransform::new((None,Some(-1.0),Some(-1.0)),(None,None,None));
-        let phase_encode_end = phase_encode_start.derive(
+
+        let phase_encode_end = Matrix::new_derived(
             "c_pe_end_mat",
+            &Rc::new(phase_encode_start.clone()),
             rewind_transform,
             non_adjustable,
             params.grad_off,
-            &mat_count
+            &mat_count,
         );
 
 
@@ -402,7 +411,7 @@ impl Mgre {
         );
 
         let phase_encode_mid = GradEvent::new(
-            (Some(w.phase_encode), None, None),
+            (Some(w.read_rewind), None, None),
             &m.phase_encode_mid,
             GradEventType::Blocking,
             "phase_encode_mid"
@@ -412,7 +421,7 @@ impl Mgre {
             (None, Some(w.phase_encode), Some(w.phase_encode)),
             &m.phase_encode_end,
             GradEventType::Blocking,
-            "phase_encode_mid"
+            "phase_encode_end"
         );
 
         let readout = GradEvent::new(

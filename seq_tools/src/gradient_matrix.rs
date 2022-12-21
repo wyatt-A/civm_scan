@@ -317,18 +317,18 @@ impl Matrix {
             disabled
         }
     }
-    pub fn derive(&self, label: &str, trans: LinTransform, adjustable:(bool,bool,bool),disabled:bool,uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
-        let uid_tracker = uid_tracker.clone();
-        let mut uid = uid_tracker.borrow_mut();
-        *uid += 1;
-        Matrix {
-            kind: MatrixType::Derived(Rc::new(self.clone()), trans),
-            label: label.to_owned(),
-            uid: (*uid).clone(),
-            adjustable,
-            disabled
-        }
-    }
+    // pub fn derive(&self, label: &str, trans: LinTransform, adjustable:(bool,bool,bool),disabled:bool,uid_tracker: &Rc<RefCell<u8>>) -> Matrix {
+    //     let uid_tracker = uid_tracker.clone();
+    //     let mut uid = uid_tracker.borrow_mut();
+    //     *uid += 1;
+    //     Matrix {
+    //         kind: MatrixType::Derived(Rc::new(self.clone()), trans),
+    //         label: label.to_owned(),
+    //         uid: (*uid).clone(),
+    //         adjustable,
+    //         disabled
+    //     }
+    // }
     pub fn kind(&self) -> MatrixType {
         self.kind.clone()
     }

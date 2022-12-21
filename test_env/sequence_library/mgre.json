@@ -1,0 +1,32 @@
+{
+  "name": "mgre",
+  "cs_table": "C:\\workstation\\data\\petableCS_stream\\stream_CS480_8x_pa18_pb54",
+  "fov": [
+    19.7,
+    12.0,
+    12.0
+  ],
+  "samples": [
+    788,
+    480,
+    480
+  ],
+  "sample_discards": 0,
+  "spectral_width": "SW200kH",
+  "readout_padding": 0.0001,
+  "rf_alpha_flip_angle": 30.0,
+  "rf_alpha_duration": 0.00014,
+  "tr_spoil_duration": 0.0007,
+  "read_rewind_duration": 0.00114,
+  "ramp_time": 0.0001,
+  "phase_encode_time": 0.0006,
+  "echo_time": 0.00324,
+  "n_echos": 4,
+  "echo_spacing": 0.006,
+  "rep_time": 0.05,
+  "n_averages": 1,
+  "n_repetitions": 2000,
+  "setup_mode": false,
+  "grad_off": false,
+  "adjustment_file": null
+}

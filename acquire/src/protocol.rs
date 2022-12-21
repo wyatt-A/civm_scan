@@ -57,7 +57,7 @@ impl Protocol {
         setup_pprs
     }
 
-    pub fn build_acquisition(&self,study_dir:&Path,setup_pprs:&Vec<PathBuf>) {
+    pub fn build_acquisition(&self,study_dir:&Path,setup_pprs:Option<Vec<PathBuf>>,adj_file:Option<PathBuf>) {
 
         let mut setup_counter = 0;
 
@@ -69,13 +69,20 @@ impl Protocol {
                         alias: item.alias.clone(),
                         destination: item.acquire_dir(study_dir),
                         b_table: table.clone(),
-                        adjustment_file: None
+                        adjustment_file: adj_file.clone()
                     });
 
                 }
-                None => {}
+                None => {
+                    build::new(&args::NewArgs{
+                        alias: item.alias.clone(),
+                        destination: item.acquire_dir(study_dir),
+                        adjustment_file: adj_file.clone()
+                    })
+                }
             }
             if item.require_setup {
+                let setup_pprs = setup_pprs.clone().unwrap();
                 build::apply_setup(&args::ApplySetupArgs{
                     setup_ppr: setup_pprs[setup_counter].clone(),
                     children: item.acquire_dir(study_dir),
