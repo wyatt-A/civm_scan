@@ -1069,6 +1069,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "interpolation"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3b7357d2bbc5ee92f8e899ab645233e43d21407573cceb37fed8bc3dede2c02"
+
+[[package]]
 name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2252,6 +2258,7 @@ dependencies = [
  "chrono",
  "clean-path",
  "glob",
+ "interpolation",
  "num-complex",
  "rustfft",
  "walkdir",

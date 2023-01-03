@@ -18,6 +18,15 @@ pub enum WaveformData {
     Acq(PlotTrace),
 }
 
+impl WaveformData {
+    pub fn read_channel(&self) -> Option<PlotTrace> {
+        match self {
+            WaveformData::Grad(r,_,_) => r.clone(),
+            _=> None
+        }
+    }
+}
+
 #[derive(Debug,Clone,Serialize)]
 pub struct PlotTrace {
     pub x:Vec<f32>,

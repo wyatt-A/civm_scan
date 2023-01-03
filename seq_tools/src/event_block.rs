@@ -132,6 +132,11 @@ impl EventQueue {
         s.set_unique_labels();
         s
     }
+
+    pub fn events(&self) -> Vec<Rc<RefCell<Event>>> {
+        self.events.clone()
+    }
+
     /** Assign labels to events such that they don't collide */
     fn set_unique_labels(&mut self){
         let mut h = HashSet::<String>::new();

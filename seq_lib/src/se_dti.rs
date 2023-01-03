@@ -492,7 +492,10 @@ impl SeDti {
         let sep = sec_to_clock(self.params.diff_pulse_separation);
         let c1 = c2 - sep;
         let diffusion1 = Event::new(self.events.diffusion1.as_reference(), ExactFromOrigin(c1));
-
+        
+        
+        
+        
         EventQueue::new(
             &vec![
                 excitation,

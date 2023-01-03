@@ -9,6 +9,8 @@ use rustfft::{FftPlanner};
 use num_complex::Complex;
 use chrono::{DateTime,Local};
 use clean_path::{Clean};
+use std::ops::Bound;
+use std::slice::range;
 
 
 pub fn absolute_path(path:&Path) -> PathBuf {
@@ -280,4 +282,56 @@ pub fn trapz(x:&Vec<f32>,dt:Option<f32>) -> f32 {
         s = s + x[i] + x[i+1];
     }
     dt.unwrap_or(1.0)*s/2.0
+}
+
+pub fn cumsum(x:&Vec<f32>) -> Vec<f32> {
+    let mut sum:f32 = 0.0;
+    let mut out = Vec::<f32>::with_capacity(x.len());
+    for val in x {
+        sum = sum + val;
+        out.push(sum);
+    }
+    out
+}
+
+
+pub fn cumtrapz(x:&Vec<f32>,dt:Option<f32>) -> Vec<f32> {
+    //dt = diff(x,1,1)/2;
+    //     z = [zeros(1,n,class(y)); cumsum(dt .* (y(1:end-1,:) + y(2:end,:)),1)];
+
+    let mut v = Vec::<f32>::with_capacity(x.len()-1);
+
+    let dt = dt.unwrap_or(1.0)/2.0;
+    for i in 0..x.len()-1 {
+        v.push(dt*(x[i] + x[i+1]));
+    }
+    let mut v = cumsum(&v);
+    v.insert(0,0.0);
+    v
+}
+
+
+
+
+
+
+
+
+#[test]
+fn test() {
+    let x:Vec<f32> = vec![1.0,1.0,3.0,1.0];
+    let c = cumtrapz(&x,Some(0.5));
+    println!("c = {:?}",c);
+
+
+    // quantize time to integer values so we can use binary tree searching
+
+    let x:Vec<i32> = vec![0,1,2,3,4];
+    let mut map = std::collections::BTreeSet::<i32>::new();
+    for k in x {
+        map.insert(k);
+    }
+
+
+
 }

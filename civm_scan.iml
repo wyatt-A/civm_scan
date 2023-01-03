@@ -18,6 +18,7 @@
       <sourceFolder url="file://$MODULE_DIR$/review/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/seq_tools/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/seq_sim/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/seq_lib/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
