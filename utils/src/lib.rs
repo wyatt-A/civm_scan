@@ -9,8 +9,7 @@ use rustfft::{FftPlanner};
 use num_complex::Complex;
 use chrono::{DateTime,Local};
 use clean_path::{Clean};
-use std::ops::Bound;
-use std::slice::range;
+
 
 
 pub fn absolute_path(path:&Path) -> PathBuf {
@@ -311,6 +310,47 @@ pub fn cumtrapz(x:&Vec<f32>,dt:Option<f32>) -> Vec<f32> {
 }
 
 
+// floating point binary search
+fn interp(x:&Vec<f32>,y:&Vec<f32>,q:f32) -> f32 {
+    let n = x.len();
+
+    if q < x[0] || q > x[n-1] {
+        return 0.0;
+    }
+
+    if q == x[0] {
+        return y[0];
+    }
+
+    if q == x[n-1] {
+        return y[n-1];
+    }
+
+    let mut left:usize = 0;
+    let mut right:usize = n-1;
+
+
+    loop {
+        let mut mid = (right + left)/2;
+
+        if x[mid] > q {
+            right = mid;
+        } else if x[mid] < q {
+            left = mid;
+        } else {
+            return y[mid]
+        }
+        if right - left == 1 {
+            break
+        }
+    }
+
+    let t = (q - x[left])/(x[right] - x[left]);
+
+    (y[right] - y[left])*t + y[left]
+}
+
+
 
 
 
@@ -319,19 +359,11 @@ pub fn cumtrapz(x:&Vec<f32>,dt:Option<f32>) -> Vec<f32> {
 
 #[test]
 fn test() {
-    let x:Vec<f32> = vec![1.0,1.0,3.0,1.0];
-    let c = cumtrapz(&x,Some(0.5));
-    println!("c = {:?}",c);
+    let x:Vec<f32> = vec![0.0,0.0,1.0,1.0];
+    let y:Vec<f32> = vec![7.0,8.0,9.0,10.0];
 
+    let i = binary_search(&x,&y,0.1);
 
-    // quantize time to integer values so we can use binary tree searching
-
-    let x:Vec<i32> = vec![0,1,2,3,4];
-    let mut map = std::collections::BTreeSet::<i32>::new();
-    for k in x {
-        map.insert(k);
-    }
-
-
+    println!("{}",i);
 
 }
