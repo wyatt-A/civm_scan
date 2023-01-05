@@ -119,7 +119,7 @@ impl ExecutionBlock for AcqEvent {
                 ppl_function::resync(),
                 ppl_function::set_rec_phase_with_var(&self.phase_state.phase_var()),
                 ppl_function::wait_timer(ACQ_TIME_BLOCK_1),
-                ppl_function::acquire(&self.n_samples_var(),&self.sample_period_var())
+                ppl_function::acquire(&self.n_samples_var(), &self.sample_period_var())
             ].join("\n")
         );
         BlockExecution::new(cmd,post_delay_clock)

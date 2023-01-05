@@ -17,6 +17,7 @@ pub struct KspaceCoord {
 impl CSTable {
     pub fn open(source: &Path) -> Self {
         if !source.exists() {
+            println!("{:?}",source);
             panic!("cs table not found!");
         }
         let mut s = String::new();

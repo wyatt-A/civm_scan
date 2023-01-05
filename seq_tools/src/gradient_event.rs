@@ -110,7 +110,7 @@ impl<GF> GradEvent<GF> where GF:GradFrame + Copy {
             Some(label) => {
                 Some(vec![
                     ppl_function::init_list_var(&label),
-                    ppl_function::init_list(&GRAD_SEQ_FILE_LABEL,&label)
+                    ppl_function::init_list(&GRAD_SEQ_FILE_LABEL, &label)
                 ].join("\n"))
             }
             None => None

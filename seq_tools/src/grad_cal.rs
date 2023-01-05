@@ -16,13 +16,13 @@ pub fn grad_to_dac(grad_hz_per_mm:f32) -> i16 {
 }
 
 // dac -> Hz/mm
-pub fn dac_to_grad(grad_dac:i16) -> u32 {
+pub fn dac_to_grad(grad_dac:i16) -> f32 {
     let fraction = grad_dac as f32 / i16::MAX as f32;
-    (GRAD_MIN as f32 * fraction) as u32
+    GRAD_MIN as f32 * fraction
 }
 
 pub fn dac_to_hz_per_meter(grad_dac:i16) -> f32 {
-    (dac_to_grad(grad_dac) as f32)*1000.0
+    (dac_to_grad(grad_dac))*1000.0
 }
 
 pub fn dac_to_tesla_per_meter(grad_dac:i16) -> f32 {

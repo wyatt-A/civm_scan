@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use crate::execution::{ExecutionBlock, WaveformData, EventType};
+use crate::execution::{ExecutionBlock, WaveformData, EventType, PlotTrace};
 use crate::ppl_function::MIN_DELAY_CLOCKS;
 use serde::{Serialize};
 use crate::command_string::CommandString;
@@ -7,6 +7,7 @@ use crate::_utils;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use crate::acq_event::SpectralWidth;
+use crate::gradient_event::Channel;
 use crate::loop_structure::FlatLoopStructure;
 use crate::ppl_header::Adjustment;
 
@@ -31,6 +32,12 @@ pub struct EventGraph {
 impl EventGraph {
     pub fn waveform_start(&self) -> f32 {
         self.waveform_start
+    }
+    pub fn grad_channel(&self,channel:Channel) -> Option<PlotTrace> {
+        let wav = self.wave_data.grad_channel(channel)?;
+        let wave_start = self.waveform_start;
+        let shifted = wav.x.iter().map(| t | t + wave_start).collect();
+        Some(PlotTrace::new(shifted,wav.y))
     }
     // pub fn waveform_end(&self) -> f32 {
     //     self.waveform_start + self.wave_data.waveform_duration()
@@ -103,6 +110,9 @@ impl Event {
     }
     pub fn center(&self) -> i32 {
         self.center
+    }
+    pub fn kind(&self) -> EventType {
+        self.execution.kind()
     }
 }
 

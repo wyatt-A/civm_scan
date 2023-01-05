@@ -120,7 +120,7 @@ impl Initialize for SeDtiParams {
     fn default() -> Self {
         SeDtiParams {
             name: "se_dti".to_string(),
-            cs_table: Path::new(r"C:\workstation\data\petableCS_stream\stream_CS480_8x_pa18_pb54").to_owned(),
+            cs_table: Path::new("/Users/Wyatt/IdeaProjects/civm_scan/test_env/cs_tables/stream_CS480_8x_pa18_pb54").to_owned(),
             b_value: 3000.0,
             b_vec: (1.0, 0.0, 0.0),
             fov: (19.7, 12.0, 12.0),
@@ -333,7 +333,8 @@ impl SeDti {
         let readout = Matrix::new_static("read_mat", DacValues::new(Some(read_grad_dac), None, None), non_adjustable, params.grad_off, &mat_count);
 
         /* PHASE ENCODING */
-        let lut = vec![240; 230400];
+        let lut = vec![0;8192];
+        //let lut = CSTable::open(&params.cs_table).elements();
         let phase_encode_strategy = EncodeStrategy::LUT(Dimension::_3D, lut);
 
         let pe_driver1 = MatrixDriver::new(DriverVar::Repetition, MatrixDriverType::PhaseEncode(phase_encode_strategy.clone()), Some(0));

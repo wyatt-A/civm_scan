@@ -2,6 +2,7 @@ use crate::acq_event::{SpectralWidth};
 use crate::command_string::CommandString;
 use crate::{ppl_function};
 use serde::{Serialize};
+use crate::gradient_event::Channel;
 use crate::ppl_header::Adjustment;
 
 #[derive(PartialEq)]
@@ -19,9 +20,15 @@ pub enum WaveformData {
 }
 
 impl WaveformData {
-    pub fn read_channel(&self) -> Option<PlotTrace> {
+    pub fn grad_channel(&self,channel:Channel) -> Option<PlotTrace> {
         match self {
-            WaveformData::Grad(r,_,_) => r.clone(),
+            WaveformData::Grad(r,p,s) => {
+                match channel {
+                    Channel::Read => r.clone(),
+                    Channel::Phase => p.clone(),
+                    Channel::Slice => s.clone(),
+                }
+            },
             _=> None
         }
     }
@@ -42,6 +49,10 @@ impl PlotTrace {
             x,
             y
         }
+    }
+    pub fn scale_y(&self,scale:f32) -> PlotTrace {
+        let scaled = self.y.iter().map(|val| scale**val).collect();
+        PlotTrace::new(self.x.clone(),scaled)
     }
     pub fn f64_pair(&self,x_offset:f64) -> Vec<[f64;2]> {
         let mut out = Vec::<[f64;2]>::with_capacity(self.x.len());

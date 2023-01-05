@@ -9,7 +9,7 @@ edition = "2021"
 scan_control = { path = "../scan_control"}
 utils = { path = "../utils"}
 headfile = { path = "../headfile"}
-seq_tools = { path = "../seq_tools"}
+seq_tools = { path = "../seq_tools" }
 seq_lib = { path = "../seq_lib"}
 cs_table = { path = "../cs_table"}
 build_sequence = { path ="../build_sequence"}

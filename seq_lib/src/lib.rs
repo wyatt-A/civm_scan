@@ -8,3 +8,4 @@ pub mod one_pulse;
 pub mod rfcal;
 pub mod multi_echo_2d;
 pub mod mgre;
+pub mod diffusion;

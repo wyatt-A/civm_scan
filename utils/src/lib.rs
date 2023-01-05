@@ -310,44 +310,44 @@ pub fn cumtrapz(x:&Vec<f32>,dt:Option<f32>) -> Vec<f32> {
 }
 
 
-// floating point binary search
-fn interp(x:&Vec<f32>,y:&Vec<f32>,q:f32) -> f32 {
+// floating point binary search paired with linear interpolation
+// x must be pre-sorted
+// returns None if query point is not contained by x
+pub fn interp1(x:&Vec<f32>,y:&Vec<f32>,q:f32) -> Option<f32> {
+
+    // edge cases
     let n = x.len();
-
     if q < x[0] || q > x[n-1] {
-        return 0.0;
+        return None;
     }
-
     if q == x[0] {
-        return y[0];
+        return Some(y[0]);
     }
-
     if q == x[n-1] {
-        return y[n-1];
+        return Some(y[n-1]);
     }
 
+    // bisection loop
     let mut left:usize = 0;
     let mut right:usize = n-1;
-
-
     loop {
-        let mut mid = (right + left)/2;
-
+        let mid = (right + left)/2;
         if x[mid] > q {
             right = mid;
         } else if x[mid] < q {
             left = mid;
         } else {
-            return y[mid]
+            return Some(y[mid])
         }
         if right - left == 1 {
             break
         }
     }
 
+    // parameter for lerp
     let t = (q - x[left])/(x[right] - x[left]);
-
-    (y[right] - y[left])*t + y[left]
+    // lerp formula
+    Some((y[right] - y[left])*t + y[left])
 }
 
 
@@ -359,10 +359,10 @@ fn interp(x:&Vec<f32>,y:&Vec<f32>,q:f32) -> f32 {
 
 #[test]
 fn test() {
-    let x:Vec<f32> = vec![0.0,0.0,1.0,1.0];
-    let y:Vec<f32> = vec![7.0,8.0,9.0,10.0];
+    let x:Vec<f32> = vec![0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0];
+    let y:Vec<f32> = vec![7.0,8.0,9.0,9.0,10.0,10.0,10.0,10.0];
 
-    let i = binary_search(&x,&y,0.1);
+    let i = interp(&x,&y,0.1);
 
     println!("{}",i);
 
