@@ -63,8 +63,8 @@ impl Scout {
             path: self.context.export_dir.clone(),
             cs_table: None,
             depth_to_search: Some(1),
+            overwrite: Some(true)
         })?;
         Ok(())
     }
-
 }

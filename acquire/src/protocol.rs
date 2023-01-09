@@ -98,7 +98,8 @@ impl Protocol {
             scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
                 path: dir,
                 cs_table: None,
-                depth_to_search: None
+                depth_to_search: None,
+                overwrite:Some(false),
             }).unwrap();
         }
     }

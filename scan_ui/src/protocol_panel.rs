@@ -78,12 +78,12 @@ pub fn protocol_panel(_ctx: &egui::Context,ui:&mut Ui,pp:&mut ProtocolPanel,sp:&
                                         scan_control::command::setup_ppr(scan_control::args::RunDirectoryArgs {
                                             path: ppr_for_thread,
                                             cs_table: None,
-                                            depth_to_search: None
+                                            depth_to_search: None,
+                                            overwrite:Some(true),
                                         }).unwrap();
                                     });
                                 }
                             }
-
                             if ui.button("setup complete").clicked(){
                                 pp.setup_complete = true;
                             }

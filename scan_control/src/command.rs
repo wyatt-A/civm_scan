@@ -148,6 +148,22 @@ pub fn run_directory(args:RunDirectoryArgs) -> Result<(),ScanControlError>{
 
     // find all pprs recursively from base path
     let ppr_files = utils::find_files(&args.path,"ppr",true).ok_or(ScanControlError::PPRNotFound)?;
+
+    // if overwrite isn't on, filter out pprs that have already been acquired
+    let ppr_files:Vec<PathBuf> = match args.overwrite.unwrap_or(false) {
+        true => {
+            ppr_files
+        }
+        false => {
+            ppr_files.iter().filter_map(|ppr| {
+                match ppr.with_extension("ac").exists() {
+                    true => None,
+                    false => Some(ppr.clone())
+                }
+            }).collect()
+        }
+    };
+
     let n_pprs = ppr_files.len();
 
     // this is the pattern used to search for a cs table in the same dir as the ppr
@@ -164,7 +180,10 @@ pub fn run_directory(args:RunDirectoryArgs) -> Result<(),ScanControlError>{
 
         // upload a cs_table if it exists
         match utils::get_first_match(&ppr.parent().unwrap(), &cs_table_pattern) {
-            Some(cs_table) => upload_table(&cs_table)?,
+            Some(cs_table) =>{
+                println!("uploading cs table: {:?}",cs_table);
+                upload_table(&cs_table)?
+            },
             None => println!("no cs table found that matches {}. No table will be uploaded",cs_table_pattern),
         }
 
@@ -180,10 +199,10 @@ pub fn run_directory(args:RunDirectoryArgs) -> Result<(),ScanControlError>{
                 // scan is complete so we write an ac file and break
                 utils::write_to_file(&ppr,"ac",&format!("completion_date={}", utils::time_stamp()));
                 break
-            }else if !scan_busy()? {
-                // if the scan isn't complete and not busy, something unexpected happened, so we will return an error
-                return Err(ScanControlError::ScanStoppedUnexpectedly);
-            }
+            }//else if !scan_busy()? {
+                //if the scan isn't complete and not busy, something unexpected happened, so we will return an error
+                //return Err(ScanControlError::ScanStoppedUnexpectedly);
+            //}
             else {
                 // here the scanner must be busy so we'll wait 2 seconds and check again
                 thread::sleep(time::Duration::from_secs(2))

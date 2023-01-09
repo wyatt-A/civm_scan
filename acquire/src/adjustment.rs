@@ -144,7 +144,8 @@ impl Adjustment {
         scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
             path: self.freq_cal_dir.clone(),
             cs_table: None,
-            depth_to_search: Some(0)
+            depth_to_search: Some(0),
+            overwrite: Some(true)
         })?;
 
         // analyze the results
@@ -158,7 +159,8 @@ impl Adjustment {
         scan_control::command::run_directory(scan_control::args::RunDirectoryArgs{
             path: self.rf_cal_dir.clone(),
             cs_table: None,
-            depth_to_search: Some(0)
+            depth_to_search: Some(0),
+            overwrite: Some(true)
         })?;
 
         let (signal_difference,rf_dac_secs) = self.calc_rf_dac_seconds();

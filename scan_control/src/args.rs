@@ -37,5 +37,7 @@ pub struct RunDirectoryArgs {
     #[clap(short, long)]
     pub cs_table:Option<String>,
     #[clap(short, long)]
-    pub depth_to_search:Option<u8>
+    pub depth_to_search:Option<u8>,
+    #[clap(short, long)]
+    pub overwrite:Option<bool>,
 }
