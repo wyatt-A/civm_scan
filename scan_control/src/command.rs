@@ -7,8 +7,6 @@ use cs_table::cs_table::CSTable;
 use cs_table::cs_table::MAX_TABLE_ELEMENTS;
 use crate::args::*;
 
-
-
 const VBS_DIR:&str = "C:/workstation/civm_scan/vb_script";
 
 enum VBScript {
@@ -50,60 +48,6 @@ impl VBScript {
         Ok(String::from_utf8(out.stdout).unwrap())
     }
 }
-
-
-//let script = Path::new(DIR).join(SET_MRD_VBS);
-//     let mut cmd = Command::new("cscript");
-//     let out = cmd.args(vec![
-//         script,
-//         path.to_owned()
-//     ]).output().expect("failed to launch cscript");
-
-
-
-
-// pub fn setup_ppr(args:RunDirectoryArgs) {
-//     let ppr = args.path.to_owned();
-//
-//     if !set_ppr(&ppr){
-//         panic!("ppr not set. Cannot continue.");
-//     }
-//     match &args.cs_table {
-//         Some(table_pat) => {
-//             let pat = ppr.with_file_name(format!("*{}*",table_pat));
-//             let paths:Vec<PathBuf> = glob(pat.to_str().unwrap()).expect("failed to read glob pattern").flat_map(|m| m).collect();
-//             if paths.len() < 1 {
-//                 println!("no cs table found that matches pattern! table will not be uploaded");
-//             }
-//             else{
-//                 upload_table(&paths[0]);
-//                 println!("cs table uploaded");
-//             }
-//         }
-//         None => {}
-//     };
-//     run_setup();
-// }
-
-
-
-// pub fn acquire_ppr(args:RunDirectoryArgs) -> Result<(),ScanControlError> {
-//     let ppr = args.path.to_owned();
-//     if !ppr.exists(){
-//         return Err(ScanControlError::PPRNotFound);
-//     }
-//     let mrd = ppr.with_extension("mrd");
-//     set_ppr(&ppr);
-//     set_mrd(&mrd);
-//     let cs_table_pattern = args.cs_table.unwrap_or(String::from("cs_table"));
-//     match utils::get_first_match(&ppr.parent().unwrap(), &cs_table_pattern) {
-//         Some(cs_table) => upload_table(&cs_table),
-//         None => println!("no cs table found that matches {}. No table will be uploaded",cs_table_pattern),
-//     }
-//     run_acquisition()?;
-//     Ok(())
-// }
-
 
 pub fn acquire_ppr(args:RunDirectoryArgs) -> Result<(),ScanControlError> {
     // check to make sure we are not already running something before we start
@@ -193,23 +137,22 @@ pub fn run_directory(args:RunDirectoryArgs) -> Result<(),ScanControlError>{
         set_mrd(&ppr.with_extension("mrd"))?;
         VBScript::Run.run(None)?;
         thread::sleep(time::Duration::from_secs(2));
-
         loop {
             if scan_complete()? {
-                // scan is complete so we write an ac file and break
+                // scan is complete so we write an ac file and break from loop
                 utils::write_to_file(&ppr,"ac",&format!("completion_date={}", utils::time_stamp()));
                 break
-            }//else if !scan_busy()? {
-                //if the scan isn't complete and not busy, something unexpected happened, so we will return an error
+            }else if !scan_busy()? {
+                //if the scan isn't complete and not busy, something strange has happened, but we will continue anyway
                 //return Err(ScanControlError::ScanStoppedUnexpectedly);
-            //}
+                break
+            }
             else {
-                // here the scanner must be busy so we'll wait 2 seconds and check again
+                // here the scanner must be busy so we'll wait 2 seconds before checking again
                 thread::sleep(time::Duration::from_secs(2))
             }
         };
     }
-
     // if we get here, the scan job is done and everything is presumed okay
     println!("acquisition complete");
     Ok(())
@@ -256,11 +199,11 @@ impl Status {
     pub fn from_id(id:i32) -> Result<Self,ScanControlError> {
         use Status::*;
         match id {
-            5 => Ok(Aborted),
+            0 => Ok(Idle),
             2 => Ok(SetupInProgress),
             3 => Ok(AcquisitionInProgress),
             4 => Ok(AcquisitionComplete),
-            0 => Ok(Idle),
+            5 => Ok(Aborted),
             _=> Err(ScanControlError::UnknownStatus)
         }
     }
@@ -326,32 +269,3 @@ pub fn setup_ppr(args:RunDirectoryArgs) -> Result<(),ScanControlError> {
     VBScript::Setup.run(None)?;
     Ok(())
 }
-
-
-
-// pub fn scan_status() -> Status {
-//     let script = Path::new(VBS_DIR).join(STATUS_VBS);
-//     let mut cmd = Command::new("cscript");
-//     let out = cmd.args(vec![
-//         script
-//     ]).output().expect("failed to launch cscript");
-//     let stdout = String::from_utf8(out.stdout).expect("failed to parse bytes");
-//     let lines = stdout.lines();
-//     let reg = Regex::new(r"status_id:([0-9])").unwrap();
-//     let mut status = String::new();
-//     lines.for_each(|line|{
-//         //println!("{}",line);
-//         let caps = reg.captures(line);
-//         if caps.is_some(){
-//             let stat:String = caps.unwrap().get(1).map_or("", |m| m.as_str()).to_string();
-//             if !stat.is_empty(){
-//                 status = stat;
-//             }
-//         }
-//     });
-//     if status.is_empty(){
-//         panic!("status not found!");
-//     }
-//     let id = status.parse().expect("unable to parse string");
-//     Status::from_id(id)
-// }
