@@ -242,7 +242,7 @@ impl VolumeManagerCollection {
     }
 
     pub fn from_work_dir(work_dir:&Path) -> Option<Self> {
-        let cfg_files = utils::find_files(work_dir,"volman_config")?;
+        let cfg_files = utils::find_files(work_dir,"volman_config",false)?;
         Some(Self{
             work_dir: work_dir.to_owned(),
             vm_config_files: cfg_files,
@@ -441,7 +441,7 @@ fn cancel(args:RunnoArgs) {
     }
 
     // find all volume manager state files recursively
-    let state_files = utils::find_files(&work_dir,"vol_man");
+    let state_files = utils::find_files(&work_dir,"vol_man",false);
 
     let mut states = match state_files {
         None => {
@@ -487,7 +487,7 @@ fn status(args:RunnoArgs) {
     }
 
     // find all volume manager state files recursively
-    let state_files = utils::find_files(&work_dir,"vol_man");
+    let state_files = utils::find_files(&work_dir,"vol_man",false);
 
 
     // match state_files {
@@ -550,7 +550,7 @@ fn wait_for_completion(args:WaitForCompletionArgs){
     }
 
     // find all volume manager state files recursively
-    let mut state_files = utils::find_files(&work_dir,"vol_man").expect(&format!("no volumes managers found in {:?}", work_dir));
+    let mut state_files = utils::find_files(&work_dir,"vol_man",false).expect(&format!("no volumes managers found in {:?}", work_dir));
     state_files.sort();
 
     loop {
@@ -607,16 +607,6 @@ fn recon(args: NewRecon){
     }
     VolumeManagerCollection::new(vmc_type,&args,&work_dir).launch();
 }
-
-// fn _dti(args: NewRecon) {
-//     let work_dir = work_dir_big_disk(&args.run_number);
-//     if !preflight_check(&args){
-//         println!("pre-flight check failed.");
-//         return
-//     }
-//     let vm_collection = VolumeManagerCollection::new(VMCollectionType::Dti,&args,&work_dir);
-//     vm_collection.launch();
-// }
 
 fn preflight_check(args: &NewRecon) -> bool {
     let p = ProjectSettings::from_file(&args.project_settings);

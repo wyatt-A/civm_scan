@@ -675,7 +675,7 @@ impl VolumeManager {
                 let tag_dir = p.join("Archive_Tags");
 
                 // archive tag that will hopefully get sent to engine
-                let raw_image_files = utils::find_files(&self.image_dir(),"raw");
+                let raw_image_files = utils::find_files(&self.image_dir(),"raw",true);
                 let n_raw = raw_image_files.expect("coudn't find any raw files in image dir. Did you delete them?").len();
                 let archive_tag = ArchiveTag{
                     runno: settings.name(),

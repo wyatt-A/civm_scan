@@ -10,6 +10,9 @@ use num_complex::Complex;
 use chrono::{DateTime,Local};
 use clean_path::{Clean};
 
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Message, SmtpTransport, Transport};
+
 
 
 pub fn absolute_path(path:&Path) -> PathBuf {
@@ -357,13 +360,50 @@ pub fn interp1(x:&Vec<f32>,y:&Vec<f32>,q:f32) -> Option<f32> {
 
 
 
+// #[test]
+// fn test() {
+//     let x:Vec<f32> = vec![0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0];
+//     let y:Vec<f32> = vec![7.0,8.0,9.0,9.0,10.0,10.0,10.0,10.0];
+//
+//     let i = interp(&x,&y,0.1);
+//
+//     println!("{}",i);
+//
+// }
+
 #[test]
-fn test() {
-    let x:Vec<f32> = vec![0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0];
-    let y:Vec<f32> = vec![7.0,8.0,9.0,9.0,10.0,10.0,10.0,10.0];
+fn mail_test() {
 
-    let i = interp(&x,&y,0.1);
 
-    println!("{}",i);
+    let email = Message::builder()
+        .from("Sender <sender@rust_test>".parse().unwrap())
+        .to("Receiver <wa41@duke.edu>".parse().unwrap())
+        .subject("Sending email with Rust")
+        .body(String::from("This is my first email"))
+        .unwrap();
+
+
+    //assert!(email.is_ok());
+
+    println!("built email");
+
+    //let creds = Credentials::new("smtp_username".to_string(), "smtp_password".to_string());
+    let creds = Credentials::new("".to_string(), "".to_string());
+
+    // Open a remote connection to gmail
+    let mailer = SmtpTransport::relay("smtp.duhs.duke.edu")
+        .unwrap()
+        //.credentials(creds)
+        .build();
+
+
+    println!("relay prepped");
+
+    match mailer.send(&email) {
+        Ok(_) => println!("Email sent successfully!"),
+        Err(e) => panic!("Could not send email: {:?}", e),
+    }
+
+    println!("email sent");
 
 }
