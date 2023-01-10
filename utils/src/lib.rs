@@ -375,7 +375,7 @@ fn mail_test() {
 
 
     let email = Message::builder()
-        .from("Sender <sender@rust_test>".parse().unwrap())
+        .from("Sender <rust_test@duke.edu>".parse().unwrap())
         .to("Receiver <wa41@duke.edu>".parse().unwrap())
         .subject("Sending email with Rust")
         .body(String::from("This is my first email"))
