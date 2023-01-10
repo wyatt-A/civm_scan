@@ -12,4 +12,6 @@ rustfft = "6.1.0"
 num-complex = "0.4.2"
 chrono = "0.4.23"
 clean-path = "0.2.1"
-lettre = "0.10.1"
+
+tokio = { version = "1", features = ["full"] }
+lettre = { version = "0.10.0-beta.2", default-features = false, features = ["smtp-transport", "tokio1-rustls-tls", "hostname", "r2d2", "builder"] }

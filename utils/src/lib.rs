@@ -10,7 +10,6 @@ use num_complex::Complex;
 use chrono::{DateTime,Local};
 use clean_path::{Clean};
 
-use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 
 
@@ -388,10 +387,10 @@ fn mail_test() {
     println!("built email");
 
     //let creds = Credentials::new("smtp_username".to_string(), "smtp_password".to_string());
-    let creds = Credentials::new("".to_string(), "".to_string());
+    //let creds = Credentials::new("".to_string(), "".to_string());
 
     // Open a remote connection to gmail
-    let mailer = SmtpTransport::relay("smtp.duhs.duke.edu")
+    let mailer = SmtpTransport::relay("smtpgw.duhs.duke.edu")
         .unwrap()
         //.credentials(creds)
         .build();
@@ -405,5 +404,52 @@ fn mail_test() {
     }
 
     println!("email sent");
+
+//     use lettre::{
+//         transport::smtp::authentication::Credentials, AsyncSmtpTransport, AsyncTransport, Message,
+//         Tokio1Executor,
+//     };
+//
+//     #[tokio::main]
+//
+// // Creating basic data structure for the email
+//     async fn email_func() -> Result<(), Box<dyn std::error::Error>> {
+//         let smtp_credentials =
+//             Credentials::new("".to_string(), "".to_string());
+//
+//         let mailer = AsyncSmtpTransport::<Tokio1Executor>::relay("smtp.duhs.duke.edu")?
+//             .credentials(smtp_credentials)
+//             .build();
+//
+//         let from = "Sender <sender@gmail.com>";
+//         let to = "receiver <wa41@duke.edu>";
+//         let subject = "Sending email with Rust";
+//         let body = "<h1>This is my first email</h1>".to_string();
+//
+//         send_email_smtp(&mailer, from, to, subject, body).await
+//     }
+//
+//     // Email sending function
+//     async fn send_email_smtp(
+//         mailer: &AsyncSmtpTransport<Tokio1Executor>,
+//         from: &str,
+//         to: &str,
+//         subject: &str,
+//         body: String,
+//     ) -> Result<(), Box<dyn std::error::Error>> {
+//         let email = Message::builder()
+//             .from(from.parse()?)
+//             .to(to.parse()?)
+//             .subject(subject)
+//             .body(body.to_string())?;
+//
+//         mailer.send(email).await?;
+//
+//         Ok(())
+//
+//
+//     }
+//
+//     email_func();
 
 }
